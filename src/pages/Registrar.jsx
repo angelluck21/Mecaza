@@ -3,8 +3,6 @@ import { LockClosedIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import { FaCar } from 'react-icons/fa';
 import axios from 'axios';
 
-
-
 function Registrar() {
   const handleRegister = (e) => {
     e.preventDefault();
@@ -12,77 +10,76 @@ function Registrar() {
       Nombre: e.target.Nombre.value,
       Correo: e.target.Correo.value,
       Contraseña: e.target.Contraseña.value,
-    })  
-    .then(response => {
-        console.log(response.data);
     })
-    
-    
+    .then(response => {
+      console.log(response.data);
+    });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-blue-900 px-4">
-      <div className="w-full max-w-md bg-white shadow-lg rounded-xl p-8">
-        <div className="flex justify-center mb-5">
-          <FaCar className="text-blue-900 text-7xl" />
-        </div>
-
-        <h1 className="text-2xl font-bold text-center text-blue-900 mb-6">Crear cuenta</h1>
-        <h1 className="text-base font-medium text-center text-blue-900 mb-6">¡Empieza a viajar con Mecaza!</h1>
-
-        <form onSubmit={handleRegister} className="space-y-5">
-  <div>
-    <label className="block text-sm font-medium text-blue-900 mb-1">Nombre completo</label>
-    <input
-      name="Nombre"
-      type="text"
-      placeholder="Tu nombre"
-      className="w-full px-4 py-2 bg-white border border-gray-300 rounded-md text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-    />
-  </div>
-
-  <div>
-    <label className="block text-sm font-medium text-blue-900 mb-1">Correo electrónico</label>
-    <div className="relative">
-      <span className="absolute left-3 top-2.5 text-blue-900">
-        <EnvelopeIcon className="h-5 w-5" />
-      </span>
-      <input
-        name="Correo"
-        type="email"
-        placeholder="correo electrónico"
-        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-md text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
+   <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700 px-4">
+  <div className="w-full max-w-md bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_30px_60px_rgba(0,0,0,0.6)]">
+    <div className="flex justify-center mb-6">
+      <FaCar className="text-blue-900 text-7xl drop-shadow-lg" />
     </div>
-  </div>
 
-  <div>
-    <label className="block text-sm font-medium text-blue-900 mb-1">Contraseña</label>
-    <div className="relative">
-      <span className="absolute left-3 top-2.5 text-blue-900">
-        <LockClosedIcon className="h-5 w-5" />
-      </span>
-      <input
-        name="Contraseña"
-        type="password"
-        placeholder="••••••••"
-        className="w-full pl-10 pr-4 py-2 bg-white border border-gray-300 rounded-md text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-400"
-      />
-    </div>
-  </div>
+    <h1 className="text-3xl font-extrabold text-center text-blue-900 mb-2">Crear cuenta</h1>
+    <p className="text-sm text-center text-gray-600 mb-8">
+      ¡Empieza a viajar con <span className="font-semibold text-blue-800">Mecaza</span>!
+    </p>
 
-  <button
-    type="submit"
-    className="w-full py-2 bg-teal-600 text-white font-semibold rounded-md hover:bg-blue-700 transition-colors"
-  >
-    Registrarse
-  </button>
-</form>
+    <form onSubmit={handleRegister} className="space-y-6">
+      <div>
+        <label className="block text-sm font-medium text-blue-900 mb-1">Nombre completo</label>
+        <input
+          name="Nombre"
+          type="text"
+          placeholder="Tu nombre"
+          className="w-full px-4 py-2 border border-gray-300 rounded-md shadow-sm text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+        />
       </div>
-    </div>
+
+      <div>
+        <label className="block text-sm font-medium text-blue-900 mb-1">Correo electrónico</label>
+        <div className="relative">
+          <span className="absolute left-3 top-2.5 text-blue-900">
+            <EnvelopeIcon className="h-5 w-5" />
+          </span>
+          <input
+            name="Correo"
+            type="email"
+            placeholder="correo electrónico"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-blue-900 mb-1">Contraseña</label>
+        <div className="relative">
+          <span className="absolute left-3 top-2.5 text-blue-900">
+            <LockClosedIcon className="h-5 w-5" />
+          </span>
+          <input
+            name="Contraseña"
+            type="password"
+            placeholder="••••••••"
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
+        </div>
+      </div>
+
+      <button
+        type="submit"
+        className="w-full py-2 bg-teal-600 text-white font-semibold rounded-md shadow-md hover:bg-blue-700 transition-colors"
+      >
+        Registrarse
+      </button>
+    </form>
+  </div>
+</div>
+
   );
 }
-
-
 
 export default Registrar;
