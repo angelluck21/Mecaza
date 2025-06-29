@@ -4,7 +4,8 @@ import { useState } from 'react';
 import { LockClosedIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import { FaCar } from 'react-icons/fa';
 import React from 'react';
-import Registrar from './pages/Registrar';
+import Registrar from './pages/Registrar'
+
 
 function Login() {
   const navigate = useNavigate();
@@ -70,6 +71,8 @@ function Login() {
         Regístrate
       </a>
     </p>
+   
+    
   </div>
 </div>
 
@@ -83,6 +86,7 @@ function App() {
         <Route path="/" element={<Login />} />
         <Route path="/index" element={<Index />} />
         <Route path="/registrar" element={<Registrar />} />
+        <Route path="/App" element={<App/>}></Route>
       </Routes>
     </BrowserRouter>
   );
