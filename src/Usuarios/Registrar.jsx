@@ -7,6 +7,8 @@ function Registrar() {
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [messageType, setMessageType] = useState('');
+  const [showNotification, setShowNotification] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
 
   const handleRegister = async (e) => {
     e.preventDefault();
@@ -15,12 +17,12 @@ function Registrar() {
     
     try {
       // Configurar axios para Laravel API
-      const response = await axios.post('http://127.0.0.1:8000/api/Registro', {
-        name: e.target.Nombre.value,
-        email: e.target.Correo.value,
-        password: e.target.Contraseña.value,
-        password_confirmation: e.target.Contraseña.value, // Laravel requiere confirmación
-      }, {
+        const response = await axios.post('http://127.0.0.1:8000/api/registro', {
+        Nombre: e.target.Nombre.value,
+        Correo: e.target.Correo.value,
+        Contrasena: e.target.Contrasena.value,
+        Numero: e.target.tel.value,
+        }, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -31,13 +33,16 @@ function Registrar() {
       setMessage('¡Usuario registrado exitosamente!');
       setMessageType('success');
       
+      // Mostrar notificación toast
+      showToastNotification('¡Usuario registrado exitosamente! 🎉');
+      
       // Limpiar formulario
       e.target.reset();
       
       // Opcional: Redirigir después de un breve delay
       setTimeout(() => {
         // Aquí puedes agregar navegación a otra página
-        // window.location.href = '/login';
+         window.location.href = '/login';
       }, 2000);
       
     } catch (error) {
@@ -48,35 +53,74 @@ function Registrar() {
         const errorData = error.response.data;
         
         if (errorData.errors) {
-          // Errores de validación de Laravel
+        
           const errorMessages = Object.values(errorData.errors).flat();
           setMessage(errorMessages.join(', '));
         } else if (errorData.message) {
-          // Mensaje de error general
+         
           setMessage(errorData.message);
         } else {
           setMessage('Error al registrar usuario');
         }
       } else if (error.request) {
-        // Error de conexión
+       
         setMessage('Error de conexión. Verifica que el servidor Laravel esté ejecutándose.');
       } else {
-        // Otro error
+       
         setMessage('Error inesperado');
       }
       setMessageType('error');
+      
+  
+      showToastNotification('❌ Error al registrar usuario');
     } finally {
       setIsLoading(false);
     }
   };
 
+  const showToastNotification = (message) => {
+    setNotificationMessage(message);
+    setShowNotification(true);
+    setTimeout(() => {
+      setShowNotification(false);
+    }, 4000);
+  };
+
   const handleVolver = () => {
-    // Navegar de vuelta a la página anterior o home
+  
     window.history.back();
   };
 
   return (
    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700 px-4">
+     {/* Notificación Toast */}
+     {showNotification && (
+       <div className="fixed top-4 right-4 z-50 transform transition-all duration-300 ease-out">
+         <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
+           <div className="flex items-center">
+             <div className="flex-shrink-0">
+               <FaCar className="h-8 w-8 text-green-500" />
+             </div>
+             <div className="ml-3">
+               <p className="text-sm font-medium text-gray-900">
+                 {notificationMessage}
+               </p>
+             </div>
+             <div className="ml-auto pl-3">
+               <button
+                 onClick={() => setShowNotification(false)}
+                 className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
+               >
+                 <span className="sr-only">Cerrar</span>
+                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
+                 </svg>
+               </button>
+             </div>
+           </div>
+         </div>
+       </div>
+     )}
   <div className="w-full max-w-md bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-10 transform transition-all duration-300 hover:scale-[1.01] hover:shadow-[0_30px_60px_rgba(0,0,0,0.6)]">
     <div className="flex justify-center mb-6">
       <FaCar className="text-blue-900 text-7xl drop-shadow-lg" />
@@ -125,6 +169,21 @@ function Registrar() {
           />
         </div>
       </div>
+      <div>
+        <label className="block text-sm font-medium text-blue-900 mb-1">Numero de telefono</label>
+        <div className="relative">
+          <span className="absolute left-3 top-2.5 text-blue-900">
+            <EnvelopeIcon className="h-5 w-5" />
+          </span>
+          <input
+            name="Numero"
+            type="text"
+            placeholder="numero de telefono"
+            required
+            className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
+          />
+        </div>
+      </div>
 
       <div>
         <label className="block text-sm font-medium text-blue-900 mb-1">Contraseña</label>
@@ -133,11 +192,11 @@ function Registrar() {
             <LockClosedIcon className="h-5 w-5" />
           </span>
           <input
-            name="Contraseña"
+            name="Contrasena"
             type="password"
             placeholder="••••••••"
             required
-            minLength={6}
+            minLength={3}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md shadow-sm text-blue-900 placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
           />
         </div>

@@ -1,23 +1,15 @@
 import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { FaCar, FaPhone, FaEnvelope, FaMapMarkerAlt, FaFacebook, FaTwitter, FaInstagram } from 'react-icons/fa';
-import { MagnifyingGlassIcon, UserIcon, Bars3Icon } from '@heroicons/react/24/outline';
-// Importar el UserMenu
+import { MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
-import Login from '../Usuarios/login';
-import Registrar from '../Usuarios/Registrar';
-import IndexLogin from './indexLogin';
-import index from  './index';
-import { useNavigate } from 'react-router-dom';
 
-const Index = () => {
+const IndexLogin = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Estado para saber si el usuario está logueado
   const [userData, setUserData] = useState(null);
-  const [cars, setCars] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [cars, setCars] = useState([]);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [showRegisterModal, setShowRegisterModal] = useState(false);
-
   const navigate = useNavigate();
 
   // Datos del carrusel
@@ -43,14 +35,21 @@ const Index = () => {
   ];
 
   useEffect(() => {
-    // Leer datos de usuario desde localStorage
-    const storedUser = localStorage.getItem('userData');
-    if (storedUser) {
+    // Obtener datos del usuario del localStorage
+    const storedUserData = localStorage.getItem('userData');
+    if (storedUserData) {
       try {
-        setUserData(JSON.parse(storedUser));
+        const user = JSON.parse(storedUserData);
+        setUserData(user);
       } catch (error) {
         console.error('Error al parsear datos del usuario:', error);
+        navigate('/login');
+        return;
       }
+    } else {
+      console.log('No hay datos de usuario, redirigiendo al login');
+      navigate('/login');
+      return;
     }
 
     // Obtener carros desde la API
@@ -72,7 +71,7 @@ const Index = () => {
     };
 
     fetchCars();
-  }, []);
+  }, [navigate]);
 
   // Auto-play del carrusel
   useEffect(() => {
@@ -95,28 +94,27 @@ const Index = () => {
     setCurrentSlide((prev) => (prev - 1 + carouselData.length) % carouselData.length);
   };
 
-  const handleViewDetails = (carId) => {
-    if (userData) {
-      // Si está registrado, navegar a ver detalles
-      navigate(`/ver-detalles/${carId}`);
-    } else {
-      // Si no está registrado, mostrar modal
-      setShowRegisterModal(true);
-    }
-  };
+  console.log('Estado actual de cars:', cars);
+  console.log('Longitud de cars:', cars.length);
+  console.log('isLoading:', isLoading);
+  console.log('userData:', userData);
 
-  console.log('Estado actual de cars en index:', cars);
-  console.log('Longitud de cars en index:', cars.length);
-  console.log('isLoading en index:', isLoading);
-  console.log('userData en index:', userData);
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
+        <div className="text-white text-xl">Cargando...</div>
+      </div>
+    );
+  }
 
-  // Monitorear cambios en cars
-  useEffect(() => {
-    console.log('=== CAMBIO EN ESTADO DE CARS ===');
-    console.log('Nuevo valor de cars:', cars);
-    console.log('Longitud:', cars.length);
-    console.log('¿Es array?', Array.isArray(cars));
-  }, [cars]);
+  if (!userData) {
+    console.log('No hay userData, mostrando pantalla de carga');
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
+        <div className="text-white text-xl">Cargando usuario...</div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
@@ -144,21 +142,7 @@ const Index = () => {
 
             {/* Navegación - Desktop */}
             <div className="hidden md:flex items-center space-x-6">
-              {userData ? (
-                <UserMenu userData={userData} />
-              ) : (
-                <>
-                  <a href="/Login" className="text-blue-900 hover:text-blue-700 font-medium transition-colors">
-                    Iniciar Sesión
-                  </a>
-                  <a 
-                    href="/registrar" 
-                    className="bg-teal-600 text-white px-4 py-2 rounded-md hover:bg-blue-700 transition-colors font-medium"
-                  >
-                    Registrarse
-                  </a>
-                </>
-              )}
+              <UserMenu userData={userData} />
             </div>
 
             {/* Botón menú móvil */}
@@ -174,38 +158,47 @@ const Index = () => {
 
           {/* Menú móvil */}
           {isMenuOpen && (
-            <div className="md:hidden bg-white border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                {/* Barra de búsqueda móvil */}
-                <div className="relative mb-4">
-                  <input
-                    type="text"
-                    placeholder="Buscar contenido..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+            <>
+              {/* Fondo semitransparente para cerrar el menú */}
+              <div
+                className="fixed inset-0 bg-black bg-opacity-40 z-30"
+                onClick={() => setIsMenuOpen(false)}
+              />
+              {/* Panel lateral */}
+              <div className="fixed top-0 left-0 h-full w-3/4 max-w-xs bg-white border-r border-gray-200 z-40 shadow-lg transition-transform duration-300 transform translate-x-0">
+                <div className="px-2 pt-4 pb-3 space-y-1">
+                  {/* Barra de búsqueda móvil */}
+                  <div className="relative mb-4">
+                    <input
+                      type="text"
+                      placeholder="Buscar contenido..."
+                      className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
+                  </div>
+                  {/* Menú usuario móvil */}
+                  <div className="px-3 py-2 text-blue-900 font-medium border-b border-gray-200">
+                    <span>¡Hola, {userData.Nombre || 'Usuario'}!</span>
+                  </div>
+                  
+                  {/* Enlace a Ajustes de Cuenta - Móvil */}
+                  <button
+                    onClick={() => { setIsMenuOpen(false); navigate('/ajustes-cuenta'); }}
+                    className="w-full text-left px-3 py-2 text-blue-900 hover:bg-blue-50 rounded-md transition-colors font-medium flex items-center"
+                  >
+                    <Cog6ToothIcon className="h-5 w-5 mr-2" />
+                    Ajustes de Cuenta
+                  </button>
+                  
+                  <button
+                    onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/login'); }}
+                    className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
+                  >
+                    Cerrar Sesión
+                  </button>
                 </div>
-                
-                <a 
-                  href="/" 
-                  className="block px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  Inicio
-                </a>
-                <a 
-                  href="/login" 
-                  className="block px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  Iniciar Sesión
-                </a>
-                <a 
-                  href="/registrar" 
-                  className="block px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
-                >
-                  Registrarse
-                </a>
               </div>
-            </div>
+            </>
           )}
         </div>
       </nav>
@@ -272,103 +265,57 @@ const Index = () => {
         </div>
       </div>
 
-      {/* Contenido principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        {/* Sección de bienvenida */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-            ¡Bienvenido a <span className="text-blue-200">Mecaza</span>!
-          </h1>
-          <p className="text-xl text-blue-100 mb-8">
-            Encuentra tu viaje perfecto con conductores confiables
-          </p>
-          {!userData && (
-            <div className="space-x-4">
-              <a 
-                href="/login" 
-                className="bg-white text-blue-900 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors inline-block"
-              >
-                Iniciar Sesión
-              </a>
-              <a 
-                href="/registrar" 
-                className="bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-colors inline-block"
-              >
-                Registrarse
-              </a>
+      {/* Lista de carros guardados */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <h2 className="text-3xl font-bold text-white mb-6 text-center">Carros Disponibles</h2>
+        {!Array.isArray(cars) || cars.length === 0 ? (
+          <div className="text-center">
+            <div className="text-white text-lg">
+              {!Array.isArray(cars) ? 'Error al cargar carros' : 'No hay carros guardados.'}
             </div>
-          )}
-        </div>
-
-        {/* Lista de carros disponibles */}
-        <div className="mb-8">
-          <h2 className="text-3xl font-bold text-white mb-6 text-center">
-            {userData ? 'Carros Disponibles' : 'Viajes Disponibles'}
-          </h2>
-          
-          {isLoading ? (
-            <div className="text-center">
-              <div className="text-white text-xl">Cargando viajes...</div>
-            </div>
-          ) : !Array.isArray(cars) || cars.length === 0 ? (
-            <div className="text-center">
-              <div className="text-white text-lg">
-                {!Array.isArray(cars) ? 'Error al cargar viajes' : 'No hay viajes disponibles en este momento.'}
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {cars.map((car, idx) => {
-                if (!car) return null;
-                return (
-                  <div key={car.id_carros || idx} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-                    {car.imagencarro ? (
-                      <img src={car.imagencarro} alt="Carro" className="w-full h-32 object-cover rounded-lg mb-4" />
-                    ) : (
-                      <div className="w-full h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mb-4 flex items-center justify-center">
-                        <FaCar className="text-blue-600 text-4xl" />
-                      </div>
-                    )}
-                    <div className="text-center w-full">
-                      <div className="text-blue-900 font-bold text-lg mb-2">{car.conductor || 'Conductor'}</div>
-                      <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Placa:</span> {car.placa || 'No especificada'}
-                      </div>
-                      <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Asientos:</span> {car.asientos || 'No especificados'}
-                      </div>
-                      <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}
-                      </div>
-                      <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Hora:</span> {car.horasalida || 'No especificada'}
-                      </div>
-                      <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Fecha:</span> {car.fecha ? new Date(car.fecha).toLocaleDateString('es-ES') : 'No especificada'}
-                      </div>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6">
+            {cars.map((car, idx) => {
+              if (!car) return null;
+              return (
+                <div key={car.id_carros || idx} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
+                  {car.imagencarro ? (
+                    <img src={car.imagencarro} alt="Carro" className="w-full h-32 object-cover rounded-lg mb-4" />
+                  ) : (
+                    <div className="w-full h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mb-4 flex items-center justify-center">
+                      <FaCar className="text-blue-600 text-4xl" />
                     </div>
-                    <button 
-                      onClick={() => handleViewDetails(car.id_carros || idx)}
-                      className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
-                    >
-                      {userData ? 'Reservar Viaje' : 'Ver Detalles'}
-                    </button>
+                  )}
+                  <div className="text-center w-full">
+                    <div className="text-blue-900 font-bold text-lg mb-2">{car.conductor || 'Conductor'}</div>
+                    <div className="text-gray-600 mb-2">
+                      <span className="font-semibold">Placa:</span> {car.placa || 'No especificada'}
+                    </div>
+                    <div className="text-gray-600 mb-2">
+                      <span className="font-semibold">Asientos:</span> {car.asientos || 'No especificados'}
+                    </div>
+                    <div className="text-gray-600 mb-2">
+                      <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}
+                    </div>
+                    <div className="text-gray-600 mb-2">
+                      <span className="font-semibold">Hora:</span> {car.horasalida || 'No especificada'}
+                    </div>
+                    <div className="text-gray-600 mb-2">
+                      <span className="font-semibold">Fecha de salida:</span> {car.fecha ? new Date(car.fecha).toLocaleDateString('es-ES') : 'No especificada'}
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Información adicional */}
-        <div className="text-center text-blue-100">
-          <p className="text-lg">
-            {userData 
-              ? '¿Necesitas más información? Contacta con tu conductor.'
-              : 'Regístrate para reservar viajes y acceder a más funcionalidades.'
-            }
-          </p>
-        </div>
+                  <button 
+                    onClick={() => navigate(`/ver-detalles/${car.id_carros || idx}`)}
+                    className="mt-4 w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                  >
+                    Ver Detalles
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Footer */}
@@ -447,44 +394,8 @@ const Index = () => {
           </div>
         </div>
       </footer>
-
-      {/* Modal de Registro */}
-      {showRegisterModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full text-center">
-            <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaUser className="text-blue-600 text-2xl" />
-            </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">¡Regístrate para continuar!</h3>
-            <p className="text-gray-600 mb-6">
-              Para ver los detalles completos del viaje y hacer tu reserva, necesitas crear una cuenta en Mecaza.
-            </p>
-            <div className="space-y-3">
-              <button
-                onClick={() => { setShowRegisterModal(false); navigate('/registrar'); }}
-                className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                Registrarse
-              </button>
-              <button
-                onClick={() => { setShowRegisterModal(false); navigate('/login'); }}
-                className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
-              >
-                Ya tengo cuenta
-              </button>
-              <button
-                onClick={() => setShowRegisterModal(false)}
-                className="w-full text-gray-500 py-2 px-4 hover:text-gray-700 transition-colors"
-              >
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-  
 };
 
-export default Index;
+export default IndexLogin;
