@@ -2,121 +2,169 @@ import React, { useState } from "react";
 import { LockClosedIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
 import { FaCar } from 'react-icons/fa';
 import axios from 'axios';
+import { CONDUCTOR_AUTH_CONFIG } from '../config/conductorAuth';
 
 function Registrar() {
   const [isLoading, setIsLoading] = useState(false);
-  const [message, setMessage] = useState('');
-  const [messageType, setMessageType] = useState('');
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const [toastType, setToastType] = useState('success');
+
+  const showNotification = (message, type = 'success') => {
+    setToastMessage(message);
+    setToastType(type);
+    setShowToast(true);
+    
+    setTimeout(() => {
+      setShowToast(false);
+    }, 4000);
+  };
 
   const handleRegister = async (e) => {
     e.preventDefault();
     setIsLoading(true);
-    setMessage('');
     
     try {
-      // Configurar axios para Laravel API
-        const response = await axios.post('http://127.0.0.1:8000/api/registro', {
+      const formData = {
         Nombre: e.target.Nombre.value,
         Correo: e.target.Correo.value,
         Contrasena: e.target.Contrasena.value,
-        Numero: e.target.tel.value,
-        }, {
+        Telefono: e.target.Telefono.value,
+      };
+      
+      if (!formData.Nombre || !formData.Correo || !formData.Contrasena || !formData.Telefono) {
+        showNotification('Por favor, completa todos los campos requeridos', 'error');
+        return;
+      }
+      
+      const isConductorAutorizado = CONDUCTOR_AUTH_CONFIG.correosAutorizados.includes(formData.Correo);
+      
+      const datosParaEnviar = {
+        ...formData,
+        rol: isConductorAutorizado ? 'conductor' : 'usuario'
+      };
+      
+      const response = await axios.post('http://127.0.0.1:8000/api/registro', datosParaEnviar, {
         headers: {
+          'Authorization':  'Bearer ' + localStorage.getItem('authToken'),
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         }
       });
       
-      console.log('Usuario registrado:', response.data);
-      setMessage('¡Usuario registrado exitosamente!');
-      setMessageType('success');
+      if (isConductorAutorizado) {
+        showNotification('¡Conductor registrado exitosamente! Serás redirigido al panel de conductor.', 'success');
+      } else {
+        showNotification('¡Usuario registrado exitosamente! Serás redirigido al login.', 'success');
+      }
       
-      // Mostrar notificación toast
-      showToastNotification('¡Usuario registrado exitosamente! 🎉');
-      
-      // Limpiar formulario
       e.target.reset();
       
-      // Opcional: Redirigir después de un breve delay
       setTimeout(() => {
-        // Aquí puedes agregar navegación a otra página
-         window.location.href = '/login';
+        if (isConductorAutorizado) {
+          const userData = {
+            ...response.data,
+            rol: 'conductor',
+            Correo: formData.Correo,
+            Nombre: formData.Nombre
+          };
+          localStorage.setItem('userData', JSON.stringify(userData));
+          window.location.href = '/conductor';
+        } else {
+          window.location.href = '/login';
+        }
       }, 2000);
       
     } catch (error) {
-      console.error('Error al registrar:', error);
-      
       if (error.response) {
-        // Error del servidor Laravel
         const errorData = error.response.data;
         
         if (errorData.errors) {
-        
           const errorMessages = Object.values(errorData.errors).flat();
-          setMessage(errorMessages.join(', '));
+          showNotification(errorMessages.join(', '), 'error');
         } else if (errorData.message) {
-         
-          setMessage(errorData.message);
+          showNotification(errorData.message, 'error');
         } else {
-          setMessage('Error al registrar usuario');
+          showNotification('Error al registrar usuario', 'error');
         }
       } else if (error.request) {
-       
-        setMessage('Error de conexión. Verifica que el servidor Laravel esté ejecutándose.');
+        showNotification('Error de conexión. Verifica que el servidor Laravel esté ejecutándose.', 'error');
       } else {
-       
-        setMessage('Error inesperado');
+        showNotification('Error inesperado: ' + error.message, 'error');
       }
-      setMessageType('error');
-      
-  
-      showToastNotification('❌ Error al registrar usuario');
     } finally {
       setIsLoading(false);
     }
   };
 
-  const showToastNotification = (message) => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 4000);
-  };
-
   const handleVolver = () => {
-  
     window.history.back();
   };
 
   return (
    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700 px-4">
-     {/* Notificación Toast */}
-     {showNotification && (
-       <div className="fixed top-4 right-4 z-50 transform transition-all duration-300 ease-out">
-         <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
-           <div className="flex items-center">
-             <div className="flex-shrink-0">
-               <FaCar className="h-8 w-8 text-green-500" />
+  
+     {showToast && (
+       <div className={`fixed top-6 right-6 z-50 max-w-sm w-full transform transition-all duration-500 ease-out ${
+         showToast ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
+       }`}>
+         <div className={`relative overflow-hidden rounded-2xl shadow-2xl border ${
+           toastType === 'success' 
+             ? 'bg-gradient-to-r from-green-500 to-emerald-600 border-green-400' 
+             : 'bg-gradient-to-r from-red-500 to-pink-600 border-red-400'
+         }`}>
+        
+           <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+           
+         
+           <div className="relative p-6 flex items-start space-x-4">
+         
+             <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+               toastType === 'success' 
+                 ? 'bg-white/20 backdrop-blur-sm' 
+                 : 'bg-white/20 backdrop-blur-sm'
+             }`}>
+               <FaCar className={`text-2xl ${
+                 toastType === 'success' ? 'text-white' : 'text-white'
+               }`} />
              </div>
-             <div className="ml-3">
-               <p className="text-sm font-medium text-gray-900">
-                 {notificationMessage}
+             
+            
+             <div className="flex-1 min-w-0">
+               <p className={`text-lg font-semibold ${
+                 toastType === 'success' ? 'text-white' : 'text-white'
+               }`}>
+                 {toastType === 'success' ? '¡Éxito!' : 'Error'}
+               </p>
+               <p className={`text-sm mt-1 ${
+                 toastType === 'success' ? 'text-green-100' : 'text-red-100'
+               }`}>
+                 {toastMessage}
                </p>
              </div>
-             <div className="ml-auto pl-3">
-               <button
-                 onClick={() => setShowNotification(false)}
-                 className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
-               >
-                 <span className="sr-only">Cerrar</span>
-                 <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                   <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                 </svg>
-               </button>
-             </div>
+             
+            
+             <button
+               onClick={() => setShowToast(false)}
+               className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+                 toastType === 'success' 
+                   ? 'hover:bg-white/20 text-white' 
+                   : 'hover:bg-white/20 text-white'
+               }`}
+             >
+               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+               </svg>
+             </button>
+           </div>
+           
+       
+           <div className={`h-1 ${
+             toastType === 'success' ? 'bg-green-400' : 'bg-red-400'
+           }`}>
+             <div className={`h-full ${
+               toastType === 'success' ? 'bg-white' : 'bg-white'
+             } animate-pulse`} style={{animationDuration: '4s'}}></div>
            </div>
          </div>
        </div>
@@ -127,20 +175,11 @@ function Registrar() {
     </div>
 
     <h1 className="text-3xl font-extrabold text-center text-blue-900 mb-2">Crear cuenta</h1>
-    <p className="text-sm text-center text-gray-600 mb-8">
+    <p className="text-sm text-center text-gray-600 mb-4">
       ¡Empieza a viajar con <span className="font-semibold text-blue-800">Mecaza</span>!
     </p>
+    
 
-    {/* Mensaje de estado */}
-    {message && (
-      <div className={`mb-4 p-3 rounded-md text-sm ${
-        messageType === 'success' 
-          ? 'bg-green-100 text-green-700 border border-green-300' 
-          : 'bg-red-100 text-red-700 border border-red-300'
-      }`}>
-        {message}
-      </div>
-    )}
 
     <form onSubmit={handleRegister} className="space-y-6">
       <div>
@@ -176,7 +215,7 @@ function Registrar() {
             <EnvelopeIcon className="h-5 w-5" />
           </span>
           <input
-            name="Numero"
+            name="Telefono"
             type="text"
             placeholder="numero de telefono"
             required

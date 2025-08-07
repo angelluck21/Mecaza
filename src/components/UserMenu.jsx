@@ -37,6 +37,11 @@ const UserMenu = ({ userData }) => {
     navigate('/ajustes-perfil'); // Ruta a la página de ajustes de perfil
   };
 
+  const handleMyReservations = () => {
+    setOpen(false);
+    navigate('/mis-reservas'); // Ruta a la página de mis reservas
+  };
+
   return (
     <div className="relative" ref={menuRef} style={{ zIndex: 50 }}>
       <button
@@ -56,6 +61,12 @@ const UserMenu = ({ userData }) => {
             className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-900"
           >
             Ver perfil
+          </button>
+          <button
+            onClick={handleMyReservations}
+            className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-900"
+          >
+            Mis Reservas
           </button>
          
           <div className="border-t my-1" />

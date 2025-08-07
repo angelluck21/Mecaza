@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaUser, FaEnvelope, FaCog, FaArrowLeft, FaEdit } from 'react-icons/fa';
+import { FaCar, FaUser, FaEnvelope, FaCog, FaArrowLeft, FaEdit, FaTrash } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
+import axios from 'axios';
 
 const VerPerfil = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -36,6 +37,45 @@ const VerPerfil = () => {
 
   const handleEditProfile = () => {
     navigate('/ajustes-perfil');
+  };
+
+  const handleDeleteProfile = async () => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar tu cuenta? Esta acción no se puede deshacer.')) {
+      return;
+    }
+
+    try {
+      // Obtener el ID del usuario del localStorage
+      const storedUserData = localStorage.getItem('userData');
+      const user = JSON.parse(storedUserData);
+      const userId = user.id_users || user.id || user.ID;
+      
+      console.log('Datos del usuario:', user);
+      console.log('ID del usuario a eliminar:', userId);
+
+      if (!userId) {
+        alert('No se pudo obtener el ID del usuario');
+        return;
+      }
+
+      const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarusuario/${userId}`, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+
+      console.log('Usuario eliminado:', response.data);
+      alert('Tu cuenta ha sido eliminada exitosamente');
+      
+      // Limpiar localStorage y redirigir al login
+      localStorage.removeItem('userData');
+      localStorage.removeItem('authToken');
+      navigate('/login');
+    } catch (error) {
+      console.error('Error al eliminar usuario:', error);
+      alert(`Error al eliminar la cuenta: ${error.message}`);
+    }
   };
 
   if (isLoading) {
@@ -139,10 +179,10 @@ const VerPerfil = () => {
             </div>
 
             {/* Información del usuario */}
-            <div className="flex-1 text-center md:text-left">
-              <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                {userData.Nombre || 'Usuario'}
-              </h2>
+                         <div className="flex-1 text-center md:text-left">
+               <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                 {userData.Nombre || userData.nombre || userData.name || 'Usuario'}
+               </h2>
               <p className="text-gray-600 mb-4">
                 {userData.rol === 'admin' ? 'Administrador' : 'Usuario'}
               </p>
@@ -157,18 +197,22 @@ const VerPerfil = () => {
                 <FaUser className="mr-2 text-blue-600" />
                 Información Personal
               </h3>
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Nombre</label>
-                  <p className="text-gray-900 font-medium">{userData.Nombre || 'No especificado'}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Rol</label>
-                  <p className="text-gray-900 font-medium">
-                    {userData.rol === 'admin' ? 'Administrador' : 'Usuario'}
-                  </p>
-                </div>
-              </div>
+                             <div className="space-y-3">
+                 <div>
+                   <label className="block text-sm font-medium text-gray-500">ID de Usuario</label>
+                   <p className="text-gray-900 font-medium">{userData.id_users || userData.id || userData.ID || 'No disponible'}</p>
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-500">Nombre</label>
+                   <p className="text-gray-900 font-medium">{userData.Nombre || userData.nombre || userData.name || 'No especificado'}</p>
+                 </div>
+                 <div>
+                   <label className="block text-sm font-medium text-gray-500">Rol</label>
+                   <p className="text-gray-900 font-medium">
+                     {userData.rol === 'admin' ? 'Administrador' : 'Usuario'}
+                   </p>
+                 </div>
+               </div>
             </div>
 
             {/* Información de contacto */}
@@ -178,10 +222,10 @@ const VerPerfil = () => {
                 Información de Contacto
               </h3>
               <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500">Correo electrónico</label>
-                  <p className="text-gray-900 font-medium">{userData.Correo || 'No especificado'}</p>
-                </div>
+                                 <div>
+                   <label className="block text-sm font-medium text-gray-500">Correo electrónico</label>
+                   <p className="text-gray-900 font-medium">{userData.Correo || userData.correo || userData.email || userData.Email || 'No especificado'}</p>
+                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Estado de la cuenta</label>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
@@ -229,6 +273,13 @@ const VerPerfil = () => {
             >
               <FaArrowLeft className="mr-2" />
               Volver
+            </button>
+            <button
+              onClick={handleDeleteProfile}
+              className="flex-1 bg-red-600 text-white py-3 px-6 rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center justify-center"
+            >
+              <FaTrash className="mr-2" />
+              Eliminar Cuenta
             </button>
           </div>
         </div>

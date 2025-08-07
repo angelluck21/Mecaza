@@ -10,30 +10,36 @@ const IndexAdmin = () => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const [showAddCarModal, setShowAddCarModal] = useState(false);
-  const [showAddEmailModal, setShowAddEmailModal] = useState(false);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
-  const [carData, setCarData] = useState({
-    Imagencarro: '',
-    Placa: '',
-    Conductor: '',
-    Asientos: '',
-    Destino: '',
-    Horasalida: '',
-    Fecha: ''
-  });
-  
-  console.log('Estado inicial de carData:', carData);
   const [emailData, setEmailData] = useState({
     email: '',
     name: '',
     role: '',
     department: ''
   });
+  const [showPreciosModal, setShowPreciosModal] = useState(false);
+  const [isSavingPrecios, setIsSavingPrecios] = useState(false);
+  const [preciosData, setPreciosData] = useState({
+    'ZaraMede': '',
+    'ZaraCauca': '',
+    'CaucaMede': ''
+  });
+
+  // Estados para el modal de estado del carro
+  const [showEstadoModal, setShowEstadoModal] = useState(false);
+  const [isSavingEstado, setIsSavingEstado] = useState(false);
+  const [estadoSeleccionado, setEstadoSeleccionado] = useState('');
+  const [estadosDisponibles] = useState([
+    { id: 1, nombre: 'En Viaje', color: '#10B981' },
+    { id: 2, nombre: 'Esperando Pasajeros', color: '#F59E0B' },
+    { id: 3, nombre: 'Cupos Llenos', color: '#EF4444' },
+    { id: 4, nombre: 'Cancelado', color: '#6B7280' },
+    { id: 5, nombre: 'Finalizado', color: '#3B82F6' },
+    { id: 6, nombre: 'En Mantenimiento', color: '#8B5CF6' }
+  ]);
 
   useEffect(() => {
-    // Verificar si el usuario está logueado y es administrador
     const storedUserData = localStorage.getItem('userData');
     if (storedUserData) {
       try {
@@ -41,30 +47,24 @@ const IndexAdmin = () => {
         if (user.rol === 'admin') {
           setUserData(user);
         } else {
-          // Si no es admin, redirigir al dashboard
           navigate('/dashboard');
         }
       } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
       }
     } else {
-      // Si no hay datos de usuario, redirigir al login
       navigate('/login');
     }
     setIsLoading(false);
   }, [navigate]);
 
   const _handleLogout = () => {
-    // Limpiar datos del usuario
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');
     setUserData(null);
-    // Redirigir al index principal
     navigate('/');
   };
 
-  // Mostrar loading mientras verifica autenticación
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
@@ -73,122 +73,152 @@ const IndexAdmin = () => {
     );
   }
 
-  // Si no hay usuario, no mostrar nada (ya se redirigió)
   if (!userData) {
     return null;
   }
-
-  const handleImageChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      setCarData({...carData, image: file});
-    }
-  };
 
   const showToastNotification = (message, type = 'success') => {
     setNotificationMessage(message);
     setShowNotification(true);
     setTimeout(() => {
       setShowNotification(false);
-    }, 4000); // La notificación desaparece después de 4 segundos
+    }, 4000);
   };
 
-  const handleAddCar = async (e) => {
+  const handleSavePrecios = async (e) => {
     e.preventDefault();
     
-    // Validar que todos los campos requeridos estén llenos
-    if (!carData.Conductor || !carData.Placa || !carData.Asientos || !carData.Destino || !carData.Horasalida || !carData.Fecha) {
-      showToastNotification('Por favor, completa todos los campos requeridos', 'error');
+    if (!preciosData['ZaraMede'] || !preciosData['ZaraCauca'] || !preciosData['CaucaMede']) {
+      showToastNotification('Por favor, completa todos los campos de precios', 'error');
       return;
     }
     
+    setIsSavingPrecios(true);
+    
+    const dataToSend = {
+      'ZaraMede': parseFloat(preciosData['ZaraMede']) || 0,
+      'ZaraCauca': parseFloat(preciosData['ZaraCauca']) || 0,
+      'CaucaMede': parseFloat(preciosData['CaucaMede']) || 0
+    };
+    
     try {
-      console.log('=== INICIANDO GUARDADO DE VEHÍCULO ===');
-      console.log('Datos a enviar:', carData);
-      console.log('Verificación de campos:');
-      console.log('- conductor:', carData.Conductor, '¿Está vacío?', !carData.Conductor);
-      console.log('- placa:', carData.Placa, '¿Está vacío?', !carData.Placa);
-      console.log('- asientos:', carData.Asientos, '¿Está vacío?', !carData.Asientos);
-      console.log('- destino:', carData.Destino, '¿Está vacío?', !carData.Destino);
-      console.log('- horasalida:', carData.Horasalida, '¿Está vacío?', !carData.Horasalida);
-      console.log('- fecha:', carData.Fecha, '¿Está vacío?', !carData.Fecha);
-      console.log('- imagencarro:', carData.Imagencarro, '¿Está vacío?', !carData.Imagencarro);
-      
-      console.log('URL de la API:', 'http://127.0.0.1:8000/api/agregarcarros');
-      
-      // Preparar los datos para enviar, convirtiendo asientos a número
-      const dataToSend = {
-        ...carData,
-        Asientos: parseInt(carData.Asientos) || 0
-      };
-      
-      console.log('Datos procesados a enviar:', dataToSend);
-      
-      // Aquí puedes ajustar la URL y los campos según tu backend
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarcarros', dataToSend, {
+      const response = await axios.put('http://127.0.0.1:8000/api/actualizarprecio/1', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         }
       });
       
-      
-      console.log('=== RESPUESTA EXITOSA ===');
-      console.log('Respuesta de la API:', response.data);
-      console.log('Status de la respuesta:', response.status);
-      console.log('Headers de la respuesta:', response.headers);
-      
-      showToastNotification('¡Vehículo registrado exitosamente! 🚗');
-              setCarData({
-          Imagencarro: '',
-          Placa: '',
-          Conductor: '',
-          Asientos: '',
-          Destino: '',
-          Horasalida: '',
-          Fecha: ''
+      if (response.data && response.data.success) {
+        showToastNotification('¡Precios guardados exitosamente! 💰');
+        
+        setPreciosData({
+          'ZaraMede': '',
+          'ZaraCauca': '',
+          'CaucaMede': ''
         });
-      console.log('Cerrando modal...');
-      setShowAddCarModal(false);
-      console.log('Modal cerrado');
-      // Si quieres actualizar la lista de vehículos, hazlo aquí
-    } catch (error) {
-      console.error('=== ERROR AL GUARDAR ===');
-      console.error('Error completo:', error);
-      console.error('Error message:', error.message);
+        
+        setShowPreciosModal(false);
+      } else {
+        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
+      }
       
+    } catch (error) {
       if (error.response) {
-        console.error('Error de la API:', error.response.data);
-        console.error('Status del error:', error.response.status);
-        console.error('Headers del error:', error.response.headers);
-        showToastNotification(`Error: ${error.response.data.message || 'No se pudo guardar el vehículo'}`, 'error');
+        if (error.response.status === 500) {
+          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
+        } else if (error.response.status === 422) {
+          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
+        } else {
+          showToastNotification(`Error: ${error.response.data.message || 'No se pudieron guardar los precios'}`, 'error');
+        }
       } else if (error.request) {
-        console.error('Error de red:', error.request);
-        console.error('Request config:', error.config);
         showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
       } else {
-        console.error('Error:', error.message);
-        showToastNotification('Error inesperado al guardar el vehículo', 'error');
+        showToastNotification('Error inesperado al guardar los precios', 'error');
       }
+    } finally {
+      setIsSavingPrecios(false);
     }
   };
 
-  const handleAddEmail = (e) => {
+  const handleSaveEstado = async (e) => {
     e.preventDefault();
-    // Aquí iría la lógica para agregar el email administrativo
-    console.log('Agregando email administrativo:', emailData);
-    setEmailData({
-      email: '',
-      name: '',
-      role: '',
-      department: ''
+    
+    if (!estadoSeleccionado) {
+      showToastNotification('Por favor, selecciona un estado del viaje', 'error');
+      return;
+    }
+    
+    setIsSavingEstado(true);
+    
+    const estadoElegido = estadosDisponibles.find(estado => estado.id === parseInt(estadoSeleccionado));
+    
+    const dataToSend = {
+      Estados: estadoElegido.nombre
+    };
+    
+    try {
+      const response = await axios.post('http://127.0.0.1:8000/api/agregarestados', dataToSend, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        }
+      });
+      
+      if (response.data && response.data.success) {
+        showToastNotification('¡Estado del viaje guardado exitosamente! 🚗');
+        
+        setEstadoSeleccionado('');
+        setShowEstadoModal(false);
+      } else {
+        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
+      }
+      
+    } catch (error) {
+      if (error.response) {
+        if (error.response.status === 500) {
+          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
+        } else if (error.response.status === 422) {
+          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
+        } else {
+          showToastNotification(`Error: ${error.response.data.message || 'No se pudo guardar el estado'}`, 'error');
+        }
+      } else if (error.request) {
+        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
+      } else {
+        showToastNotification('Error inesperado al guardar el estado', 'error');
+      }
+    } finally {
+      setIsSavingEstado(false);
+    }
+  };
+
+  const limpiarFormulario = () => {
+    setPreciosData({
+      'ZaraMede': '',
+      'ZaraCauca': '',
+      'CaucaMede': ''
     });
-    setShowAddEmailModal(false);
+  };
+
+  const limpiarFormularioEstado = () => {
+    setEstadoSeleccionado('');
+  };
+
+  const abrirModalPrecios = () => {
+    setShowPreciosModal(true);
+    limpiarFormulario();
+  };
+
+  const abrirModalEstado = () => {
+    setShowEstadoModal(true);
+    limpiarFormularioEstado();
   };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {/* Notificación Toast */}
       {showNotification && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
           <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
@@ -216,17 +246,15 @@ const IndexAdmin = () => {
           </div>
         </div>
       )}
-      {/* Navbar */}
+
       <nav className="bg-white shadow-lg relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
             <div className="flex items-center space-x-3">
               <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
               <span className="text-2xl font-bold text-blue-900">Mecaza Admin</span>
             </div>
 
-            {/* Barra de búsqueda - Desktop */}
             <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
               <div className="relative w-full">
                 <input
@@ -238,7 +266,6 @@ const IndexAdmin = () => {
               </div>
             </div>
 
-            {/* Navegación - Desktop */}
             <div className="hidden md:flex items-center space-x-6">
               <a href="/" className="text-blue-900 hover:text-blue-700 font-medium transition-colors">
                 Inicio
@@ -249,7 +276,6 @@ const IndexAdmin = () => {
               <UserMenu userData={userData} />
             </div>
 
-            {/* Botón menú móvil */}
             <div className="md:hidden">
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -260,11 +286,9 @@ const IndexAdmin = () => {
             </div>
           </div>
 
-          {/* Menú móvil */}
           {isMenuOpen && (
             <div className="md:hidden bg-white border-t border-gray-200">
               <div className="px-2 pt-2 pb-3 space-y-1">
-                {/* Barra de búsqueda móvil */}
                 <div className="relative mb-4">
                   <input
                     type="text"
@@ -298,7 +322,6 @@ const IndexAdmin = () => {
         </div>
       </nav>
 
-      {/* Contenido principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
           <div className="text-center mb-8">
@@ -310,52 +333,45 @@ const IndexAdmin = () => {
             </p>
           </div>
 
-          {/* Opciones administrativas */}
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            {/* Agregar Carro */}
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+              <div className="flex items-center mb-4">
+                <div className="bg-green-600 p-3 rounded-lg mr-4">
+                  <FaCar className="text-2xl text-white" />
+                </div>
+                <h3 className="text-xl font-bold text-green-900">Agregar Estado del Viaje</h3>
+              </div>
+              <p className="text-gray-600 mb-6 leading-relaxed">
+                Configura los estados de los viajes: esperando pasajeros, en viaje, cupos llenos y otros estados del sistema.
+              </p>
+              <button
+                onClick={abrirModalEstado}
+                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
+              >
+                <FaPlus className="mr-2" />
+                Agregar Estado
+              </button>
+            </div>
+
             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center mb-4">
                 <div className="bg-blue-600 p-3 rounded-lg mr-4">
-                  <FaCar className="text-2xl text-white" />
+                  <FaEnvelope className="text-2xl text-white" />
                 </div>
-                <h3 className="text-xl font-bold text-blue-900">Gestión de Vehículos</h3>
+                <h3 className="text-xl font-bold text-blue-900">Agregar Precios</h3>
               </div>
               <p className="text-gray-600 mb-6 leading-relaxed">
-                Agrega nuevos vehículos al sistema con información completa: placa, conductor, puestos, destino, horarios y mapa.
+                Gestiona precios de viajes, configura rutas y administra la información de los vehículos del sistema.
               </p>
               <button
-                onClick={() => {
-                  console.log('Abriendo modal, estado actual de carData:', carData);
-                  setShowAddCarModal(true);
-                }}
+                onClick={abrirModalPrecios}
                 className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
               >
                 <FaPlus className="mr-2" />
-                Agregar Vehículo
+                Agregar Precios
               </button>
             </div>
 
-            {/* Agregar Email Administrativo */}
-            <div className="bg-gradient-to-br from-teal-50 to-teal-100 p-6 rounded-xl border-2 border-teal-200 hover:border-teal-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center mb-4">
-                <div className="bg-teal-600 p-3 rounded-lg mr-4">
-                  <FaEnvelope className="text-2xl text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-teal-900">Gestión de Usuarios</h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Agrega nuevos usuarios administrativos con roles específicos y departamentos asignados.
-              </p>
-              <button
-                onClick={() => setShowAddEmailModal(true)}
-                className="w-full bg-teal-600 text-white px-6 py-3 rounded-lg hover:bg-teal-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-              >
-                <FaPlus className="mr-2" />
-                Agregar Usuario
-              </button>
-            </div>
-
-            {/* Ver Estadísticas */}
             <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border-2 border-purple-200 hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
               <div className="flex items-center mb-4">
                 <div className="bg-purple-600 p-3 rounded-lg mr-4">
@@ -376,7 +392,6 @@ const IndexAdmin = () => {
             </div>
           </div>
 
-          {/* Estadísticas rápidas */}
           <div className="grid md:grid-cols-3 gap-6">
             <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg">
               <div className="flex items-center">
@@ -409,222 +424,229 @@ const IndexAdmin = () => {
         </div>
       </div>
 
-      {/* Modal Agregar Carro */}
-      {showAddCarModal && (
+      {/* Modal Seleccionar Estado del Viaje */}
+      {showEstadoModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-            {/* Botón de cerrar arriba a la derecha */}
+          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
             <button
-              onClick={() => setShowAddCarModal(false)}
+              onClick={() => {
+                setShowEstadoModal(false);
+                limpiarFormularioEstado();
+              }}
               className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
               aria-label="Cerrar"
             >
               &times;
             </button>
-            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">Agregar Vehículo</h2>
-            <form onSubmit={handleAddCar} className="space-y-5">
-              {/* Placa */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Placa</label>
-                                  <input
-                    type="text"
-                    value={carData.Placa}
-                    onChange={(e) => {
-                      console.log('Escribiendo en placa:', e.target.value);
-                      setCarData({...carData, Placa: e.target.value});
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-              </div>
-              {/* Conductor */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Conductor</label>
-                                  <input
-                    type="text"
-                    value={carData.Conductor}
-                    onChange={(e) => {
-                      console.log('Escribiendo en conductor:', e.target.value);
-                      setCarData({...carData, Conductor: e.target.value});
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-              </div>
-              {/* Imagen */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Vehículo (texto de prueba)</label>
-                                  <input
-                    type="text"
-                    value={carData.Imagencarro || ''}
-                    onChange={(e) => {
-                      console.log('Escribiendo en imagencarro:', e.target.value);
-                      setCarData({ ...carData, Imagencarro: e.target.value });
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Escribe un texto de prueba"
-                    required
-                  />
-              </div>
-              {/* Puestos */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad de Puestos</label>
-                                  <input
-                    type="number"
-                    min="1"
-                    max="50"
-                    value={carData.Asientos}
-                    onChange={(e) => {
-                      console.log('Escribiendo en asientos:', e.target.value);
-                      setCarData({...carData, Asientos: e.target.value});
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ej: 15"
-                    required
-                  />
-              </div>
-              {/* Destino */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Destino</label>
-                                  <select
-                    value={carData.Destino}
-                    onChange={(e) => {
-                      console.log('Seleccionando destino:', e.target.value);
-                      setCarData({...carData, Destino: e.target.value});
-                    }}
+            
+            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">
+              Guardar Estado del Viaje
+            </h2>
+
+            <form onSubmit={handleSaveEstado} className="space-y-6">
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Estados Disponibles
+                </h3>
+                
+                {/* Selector de Estado */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-3">Selecciona el estado del viaje *</label>
+                  <select
+                    value={estadoSeleccionado}
+                    onChange={(e) => setEstadoSeleccionado(e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                     required
                   >
-                  <option value="">Seleccionar destino</option>
-                  <option value="Medellin">Medellín</option>
-                  <option value="Caucasia">Caucasia</option>
-                  <option value="Zaragoza">Zaragoza</option>
-                </select>
-              </div>
-              {/* Enlace del Mapa */}
-             
-              {/* Hora de Salida */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Hora de Salida</label>
-                                  <input
-                    type="text"
-                    value={carData.Horasalida}
-                    onChange={(e) => {
-                      console.log('Escribiendo en horasalida:', e.target.value);
-                      setCarData({...carData, Horasalida: e.target.value});
+                    <option value="">Selecciona un estado...</option>
+                    {estadosDisponibles.map((estado) => (
+                      <option key={estado.id} value={estado.id}>
+                        {estado.nombre}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Información adicional */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <FaCar className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-800">Estados de Viaje</h4>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Selecciona el estado actual del viaje. Esto ayudará a los pasajeros a conocer el estado de su viaje.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Botones */}
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <button
+                    type="submit"
+                    disabled={isSavingEstado || !estadoSeleccionado}
+                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
+                  >
+                    {isSavingEstado ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <FaCar className="mr-2" />
+                        Guardar Estado
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowEstadoModal(false);
+                      limpiarFormularioEstado();
                     }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-              </div>
-              {/* Día */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Día</label>
-                                  <input
-                    type="text"
-                    value={carData.Fecha}
-                    onChange={(e) => {
-                      console.log('Escribiendo en fecha:', e.target.value);
-                      setCarData({...carData, Fecha: e.target.value});
-                    }}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-              </div>
-              {/* Botones */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Agregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCarModal(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
-                >
-                  Cancelar
-                </button>
+                    disabled={isSavingEstado}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
+                </div>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Modal Agregar Email Administrativo */}
-      {showAddEmailModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-8 max-w-md w-full mx-4">
-            <h2 className="text-2xl font-bold text-teal-900 mb-6">Agregar Usuario Administrativo</h2>
-            <form onSubmit={handleAddEmail}>
-              <div className="space-y-4">
+      {/* Modal Agregar Precios */}
+      {showPreciosModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-4xl w-full mx-4 overflow-y-auto max-h-[90vh]">
+            <button
+              onClick={() => {
+                setShowPreciosModal(false);
+                limpiarFormulario();
+              }}
+              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
+              aria-label="Cerrar"
+            >
+              &times;
+            </button>
+            
+            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">
+              Agregar Precios de Viajes
+            </h2>
+
+            <form onSubmit={handleSavePrecios} className="space-y-5">
+              <div className="border-t pt-6">
+                <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                  Agregar Nuevos Precios
+                </h3>
+                
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Nombre Completo</label>
-                  <input
-                    type="text"
-                    value={emailData.name}
-                    onChange={(e) => setEmailData({...emailData, name: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    required
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Caucasia - Medellín (cauca-mede)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input
+                      type="text"
+                      min="0"
+                      step="0.01"
+                      value={preciosData['CaucaMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'CaucaMede': e.target.value})}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                  <input
-                    type="email"
-                    value={emailData.email}
-                    onChange={(e) => setEmailData({...emailData, email: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    required
-                  />
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Zaragoza - Medellín (zara-mede)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input
+                      type="text"
+                      min="0"
+                      step="0.01"
+                      value={preciosData['ZaraMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraMede': e.target.value})}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Rol</label>
-                  <select
-                    value={emailData.role}
-                    onChange={(e) => setEmailData({...emailData, role: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    required
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Zaragoza - Caucasia (zara-cauca)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
+                    <input
+                      type="text"
+                      min="0"
+                      step="0.01"
+                      value={preciosData['ZaraCauca']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraCauca': e.target.value})}
+                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      placeholder="0.00"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                  <div className="flex items-start">
+                    <FaCar className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-medium text-blue-800">Información de Precios</h4>
+                      <p className="text-xs text-blue-700 mt-1">
+                        Los precios configurados aquí se aplicarán a todos los viajes en estas rutas. Asegúrate de establecer precios competitivos y rentables.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-3 mt-6">
+                  <button
+                    type="submit"
+                    disabled={isSavingPrecios}
+                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
                   >
-                    <option value="">Seleccionar rol</option>
-                    <option value="admin">Administrador</option>
-                    <option value="supervisor">Supervisor</option>
-                    <option value="operator">Operador</option>
-                  </select>
+                    {isSavingPrecios ? (
+                      <>
+                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                        Guardando...
+                      </>
+                    ) : (
+                      <>
+                        <FaCar className="mr-2" />
+                        Guardar Precios
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowPreciosModal(false);
+                      setPreciosData({
+                        'ZaraMede': '',
+                        'ZaraCauca': '',
+                        'CaucaMede': ''
+                      });
+                    }}
+                    disabled={isSavingPrecios}
+                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50"
+                  >
+                    Cancelar
+                  </button>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Departamento</label>
-                  <input
-                    type="text"
-                    value={emailData.department}
-                    onChange={(e) => setEmailData({...emailData, department: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500"
-                    required
-                  />
-                </div>
-              </div>
-              <div className="flex space-x-3 mt-6">
-                <button
-                  type="submit"
-                  className="flex-1 bg-teal-600 text-white py-2 px-4 rounded-md hover:bg-teal-700 transition-colors"
-                >
-                  Agregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddEmailModal(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
-                >
-                  Cancelar
-                </button>
               </div>
             </form>
           </div>
         </div>
       )}
       
-      {/* Estilos CSS para animaciones */}
       <style>{`
         @keyframes slideIn {
           from {

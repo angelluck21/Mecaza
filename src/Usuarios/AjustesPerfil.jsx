@@ -14,7 +14,6 @@ const AjustesPerfil = () => {
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
-  // Estado del formulario simplificado
   const [profileData, setProfileData] = useState({
     nombre: '',
     email: '',
@@ -22,19 +21,17 @@ const AjustesPerfil = () => {
     confirmarContrasena: ''
   });
 
-  // Estado para la imagen de perfil
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
+  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
-    // Obtener datos del usuario del localStorage
     const storedUserData = localStorage.getItem('userData');
     if (storedUserData) {
       try {
         const user = JSON.parse(storedUserData);
         setUserData(user);
         
-        // Cargar datos del perfil
         setProfileData({
           nombre: user.Nombre || '',
           email: user.Correo || '',
@@ -42,17 +39,17 @@ const AjustesPerfil = () => {
           confirmarContrasena: ''
         });
 
-        // Cargar imagen de perfil si existe
         if (user.fotoPerfil) {
           setImagePreview(user.fotoPerfil);
         }
+
+        // Establecer el ID del usuario directamente desde los datos del localStorage
+        setUserId(user.id_users || user.id || user.ID);
       } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
         return;
       }
     } else {
-      console.log('No hay datos de usuario, redirigiendo al login');
       navigate('/login');
       return;
     }
@@ -71,7 +68,6 @@ const AjustesPerfil = () => {
     const file = e.target.files[0];
     if (file) {
       setProfileImage(file);
-      // Crear preview de la imagen
       const reader = new FileReader();
       reader.onload = (e) => {
         setImagePreview(e.target.result);
@@ -83,7 +79,6 @@ const AjustesPerfil = () => {
   const handleSaveProfile = async (e) => {
     e.preventDefault();
     
-    // Validar que las contraseñas coincidan
     if (profileData.contrasena && profileData.contrasena !== profileData.confirmarContrasena) {
       showToastNotification('Las contraseñas no coinciden', 'error');
       return;
@@ -92,7 +87,6 @@ const AjustesPerfil = () => {
     setIsSaving(true);
     
     try {
-      // Preparar datos para enviar (solo enviar contraseña si se cambió)
       const dataToSend = {
         nombre: profileData.nombre,
         email: profileData.email
@@ -102,7 +96,6 @@ const AjustesPerfil = () => {
         dataToSend.contrasena = profileData.contrasena;
       }
       
-      // Si hay una nueva imagen, subirla primero
       if (profileImage) {
         const formData = new FormData();
         formData.append('foto_perfil', profileImage);
@@ -121,8 +114,7 @@ const AjustesPerfil = () => {
         }
       }
       
-      // Enviar datos del perfil
-      const response = await axios.put('http://127.0.0.1:8000/api/actualizar-perfil', dataToSend, {
+      const response = await axios.put(`http://127.0.0.1:8000/api/actualizarusuario/${userData.id || userData.Correo}`, dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -130,31 +122,26 @@ const AjustesPerfil = () => {
         }
       });
       
-      console.log('Perfil actualizado:', response.data);
       showToastNotification('¡Perfil actualizado exitosamente! ✅');
       
-      // Actualizar datos en localStorage
       const updatedUserData = {
         ...userData,
         Nombre: profileData.nombre,
         Correo: profileData.email,
-        fotoPerfil: imagePreview // Guardar la nueva imagen
+        fotoPerfil: imagePreview
       };
       localStorage.setItem('userData', JSON.stringify(updatedUserData));
       setUserData(updatedUserData);
       
-      // Limpiar campos de contraseña
       setProfileData({
         ...profileData,
         contrasena: '',
         confirmarContrasena: ''
       });
       
-      // Limpiar imagen temporal
       setProfileImage(null);
       
     } catch (error) {
-      console.error('Error al actualizar perfil:', error);
       showToastNotification('Error al actualizar el perfil. Inténtalo de nuevo.', 'error');
     } finally {
       setIsSaving(false);
@@ -162,7 +149,7 @@ const AjustesPerfil = () => {
   };
 
   const handleGoBack = () => {
-    navigate(-1); // Regresar a la página anterior
+    navigate(-1);
   };
 
   if (isLoading) {
@@ -179,7 +166,6 @@ const AjustesPerfil = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {/* Notificación Toast */}
       {showNotification && (
         <div className="fixed top-4 right-4 z-50 animate-slide-in">
           <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
@@ -208,17 +194,14 @@ const AjustesPerfil = () => {
         </div>
       )}
 
-      {/* Navbar */}
       <nav className="bg-white shadow-lg relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
             <div className="flex items-center space-x-3">
               <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
               <span className="text-2xl font-bold text-blue-900">Mecaza</span>
             </div>
 
-            {/* Navegación - Desktop */}
             <div className="hidden md:flex items-center space-x-6">
               <button
                 onClick={handleGoBack}
@@ -230,7 +213,6 @@ const AjustesPerfil = () => {
               <UserMenu userData={userData} />
             </div>
 
-            {/* Botón menú móvil */}
             <div className="md:hidden">
               <button
                 onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -241,7 +223,6 @@ const AjustesPerfil = () => {
             </div>
           </div>
 
-          {/* Menú móvil */}
           {isMenuOpen && (
             <div className="md:hidden bg-white border-t border-gray-200">
               <div className="px-2 pt-2 pb-3 space-y-1">
@@ -264,10 +245,8 @@ const AjustesPerfil = () => {
         </div>
       </nav>
 
-      {/* Contenido principal */}
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
-          {/* Header */}
           <div className="text-center mb-8">
             <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
               Ajustes de Perfil
@@ -277,7 +256,6 @@ const AjustesPerfil = () => {
             </p>
           </div>
 
-          {/* Foto de perfil */}
           <div className="flex flex-col items-center space-y-4 mb-8">
             <div className="relative">
               <div className="w-32 h-32 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 flex items-center justify-center overflow-hidden shadow-lg">
@@ -304,9 +282,22 @@ const AjustesPerfil = () => {
             <p className="text-sm text-gray-500 text-center">Haz clic en la cámara para cambiar tu foto</p>
           </div>
 
-          {/* Formulario simplificado */}
           <form onSubmit={handleSaveProfile} className="space-y-6">
-            {/* Nombre */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">ID de Usuario</label>
+              <div className="relative">
+                <FaUser className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={userId || 'Cargando...'}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
+                  placeholder="ID del usuario"
+                  readOnly
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">Este es tu identificador único en el sistema</p>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
               <div className="relative">
@@ -322,7 +313,6 @@ const AjustesPerfil = () => {
               </div>
             </div>
 
-            {/* Email */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Correo electrónico</label>
               <div className="relative">
@@ -338,7 +328,6 @@ const AjustesPerfil = () => {
               </div>
             </div>
 
-            {/* Contraseña actual */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña (opcional)</label>
               <div className="relative">
@@ -353,7 +342,6 @@ const AjustesPerfil = () => {
               </div>
             </div>
 
-            {/* Confirmar contraseña */}
             {profileData.contrasena && (
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Confirmar nueva contraseña</label>
@@ -371,7 +359,6 @@ const AjustesPerfil = () => {
               </div>
             )}
 
-            {/* Botones */}
             <div className="flex flex-col sm:flex-row gap-4 pt-6">
               <button
                 type="submit"
@@ -394,7 +381,6 @@ const AjustesPerfil = () => {
         </div>
       </div>
       
-      {/* Estilos CSS para animaciones */}
       <style>{`
         @keyframes slideIn {
           from {

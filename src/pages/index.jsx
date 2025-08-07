@@ -11,12 +11,14 @@ import { useNavigate } from 'react-router-dom';
 
 const Index = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  // Estado para saber si el usuario está logueado
+
   const [userData, setUserData] = useState(null);
   const [cars, setCars] = useState([]);
+  const [filteredCars, setFilteredCars] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   const navigate = useNavigate();
 
@@ -26,24 +28,24 @@ const Index = () => {
       id: 1,
       title: "Viajes Seguros y Confiables",
       subtitle: "Conductores verificados para tu tranquilidad",
-      image: "https://images.unsplash.com/photo-1449824913935-59a10b8d2000?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
+      icon: "🛡️"
     },
     {
       id: 2,
       title: "Destinos Increíbles",
       subtitle: "Explora nuevos lugares con comodidad",
-      image: "https://images.unsplash.com/photo-1506905925346-21bda4d32df4?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
+      icon: "🌍"
     },
     {
       id: 3,
       title: "Precios Justos",
       subtitle: "Tarifas transparentes sin sorpresas",
-      image: "https://images.unsplash.com/photo-1441974231531-c6227db76b6e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1920&q=80"
+      icon: "💰"
     }
   ];
 
   useEffect(() => {
-    // Leer datos de usuario desde localStorage
+   
     const storedUser = localStorage.getItem('userData');
     if (storedUser) {
       try {
@@ -53,7 +55,6 @@ const Index = () => {
       }
     }
 
-    // Obtener carros desde la API
     const fetchCars = async () => {
       try {
         const response = await fetch('http://127.0.0.1:8000/api/listarcarro');
@@ -62,10 +63,13 @@ const Index = () => {
         }
         const data = await response.json();
         console.log('Datos de carros recibidos:', data);
-        setCars(Array.isArray(data.data) ? data.data : []);
+        const carsData = Array.isArray(data.data) ? data.data : [];
+        setCars(carsData);
+        setFilteredCars(carsData); // Inicializar filteredCars con todos los carros
       } catch (err) {
         console.error('Error al obtener carros:', err);
         setCars([]);
+        setFilteredCars([]);
       } finally {
         setIsLoading(false);
       }
@@ -74,7 +78,7 @@ const Index = () => {
     fetchCars();
   }, []);
 
-  // Auto-play del carrusel
+ 
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentSlide((prev) => (prev + 1) % carouselData.length);
@@ -97,12 +101,35 @@ const Index = () => {
 
   const handleViewDetails = (carId) => {
     if (userData) {
-      // Si está registrado, navegar a ver detalles
+     
       navigate(`/ver-detalles/${carId}`);
     } else {
-      // Si no está registrado, mostrar modal
+      
       setShowRegisterModal(true);
     }
+  };
+
+  // Función de búsqueda
+  const handleSearch = (searchValue) => {
+    setSearchTerm(searchValue);
+    
+    if (!searchValue.trim()) {
+      setFilteredCars(cars);
+      return;
+    }
+    
+    const filtered = cars.filter(car => {
+      const searchLower = searchValue.toLowerCase();
+      return (
+        (car.conductor && car.conductor.toLowerCase().includes(searchLower)) ||
+        (car.destino && car.destino.toLowerCase().includes(searchLower)) ||
+        (car.placa && car.placa.toLowerCase().includes(searchLower)) ||
+        (car.horasalida && car.horasalida.toLowerCase().includes(searchLower)) ||
+        (car.fecha && car.fecha.toLowerCase().includes(searchLower))
+      );
+    });
+    
+    setFilteredCars(filtered);
   };
 
   console.log('Estado actual de cars en index:', cars);
@@ -110,7 +137,7 @@ const Index = () => {
   console.log('isLoading en index:', isLoading);
   console.log('userData en index:', userData);
 
-  // Monitorear cambios en cars
+ 
   useEffect(() => {
     console.log('=== CAMBIO EN ESTADO DE CARS ===');
     console.log('Nuevo valor de cars:', cars);
@@ -120,11 +147,11 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {/* Navbar */}
+     
       <nav className="bg-white shadow-lg relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
+           
             <div className="flex items-center space-x-3">
               <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
               <span className="text-2xl font-bold text-blue-900">Mecaza</span>
@@ -135,7 +162,9 @@ const Index = () => {
               <div className="relative w-full">
                 <input
                   type="text"
-                  placeholder="Buscar contenido..."
+                  placeholder="Buscar por conductor, destino, placa..."
+                  value={searchTerm}
+                  onChange={(e) => handleSearch(e.target.value)}
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
                 />
                 <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -180,7 +209,9 @@ const Index = () => {
                 <div className="relative mb-4">
                   <input
                     type="text"
-                    placeholder="Buscar contenido..."
+                    placeholder="Buscar por conductor, destino, placa..."
+                    value={searchTerm}
+                    onChange={(e) => handleSearch(e.target.value)}
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                   <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
@@ -211,7 +242,7 @@ const Index = () => {
       </nav>
 
       {/* Carrusel Header */}
-      <div className="relative h-96 overflow-hidden">
+      <div className="relative h-96 overflow-hidden bg-gradient-to-br from-blue-800 to-blue-600">
         {/* Slides */}
         <div className="flex transition-transform duration-500 ease-in-out h-full">
           {carouselData.map((slide, index) => (
@@ -220,14 +251,12 @@ const Index = () => {
               className="w-full flex-shrink-0 relative"
               style={{ transform: `translateX(-${currentSlide * 100}%)` }}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-blue-900/60 to-blue-700/60 z-10"></div>
-              <img
-                src={slide.image}
-                alt={slide.title}
-                className="w-full h-full object-cover"
-              />
+              <div className="absolute inset-0 bg-gradient-to-r from-blue-900/40 to-blue-700/40 z-10"></div>
               <div className="absolute inset-0 z-20 flex items-center justify-center">
                 <div className="text-center text-white px-4">
+                  <div className="text-8xl mb-6 drop-shadow-lg">
+                    {slide.icon}
+                  </div>
                   <h1 className="text-4xl md:text-6xl font-bold mb-4 drop-shadow-lg">
                     {slide.title}
                   </h1>
@@ -275,30 +304,7 @@ const Index = () => {
       {/* Contenido principal */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         {/* Sección de bienvenida */}
-        <div className="text-center mb-12">
-          <h1 className="text-4xl md:text-6xl font-bold text-white mb-4">
-            ¡Bienvenido a <span className="text-blue-200">Mecaza</span>!
-          </h1>
-          <p className="text-xl text-blue-100 mb-8">
-            Encuentra tu viaje perfecto con conductores confiables
-          </p>
-          {!userData && (
-            <div className="space-x-4">
-              <a 
-                href="/login" 
-                className="bg-white text-blue-900 px-6 py-3 rounded-lg font-semibold hover:bg-blue-50 transition-colors inline-block"
-              >
-                Iniciar Sesión
-              </a>
-              <a 
-                href="/registrar" 
-                className="bg-teal-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-teal-700 transition-colors inline-block"
-              >
-                Registrarse
-              </a>
-            </div>
-          )}
-        </div>
+       
 
         {/* Lista de carros disponibles */}
         <div className="mb-8">
@@ -310,15 +316,16 @@ const Index = () => {
             <div className="text-center">
               <div className="text-white text-xl">Cargando viajes...</div>
             </div>
-          ) : !Array.isArray(cars) || cars.length === 0 ? (
+          ) : !Array.isArray(filteredCars) || filteredCars.length === 0 ? (
             <div className="text-center">
               <div className="text-white text-lg">
-                {!Array.isArray(cars) ? 'Error al cargar viajes' : 'No hay viajes disponibles en este momento.'}
+                {!Array.isArray(filteredCars) ? 'Error al cargar viajes' : 
+                 searchTerm ? 'No se encontraron viajes que coincidan con tu búsqueda.' : 'No hay viajes disponibles en este momento.'}
               </div>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-              {cars.map((car, idx) => {
+              {filteredCars.map((car, idx) => {
                 if (!car) return null;
                 return (
                   <div key={car.id_carros || idx} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
@@ -404,8 +411,8 @@ const Index = () => {
               <ul className="space-y-2">
                 <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Inicio</a></li>
                 <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Viajes</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Conductores</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Ayuda</a></li>
+          
+   
               </ul>
             </div>
 

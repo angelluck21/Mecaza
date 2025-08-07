@@ -32,12 +32,12 @@ function Login() {
     const contrasena = e.target.contrasenaS.value;
     
     try {
-      // Verificar credenciales contra la API de Laravel
       const response = await axios.post('http://127.0.0.1:8000/api/login', {
         Correo: correo,
         Contrasena: contrasena,
+
+        
       },
-                                                                  
       {
         headers: {
           'Content-Type': 'application/json',
@@ -45,65 +45,66 @@ function Login() {
         }
       });
       
-      console.log('Login exitoso:', response.data);
       showNotification('¡Inicio de sesión exitoso!', 'success');
       
-      // Guardar token y datos del usuario en localStorage
       if (response.data.token) {
         localStorage.setItem('authToken', response.data.token);
       }
       
-      // Verificar si es un administrador
       const isAdmin = correo.toLowerCase().includes('admin') || correo.toLowerCase().includes('administrador');
+      const isConductor = correo.toLowerCase().includes('conductor') || 
+                         correo.toLowerCase().includes('driver') || 
+                         correo.toLowerCase().includes('chofer') ||
+                         correo.toLowerCase().includes('piloto') ||
+                         correo.toLowerCase().includes('mecaza.com') ||
+                         correo.toLowerCase().includes('conductor1') ||
+                         correo.toLowerCase().includes('conductor2') ||
+                         correo.toLowerCase().includes('conductor3');
       
-      console.log('Correo:', correo);
-      console.log('¿Es admin?', isAdmin);
+      console.log('Login Debug:', {
+        correo,
+        isAdmin,
+        isConductor,
+        rol: isAdmin ? 'admin' : (isConductor ? 'conductor' : 'usuario')
+      });
       
-      // Crear objeto de usuario con los datos disponibles
       const userData = {
-        Nombre: correo.split('@')[0], // Usar parte del email como nombre temporal
+        Nombre: correo.split('@')[0],
         Correo: correo,
         token: response.data.token,
-        rol: isAdmin ? 'admin' : 'usuario'
+        rol: isAdmin ? 'admin' : (isConductor ? 'conductor' : 'usuario')
       };
       
       localStorage.setItem('userData', JSON.stringify(userData));
-      console.log('Datos de usuario guardados:', userData);
       
-      // Redirigir según el rol del usuario
       setTimeout(() => {
-        console.log('Redirigiendo... isAdmin:', isAdmin);
         if (isAdmin) {
-          console.log('Redirigiendo a /indexAdmin');
+          console.log('Redirigiendo a admin');
           navigate('/indexAdmin');
+        } else if (isConductor) {
+          console.log('Redirigiendo a conductor');
+          navigate('/conductor');
         } else {
-          console.log('Redirigiendo a /indexLogin');
+          console.log('Redirigiendo a usuario');
           navigate('/indexLogin');
         }
       }, 1500);
       
     } catch (error) {
-      console.error('Error al iniciar sesión:', error);
-      
       if (error.response) {
-        // Error del servidor Laravel
         const errorData = error.response.data;
         
         if (errorData.errors) {
-          // Errores de validación de Laravel
           const errorMessages = Object.values(errorData.errors).flat();
           showNotification(errorMessages.join(', '), 'error');
         } else if (errorData.message) {
-          // Mensaje de error general
           showNotification(errorData.message, 'error');
         } else {
           showNotification('Credenciales inválidas', 'error');
         }
       } else if (error.request) {
-        // Error de conexión
         showNotification('Error de conexión. Verifica que el servidor Laravel esté ejecutándose.', 'error');
       } else {
-        // Otro error
         showNotification('Error inesperado al iniciar sesión', 'error');
       }
     } finally {
@@ -117,7 +118,6 @@ function Login() {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-900 to-blue-700 px-4">
-      {/* Toast Notification Mejorada */}
       {showToast && (
         <div className={`fixed top-6 right-6 z-50 max-w-sm w-full transform transition-all duration-500 ease-out ${
           showToast ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
@@ -127,12 +127,9 @@ function Login() {
               ? 'bg-gradient-to-r from-green-500 to-emerald-600 border-green-400' 
               : 'bg-gradient-to-r from-red-500 to-pink-600 border-red-400'
           }`}>
-            {/* Efecto de brillo */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
             
-            {/* Contenido de la notificación */}
             <div className="relative p-6 flex items-start space-x-4">
-              {/* Icono con fondo circular */}
               <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
                 toastType === 'success' 
                   ? 'bg-white/20 backdrop-blur-sm' 
@@ -143,7 +140,6 @@ function Login() {
                 }`} />
               </div>
               
-              {/* Mensaje */}
               <div className="flex-1 min-w-0">
                 <p className={`text-lg font-semibold ${
                   toastType === 'success' ? 'text-white' : 'text-white'
@@ -157,7 +153,6 @@ function Login() {
                 </p>
               </div>
               
-              {/* Botón de cerrar */}
               <button
                 onClick={() => setShowToast(false)}
                 className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
@@ -172,7 +167,6 @@ function Login() {
               </button>
             </div>
             
-            {/* Barra de progreso */}
             <div className={`h-1 ${
               toastType === 'success' ? 'bg-green-400' : 'bg-red-400'
             }`}>
