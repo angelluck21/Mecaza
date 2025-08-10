@@ -194,6 +194,7 @@ const VerDetalles = () => {
       const response = await fetch('http://127.0.0.1:8000/api/agregarreserva', {
         method: 'POST',
         headers: {
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
@@ -202,7 +203,8 @@ const VerDetalles = () => {
            Nombre: nombre.trim(),
            Ubicacion: pickupLocation,
            Asiento: selectedSeat,
-           Usuario: userData.id || userData.id_users || userData.ID || 1
+           Usuario: userData.id || userData.id_users || userData.ID || 1,
+           estado: 'pendiente' // Estado inicial pendiente de confirmación
          })
       });
 
@@ -330,20 +332,20 @@ const VerDetalles = () => {
           <div className="grid md:grid-cols-2 gap-8 mb-8">
             
             <div className="space-y-6">
-              {/* Imagen del carro */}
-              <div className="flex justify-center">
-                {carDetails.imagencarro ? (
-                  <img 
-                    src={carDetails.imagencarro} 
-                    alt="Carro" 
-                    className="w-full max-w-md h-64 object-cover rounded-lg shadow-lg"
-                  />
-                ) : (
-                  <div className="w-full max-w-md h-64 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-lg flex items-center justify-center">
-                    <FaCar className="text-blue-600 text-6xl" />
-                  </div>
-                )}
-              </div>
+                             {/* Imagen del carro */}
+               <div className="flex justify-center">
+                 {carDetails.imagencarro ? (
+                   <img 
+                     src={carDetails.imagencarro} 
+                     alt="Carro" 
+                     className="w-full max-w-md h-64 object-cover rounded-lg shadow-lg"
+                   />
+                 ) : (
+                   <div className="w-full max-w-md h-64 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-lg flex items-center justify-center">
+                     <FaCar className="text-blue-600 text-6xl" />
+                   </div>
+                 )}
+               </div>
 
             
               <div className="bg-white rounded-lg p-6 border border-gray-200">
@@ -379,21 +381,21 @@ const VerDetalles = () => {
                   Información del Conductor
                 </h3>
                 <div className="space-y-3">
-                  <div>
-                    <span className="font-semibold text-gray-700">Nombre:</span>
-                    <p className="text-gray-900">{carDetails.conductor}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Placa:</span>
-                    <p className="text-gray-900">{carDetails.placa}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Teléfono:</span>
-                    <p className="text-gray-900 flex items-center">
-                      <FaPhone className="mr-2 text-blue-600" />
-                      {carDetails.telefono}
-                    </p>
-                  </div>
+                                     <div>
+                     <span className="font-semibold text-gray-700">Nombre:</span>
+                     <p className="text-gray-900">{carDetails.conductor}</p>
+                   </div>
+                   <div>
+                     <span className="font-semibold text-gray-700">Placa:</span>
+                     <p className="text-gray-900">{carDetails.placa}</p>
+                   </div>
+                   <div>
+                     <span className="font-semibold text-gray-700">Teléfono:</span>
+                     <p className="text-gray-900 flex items-center">
+                       <FaPhone className="mr-2 text-blue-600" />
+                       {carDetails.telefono}
+                     </p>
+                   </div>
                  
                 </div>
               </div>
@@ -404,30 +406,30 @@ const VerDetalles = () => {
                   <FaMapMarkerAlt className="mr-2" />
                   Detalles del Viaje
                 </h3>
-                <div className="space-y-3">
-                  <div>
-                    <span className="font-semibold text-gray-700">Destino:</span>
-                    <p className="text-gray-900">{carDetails.destino}</p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Fecha:</span>
-                    <p className="text-gray-900 flex items-center">
-                      <FaCalendar className="mr-2 text-green-600" />
-                      {new Date(carDetails.fecha).toLocaleDateString('es-ES')}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Hora de salida:</span>
-                    <p className="text-gray-900 flex items-center">
-                      <FaClock className="mr-2 text-green-600" />
-                      {carDetails.horasalida}
-                    </p>
-                  </div>
-                  <div>
-                    <span className="font-semibold text-gray-700">Asientos disponibles:</span>
-                    <p className="text-gray-900">{carDetails.asientos_disponibles || carDetails.asientos} de {carDetails.asientos}</p>
-                  </div>
-                </div>
+                                 <div className="space-y-3">
+                   <div>
+                     <span className="font-semibold text-gray-700">Destino:</span>
+                     <p className="text-gray-900">{carDetails.destino}</p>
+                   </div>
+                   <div>
+                     <span className="font-semibold text-gray-700">Fecha:</span>
+                     <p className="text-gray-900 flex items-center">
+                       <FaCalendar className="mr-2 text-green-600" />
+                       {new Date(carDetails.fecha).toLocaleDateString('es-ES')}
+                     </p>
+                   </div>
+                   <div>
+                     <span className="font-semibold text-gray-700">Hora de salida:</span>
+                     <p className="text-gray-900 flex items-center">
+                       <FaClock className="mr-2 text-green-600" />
+                       {carDetails.horasalida}
+                     </p>
+                   </div>
+                   <div>
+                     <span className="font-semibold text-gray-700">Asientos disponibles:</span>
+                     <p className="text-gray-900">{carDetails.asientos_disponibles || carDetails.asientos} de {carDetails.asientos}</p>
+                   </div>
+                 </div>
               </div>
             </div>
           </div>
@@ -438,11 +440,11 @@ const VerDetalles = () => {
             
             {/* Layout moderno de asientos */}
             <div className="max-w-md mx-auto">
-              {/* Información del vehículo */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-xl p-4 text-white text-center mb-4">
-                <h4 className="font-bold text-lg">{carDetails.placa}</h4>
-                <p className="text-sm opacity-90">Vehículo disponible</p>
-              </div>
+                             {/* Información del vehículo */}
+               <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-xl p-4 text-white text-center mb-4">
+                 <h4 className="font-bold text-lg">{carDetails.placa}</h4>
+                 <p className="text-sm opacity-90">Vehículo disponible</p>
+               </div>
               
               {/* Asientos */}
               <div className="bg-white rounded-b-xl shadow-xl p-6">
@@ -596,13 +598,13 @@ const VerDetalles = () => {
                  <span className="font-semibold">Hora:</span> {carDetails.horasalida}
                </div>
                                <div>
-                   <span className="font-semibold">Pasajero:</span> {nombre}
+                   <span className="font-semibold">Pasajero:</span> {nombre || 'No especificado'}
                 </div>
                <div>
-                 <span className="font-semibold">Puesto:</span> {selectedSeat}
+                 <span className="font-semibold">Puesto:</span> {selectedSeat || 'No seleccionado'}
                </div>
                <div>
-                 <span className="font-semibold">Ubicación:</span> {pickupLocation}
+                 <span className="font-semibold">Ubicación:</span> {pickupLocation || 'No especificada'}
                </div>
              </div>
             <div className="flex space-x-4">
@@ -643,13 +645,18 @@ const VerDetalles = () => {
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaCheck className="text-green-600 text-2xl" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Reserva Confirmada!</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Reserva Creada!</h3>
             <p className="text-gray-600 mb-6">
-              Tu viaje ha sido reservado exitosamente. El conductor te contactará pronto.
+              Tu reserva ha sido creada exitosamente y está pendiente de confirmación por el conductor.
             </p>
+            <div className="bg-yellow-50 rounded-lg p-4 mb-6">
+              <p className="text-sm text-yellow-800">
+                <strong>Estado:</strong> Pendiente de confirmación por el conductor. Te notificaremos cuando sea confirmada.
+              </p>
+            </div>
             <div className="bg-green-50 rounded-lg p-4 mb-6">
               <p className="text-sm text-green-800">
-                <strong>Recordatorio:</strong> Llega 10 minutos antes de la hora de salida en tu ubicación de recogida.
+                <strong>Recordatorio:</strong> Una vez confirmada, llega 10 minutos antes de la hora de salida en tu ubicación de recogida.
               </p>
             </div>
             <p className="text-sm text-gray-500">

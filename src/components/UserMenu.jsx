@@ -2,6 +2,42 @@ import React, { useState, useRef, useEffect } from 'react';
 import { FaUserCircle } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
 
+// Estilos CSS para las animaciones y z-index
+const userMenuStyles = `
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.2s ease-out;
+  }
+  
+  .user-menu-container {
+    position: relative;
+    z-index: 999999 !important;
+  }
+  
+  .user-menu-dropdown {
+    position: absolute !important;
+    z-index: 999999 !important;
+    top: 100% !important;
+    right: 0 !important;
+    min-width: 12rem !important;
+    background-color: white !important;
+    border: 1px solid #e5e7eb !important;
+    border-radius: 0.5rem !important;
+    box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15) !important;
+    margin-top: 0.5rem !important;
+  }
+`;
+
 const UserMenu = ({ userData }) => {
   const [open, setOpen] = useState(false);
   const menuRef = useRef(null);
@@ -42,43 +78,56 @@ const UserMenu = ({ userData }) => {
     navigate('/mis-reservas'); // Ruta a la página de mis reservas
   };
 
+  const handleNotifications = () => {
+    setOpen(false);
+    navigate('/conductor-notificaciones'); // Ruta a las notificaciones del conductor
+  };
+
   return (
-    <div className="relative" ref={menuRef} style={{ zIndex: 50 }}>
-      <button
-        onClick={() => setOpen((prev) => !prev)}
-        className="flex items-center space-x-2 px-4 py-2 bg-blue-100 rounded-full hover:bg-blue-200 transition-colors focus:outline-none"
-        style={{ zIndex: 50 }}
-      >
-        <FaUserCircle className="text-blue-900 text-2xl" />
-        <span className="font-semibold text-blue-900">Hola, {userData?.Nombre || 'Usuario'}</span>
-      </button>
-      {open && (
-        <div className="absolute right-0 mt-2 w-48 bg-white rounded-lg shadow-lg border animate-fade-in"
-          style={{ zIndex: 50 }}
+    <>
+      <style>{userMenuStyles}</style>
+      <div className="user-menu-container" ref={menuRef}>
+        <button
+          onClick={() => setOpen((prev) => !prev)}
+          className="flex items-center space-x-2 px-4 py-2 bg-blue-100 rounded-full hover:bg-blue-200 transition-colors focus:outline-none"
         >
-          <button
-            onClick={handleProfile}
-            className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-900"
-          >
-            Ver perfil
-          </button>
-          <button
-            onClick={handleMyReservations}
-            className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-blue-900"
-          >
-            Mis Reservas
-          </button>
-         
-          <div className="border-t my-1" />
-          <button
-            onClick={handleLogout}
-            className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600"
-          >
-            Cerrar sesión
-          </button>
-        </div>
-      )}
-    </div>
+          <FaUserCircle className="text-blue-900 text-2xl" />
+          <span className="font-semibold text-blue-900">Hola, {userData?.Nombre || 'Usuario'}</span>
+        </button>
+        {open && (
+          <div className="user-menu-dropdown animate-fade-in">
+            <button
+              onClick={handleProfile}
+              className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
+            >
+              Ver perfil
+            </button>
+            <button
+              onClick={handleMyReservations}
+              className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
+            >
+              Mis Reservas
+            </button>
+            {(userData?.rol === 'conductor' || userData?.rol === 'admin') && (
+              <button
+                onClick={handleNotifications}
+                className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
+              >
+                Notificaciones
+              </button>
+            )}
+           
+            <div className="border-t border-gray-200 my-1" />
+            <button
+              onClick={handleLogout}
+              className="block w-full text-left px-4 py-2 hover:bg-red-50 text-red-600 hover:text-red-700 transition-colors"
+            >
+              Cerrar sesión
+            </button>
+          </div>
+        )}
+      </div>
+    </>
   );
 };
 

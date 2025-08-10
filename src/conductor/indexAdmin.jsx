@@ -109,11 +109,11 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarprecio', dataToSend, {
+      // Llamada a la ruta /agregarprecio que conecta con PrecioviajeController::Create
+      const response = await axios.put('http://127.0.0.1:8000/api/agregarprecio', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
       
@@ -132,9 +132,10 @@ const IndexAdmin = () => {
       }
       
     } catch (error) {
+      console.error('Error al guardar precios:', error);
       if (error.response) {
         if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
+          showToastNotification('Error del servidor: Verifica que el PrecioviajeController esté configurado correctamente', 'error');
         } else if (error.response.status === 422) {
           showToastNotification('Error de validación: Verifica los datos enviados', 'error');
         } else {
@@ -559,8 +560,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['CaucaMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'CaucaMede': e.target.value}))}
+                      value={preciosData['CaucaMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'CaucaMede': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required
@@ -576,8 +577,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['ZaraMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraMede': e.target.value}))}
+                      value={preciosData['ZaraMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraMede': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required
@@ -593,8 +594,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['ZaraCauca'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraCauca': e.target.value}))}
+                      value={preciosData['ZaraCauca']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraCauca': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required

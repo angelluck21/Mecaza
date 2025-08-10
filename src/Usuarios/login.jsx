@@ -35,12 +35,14 @@ function Login() {
       const response = await axios.post('http://127.0.0.1:8000/api/login', {
         Correo: correo,
         Contrasena: contrasena,
+       
 
-        
       },
       {
         headers: {
+          'Authorization':  'Bearer ' + localStorage.getItem('authToken'),
           'Content-Type': 'application/json',
+          
           'Accept': 'application/json',
         }
       });
@@ -51,42 +53,56 @@ function Login() {
         localStorage.setItem('authToken', response.data.token);
       }
       
-      const isAdmin = correo.toLowerCase().includes('admin') || correo.toLowerCase().includes('administrador');
-      const isConductor = correo.toLowerCase().includes('conductor') || 
-                         correo.toLowerCase().includes('driver') || 
-                         correo.toLowerCase().includes('chofer') ||
-                         correo.toLowerCase().includes('piloto') ||
-                         correo.toLowerCase().includes('mecaza.com') ||
-                         correo.toLowerCase().includes('conductor1') ||
-                         correo.toLowerCase().includes('conductor2') ||
-                         correo.toLowerCase().includes('conductor3');
+      // Obtener el rol del usuario desde la respuesta del servidor
+      const userRol = response.data.user?.rol || response.data.rol || response.data.user?.Rol || response.data.Rol || 'usuario';
       
       console.log('Login Debug:', {
         correo,
-        isAdmin,
-        isConductor,
-        rol: isAdmin ? 'admin' : (isConductor ? 'conductor' : 'usuario')
+        userRol,
+        responseData: response.data
       });
       
       const userData = {
-        Nombre: correo.split('@')[0],
+        Nombre: response.data.user?.Nombre || response.data.Nombre || response.data.user?.nombre || response.data.nombre || correo.split('@')[0],
         Correo: correo,
         token: response.data.token,
-        rol: isAdmin ? 'admin' : (isConductor ? 'conductor' : 'usuario')
+        rol: userRol
       };
       
       localStorage.setItem('userData', JSON.stringify(userData));
+      console.log('Datos guardados en localStorage:', userData); // Debug log
+      
+      // Definir rutas de redirección según el rol
+      const redirectPaths = {
+        'usuario': '/indexLogin',
+        'conductor': '/conductor',
+        'administrador': '/indexAdmin',
+        'admin': '/indexAdmin' // Fallback para 'admin'
+      };
       
       setTimeout(() => {
-        if (isAdmin) {
-          console.log('Redirigiendo a admin');
-          navigate('/indexAdmin');
-        } else if (isConductor) {
-          console.log('Redirigiendo a conductor');
-          navigate('/conductor');
+        const targetPath = redirectPaths[userRol];
+        console.log('Rol del usuario:', userRol); // Debug log
+        console.log('Ruta de redirección:', targetPath); // Debug log
+        
+        if (targetPath) {
+          console.log('Iniciando redirección...'); // Debug log
+          console.log('URL actual antes de redirección:', window.location.pathname); // Debug log
+          
+          // Forzar la redirección
+          navigate(targetPath, { replace: true });
+          
+          // Verificar si la redirección funcionó
+          setTimeout(() => {
+            console.log('URL después de redirección:', window.location.pathname); // Debug log
+            if (window.location.pathname !== targetPath) {
+              console.error('La redirección no funcionó, intentando con window.location');
+              window.location.href = targetPath;
+            }
+          }, 100);
         } else {
-          console.log('Redirigiendo a usuario');
-          navigate('/indexLogin');
+          console.error('Ruta no encontrada para el rol:', userRol);
+          navigate('/indexLogin'); // Fallback
         }
       }, 1500);
       

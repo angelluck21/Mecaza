@@ -20,6 +20,14 @@ const ListaUsuarios = () => {
   useEffect(() => {
     // Verificar autenticación
     const storedUserData = localStorage.getItem('userData');
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!authToken) {
+      console.log('No hay token de autenticación');
+      navigate('/login');
+      return;
+    }
+    
     if (storedUserData) {
       try {
         const user = JSON.parse(storedUserData);
@@ -30,6 +38,7 @@ const ListaUsuarios = () => {
         return;
       }
     } else {
+      console.log('No hay datos de usuario almacenados');
       navigate('/login');
       return;
     }
@@ -73,7 +82,23 @@ const ListaUsuarios = () => {
       }
     } catch (error) {
       console.error('Error al obtener usuarios:', error);
-      showToastNotification('Error de conexión al cargar usuarios', 'error');
+      console.log('Error response:', error.response);
+      
+      if (error.response) {
+        const statusCode = error.response.status;
+        if (statusCode === 400) {
+          showToastNotification('Error 400: Solicitud incorrecta al cargar usuarios. Verifica tu autenticación.', 'error');
+        } else if (statusCode === 401) {
+          showToastNotification('Error 401: No autorizado. Inicia sesión nuevamente.', 'error');
+          navigate('/login');
+        } else if (statusCode === 500) {
+          showToastNotification('Error del servidor al cargar usuarios. Intenta nuevamente.', 'error');
+        } else {
+          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error desconocido'}`, 'error');
+        }
+      } else {
+        showToastNotification('Error de conexión al cargar usuarios', 'error');
+      }
     } finally {
       setIsLoadingUsers(false);
     }
@@ -244,7 +269,7 @@ const ListaUsuarios = () => {
             </div>
             <div className="mt-4 md:mt-0">
               <button
-                onClick={() => navigate('/registro')}
+                onClick={() => navigate('/registrar')}
                 className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
               >
                 <FaPlus className="mr-2" />

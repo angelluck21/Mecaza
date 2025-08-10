@@ -189,7 +189,7 @@ const IndexLogin = () => {
                   </div>
                   
                   <button
-                    onClick={() => { setIsMenuOpen(false); navigate('/ajustes-cuenta'); }}
+                    onClick={() => { setIsMenuOpen(false); navigate('/ajustes-perfil'); }}
                     className="w-full text-left px-3 py-2 text-blue-900 hover:bg-blue-50 rounded-md transition-colors font-medium flex items-center"
                   >
                     <Cog6ToothIcon className="h-5 w-5 mr-2" />
@@ -343,14 +343,7 @@ const IndexLogin = () => {
               </div>
             </div>
 
-            <div>
-              <h3 className="text-lg font-semibold mb-4 text-blue-400">Enlaces Rápidos</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Inicio</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Viajes</a></li>
-               
-              </ul>
-            </div>
+        
 
             <div>
               <h3 className="text-lg font-semibold mb-4 text-blue-400">Contacto</h3>

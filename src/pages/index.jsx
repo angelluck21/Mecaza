@@ -405,16 +405,7 @@ const Index = () => {
               </div>
             </div>
 
-            {/* Enlaces rápidos */}
-            <div>
-              <h3 className="text-lg font-semibold mb-4 text-blue-400">Enlaces Rápidos</h3>
-              <ul className="space-y-2">
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Inicio</a></li>
-                <li><a href="#" className="text-gray-300 hover:text-white transition-colors">Viajes</a></li>
-          
-   
-              </ul>
-            </div>
+            
 
             {/* Contacto */}
             <div>
@@ -422,15 +413,15 @@ const Index = () => {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <FaPhone className="text-blue-400" />
-                  <span className="text-gray-300">+1 234 567 890</span>
+                  <span className="text-gray-300">+57 3243114965</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <FaEnvelope className="text-blue-400" />
-                  <span className="text-gray-300">info@mecaza.com</span>
+                  <span className="text-gray-300">mecaza@gmail.com</span>
                 </div>
                 <div className="flex items-center space-x-3">
                   <FaMapMarkerAlt className="text-blue-400" />
-                  <span className="text-gray-300">Ciudad, País</span>
+                  <span className="text-gray-300">Medellin, Colombia</span>
                 </div>
               </div>
             </div>

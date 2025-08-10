@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaTrash, FaEdit, FaCheck, FaTimes } from 'react-icons/fa';
+import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaTrash, FaEdit, FaCheck, FaTimes, FaSync } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
 import axios from 'axios';
@@ -86,6 +86,27 @@ const MisReservas = () => {
     }
   };
 
+  // Función para actualizar el estado de una reserva
+  const updateReservationStatus = async (reservationId, newStatus) => {
+    try {
+      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
+        estado: newStatus
+      }, {
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+        }
+      });
+
+      console.log('Estado de reserva actualizado:', response.data);
+      
+      // Recargar las reservas para mostrar el nuevo estado
+      await fetchUserReservations();
+    } catch (error) {
+      console.error('Error al actualizar estado de reserva:', error);
+    }
+  };
+
   const handleGoBack = () => {
     navigate(-1);
   };
@@ -145,22 +166,51 @@ const MisReservas = () => {
     const reservationId = reservation.id || reservation.id_reservarviaje || reservation.ID;
 
     try {
+      console.log('Eliminando reserva:', reservation);
+      console.log('ID de reserva:', reservationId);
+      
       const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarreserva/${reservationId}`, {
         headers: {
-          'Authorization':  'Bearer ' + localStorage.getItem('authToken'),
+          'Authorization': 'Bearer ' + localStorage.getItem('authToken'),
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         }
       });
       
-      console.log('Reserva cancelada:', response.data);
-      alert('Reserva cancelada exitosamente');
+      console.log('Reserva eliminada:', response.data);
+      
+      // Mostrar mensaje de éxito basado en la respuesta del controlador
+      if (response.data && response.data.message) {
+        alert(response.data.message);
+      } else {
+        alert('Reserva eliminada exitosamente');
+      }
       
       // Recargar la lista de reservas
       await fetchUserReservations();
     } catch (error) {
-      console.error('Error al cancelar reserva:', error);
-      alert(`Error al cancelar la reserva: ${error.message}`);
+      console.error('Error al eliminar reserva:', error);
+      
+      // Manejar diferentes tipos de errores
+      let errorMessage = 'Error al eliminar la reserva';
+      
+      if (error.response) {
+        // Error de respuesta del servidor
+        if (error.response.data && error.response.data.message) {
+          errorMessage = error.response.data.message;
+        } else if (error.response.status === 404) {
+          errorMessage = 'Reserva no encontrada';
+        } else if (error.response.status === 401) {
+          errorMessage = 'No autorizado para eliminar esta reserva';
+        } else if (error.response.status === 403) {
+          errorMessage = 'No tienes permisos para eliminar esta reserva';
+        }
+      } else if (error.request) {
+        // Error de conexión
+        errorMessage = 'Error de conexión. Verifica que el servidor esté ejecutándose.';
+      }
+      
+      alert(errorMessage);
     }
   };
 
@@ -170,10 +220,27 @@ const MisReservas = () => {
         return 'bg-green-100 text-green-800';
       case 'pendiente':
         return 'bg-yellow-100 text-yellow-800';
+      case 'rechazada':
+        return 'bg-red-100 text-red-800';
       case 'cancelada':
         return 'bg-red-100 text-red-800';
       default:
         return 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusText = (status) => {
+    switch (status?.toLowerCase()) {
+      case 'confirmada':
+        return '✅ Confirmada';
+      case 'pendiente':
+        return '⏳ Pendiente de Confirmación';
+      case 'rechazada':
+        return '❌ Rechazada';
+      case 'cancelada':
+        return '❌ Cancelada';
+      default:
+        return '⏳ Pendiente de Confirmación';
     }
   };
 
@@ -249,6 +316,13 @@ const MisReservas = () => {
             <p className="text-lg text-gray-600">
               Gestiona tus reservas de viaje
             </p>
+            <button
+              onClick={fetchUserReservations}
+              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center mx-auto"
+            >
+                              <FaSync className="mr-2" />
+              Actualizar Estado
+            </button>
           </div>
 
           {reservations.length === 0 ? (
@@ -274,7 +348,7 @@ const MisReservas = () => {
                           Reserva #{reservation.id || reservation.id_reservarviaje || reservation.ID}
                         </h3>
                         <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(reservation.estado)}`}>
-                          {reservation.estado || 'Pendiente'}
+                          {getStatusText(reservation.estado)}
                         </span>
                       </div>
                       

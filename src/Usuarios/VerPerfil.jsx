@@ -148,7 +148,6 @@ const VerPerfil = () => {
         </div>
       </nav>
 
-      {/* Contenido principal */}
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
           {/* Header */}
@@ -184,7 +183,8 @@ const VerPerfil = () => {
                  {userData.Nombre || userData.nombre || userData.name || 'Usuario'}
                </h2>
               <p className="text-gray-600 mb-4">
-                {userData.rol === 'admin' ? 'Administrador' : 'Usuario'}
+                {userData.rol === 'admin' ? 'Administrador' : 
+                 userData.rol === 'conductor' ? 'Conductor' : 'Usuario'}
               </p>
             </div>
           </div>
@@ -209,7 +209,8 @@ const VerPerfil = () => {
                  <div>
                    <label className="block text-sm font-medium text-gray-500">Rol</label>
                    <p className="text-gray-900 font-medium">
-                     {userData.rol === 'admin' ? 'Administrador' : 'Usuario'}
+                     {userData.rol === 'admin' ? 'Administrador' : 
+                      userData.rol === 'conductor' ? 'Conductor' : 'Usuario'}
                    </p>
                  </div>
                </div>
@@ -246,13 +247,15 @@ const VerPerfil = () => {
               <div>
                 <label className="block text-sm font-medium text-gray-500">Tipo de cuenta</label>
                 <p className="text-gray-900 font-medium">
-                  {userData.rol === 'admin' ? 'Cuenta Administrativa' : 'Cuenta de Usuario'}
+                    {userData.rol === 'admin' ? 'Cuenta Administrativa' : 
+                   userData.rol === 'conductor' ? 'Cuenta de Conductor' : 'Cuenta de Usuario'}
                 </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-500">Acceso</label>
                 <p className="text-gray-900 font-medium">
-                  {userData.rol === 'admin' ? 'Panel Administrativo' : 'Acceso General'}
+                  {userData.rol === 'admin' ? 'Panel Administrativo' : 
+                   userData.rol === 'conductor' ? 'Panel de Conductor' : 'Acceso General'}
                 </p>
               </div>
             </div>
