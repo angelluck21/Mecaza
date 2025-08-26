@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaUser, FaEnvelope, FaLock, FaSave, FaArrowLeft, FaCamera } from 'react-icons/fa';
+import { FaCar, FaUser, FaEnvelope, FaLock, FaSave, FaArrowLeft, FaCamera, FaPhone } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
 import axios from 'axios';
@@ -11,57 +11,89 @@ const AjustesPerfil = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [showNotification, setShowNotification] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationType, setNotificationType] = useState('success');
   const [isSaving, setIsSaving] = useState(false);
   const navigate = useNavigate();
 
+
+ 
   const [profileData, setProfileData] = useState({
+    user: '',
     nombre: '',
     email: '',
+    telefono: '',
     contrasena: '',
     confirmarContrasena: ''
   });
 
   const [profileImage, setProfileImage] = useState(null);
   const [imagePreview, setImagePreview] = useState(null);
-  const [userId, setUserId] = useState(null);
 
   useEffect(() => {
     const storedUserData = localStorage.getItem('userData');
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        setUserData(user);
-        
-        setProfileData({
-          nombre: user.Nombre || '',
-          email: user.Correo || '',
-          contrasena: '',
-          confirmarContrasena: ''
-        });
-
-        if (user.fotoPerfil) {
-          setImagePreview(user.fotoPerfil);
-        }
-
-        // Establecer el ID del usuario directamente desde los datos del localStorage
-        setUserId(user.id_users || user.id || user.ID);
-      } catch (error) {
-        navigate('/login');
-        return;
-      }
-    } else {
+    const authToken = localStorage.getItem('authToken');
+    
+    if (!storedUserData || !authToken) {
+      console.log('No hay datos de usuario o token, redirigiendo al login');
       navigate('/login');
       return;
     }
+    
+    try {
+      const user = JSON.parse(storedUserData);
+      
+      // Verificar que el usuario tenga un ID válido
+      const userId = user.id || user.id_users || user.ID || user.user_id || user.userId;
+      
+      console.log('=== DEBUG AJUSTES PERFIL ===');
+      console.log('Usuario completo:', user);
+      console.log('ID extraído:', userId);
+      console.log('Token presente:', !!authToken);
+      console.log('============================');
+      
+      if (!userId) {
+        console.error('Usuario sin ID válido:', user);
+        navigate('/login');
+        return;
+      }
+      
+      setUserData(user);
+      
+             setProfileData({
+         user: userId,
+         nombre: user.Nombre || user.nombre || user.name || '',
+         email: user.Correo || user.correo || user.email || user.Email || '',
+         telefono: user.Telefono || user.telefono || user.tel || user.phone || '',
+         contrasena: '',
+         confirmarContrasena: ''
+       });
+
+      if (user.fotoPerfil) {
+        setImagePreview(user.fotoPerfil);
+      }
+      
+    } catch (error) {
+      console.error('Error al parsear datos del usuario:', error);
+      navigate('/login');
+      return;
+    }
+    
     setIsLoading(false);
   }, [navigate]);
 
   const showToastNotification = (message, type = 'success') => {
     setNotificationMessage(message);
+    setNotificationType(type);
     setShowNotification(true);
     setTimeout(() => {
       setShowNotification(false);
-    }, 4000);
+    }, 5000); // 5 segundos como en el login
+  };
+
+  // Función auxiliar para obtener el teléfono del usuario
+  const getUserPhone = (user) => {
+    const phone = user.Telefono || user.telefono || user.tel || user.phone;
+    return phone && phone.trim() !== '' ? phone : 'Sin teléfono';
   };
 
   const handleImageChange = (e) => {
@@ -87,19 +119,28 @@ const AjustesPerfil = () => {
     setIsSaving(true);
     
     try {
-      const dataToSend = {
-        nombre: profileData.nombre,
-        email: profileData.email
-      };
+
+      const storedUserData = localStorage.getItem('userData');
+      const user = JSON.parse(storedUserData);
       
-      if (profileData.contrasena) {
-        dataToSend.contrasena = profileData.contrasena;
-      }
+                          const dataToSend = {
+          Nombre: profileData.nombre,      // Campo requerido
+          Correo: profileData.email,       // Campo requerido
+          Rol: user.rol || user.Rol || 'usuario',  // Campo requerido - no editable
+          Telefono: profileData.telefono || getUserPhone(user)  // Campo requerido - valor por defecto
+        };
+       
+       if (profileData.contrasena) {
+         dataToSend.Contrasena = profileData.contrasena;  // Campo opcional
+       }
+      
+      // Obtener el ID del usuario del localStorage
+      const userId = user.id || user.id_users || user.ID || user.user_id || user.userId;
       
       if (profileImage) {
         const formData = new FormData();
         formData.append('foto_perfil', profileImage);
-        formData.append('user_id', userData.id || userData.Correo);
+        formData.append('user_id', userId);
 
         const imageResponse = await fetch('http://127.0.0.1:8000/api/actualizar-foto-perfil', {
           method: 'POST',
@@ -113,14 +154,34 @@ const AjustesPerfil = () => {
           throw new Error('Error al subir la imagen de perfil');
         }
       }
-      
-      const response = await axios.put(`http://127.0.0.1:8000/api/actualizarusuario/${userData.id || userData.Correo}`, dataToSend, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+        
+                                   console.log('=== DEBUG ACTUALIZAR PERFIL ===');
+          console.log('Usuario completo del localStorage:', user);
+          console.log('ID del usuario extraído:', userId);
+          console.log('Datos a enviar:', dataToSend);
+          console.log('Teléfono del usuario original:', getUserPhone(user));
+          console.log('Teléfono del formulario:', profileData.telefono);
+          console.log('Teléfono final enviado:', dataToSend.Telefono);
+          console.log('Token de autorización:', localStorage.getItem('authToken') ? 'Presente' : 'Ausente');
+          console.log('URL de la petición:', `http://127.0.0.1:8000/api/actualizarusuario/${userId}`);
+          console.log('Headers de la petición:', {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          });
+          console.log('================================');
+        
+        if (!userId) {
+          throw new Error('No se pudo identificar el ID del usuario');
         }
-      });
+        
+        const response = await axios.put(`http://127.0.0.1:8000/api/actualizarusuario/${userId}`, dataToSend, {
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
+          }
+        });
       
       showToastNotification('¡Perfil actualizado exitosamente! ✅');
       
@@ -133,19 +194,52 @@ const AjustesPerfil = () => {
       localStorage.setItem('userData', JSON.stringify(updatedUserData));
       setUserData(updatedUserData);
       
-      setProfileData({
-        ...profileData,
-        contrasena: '',
-        confirmarContrasena: ''
-      });
+             setProfileData({
+         ...profileData,
+         contrasena: '',
+         confirmarContrasena: '',
+         telefono: profileData.telefono  // Mantener el teléfono
+       });
       
       setProfileImage(null);
       
-    } catch (error) {
-      showToastNotification('Error al actualizar el perfil. Inténtalo de nuevo.', 'error');
-    } finally {
-      setIsSaving(false);
-    }
+         } catch (error) {
+       console.error('Error completo al actualizar perfil:', error);
+       
+       if (error.response) {
+         // El servidor respondió con un código de estado de error
+         const statusCode = error.response.status;
+         const errorData = error.response.data;
+         
+         console.log('=== ERROR DEL SERVIDOR ===');
+         console.log('Status:', statusCode);
+         console.log('Datos del error:', errorData);
+         console.log('==========================');
+         
+         if (statusCode === 500) {
+           showToastNotification('Error interno del servidor. Por favor, contacta al administrador del sistema.', 'error');
+         } else if (statusCode === 400) {
+           showToastNotification(`Error en los datos enviados: ${errorData.message || 'Datos inválidos'}`, 'error');
+         } else if (statusCode === 401) {
+           showToastNotification('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.', 'error');
+           navigate('/login');
+         } else if (statusCode === 404) {
+           showToastNotification('Usuario no encontrado en el sistema.', 'error');
+         } else {
+           showToastNotification(`Error del servidor (${statusCode}): ${errorData.message || 'Error desconocido'}`, 'error');
+         }
+       } else if (error.request) {
+         // La petición se hizo pero no se recibió respuesta
+         console.error('No se recibió respuesta del servidor:', error.request);
+         showToastNotification('No se pudo conectar con el servidor. Verifica tu conexión a internet.', 'error');
+       } else {
+         // Error en la configuración de la petición
+         console.error('Error en la configuración de la petición:', error.message);
+         showToastNotification(`Error de configuración: ${error.message}`, 'error');
+       }
+     } finally {
+       setIsSaving(false);
+     }
   };
 
   const handleGoBack = () => {
@@ -167,28 +261,48 @@ const AjustesPerfil = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
       {showNotification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaUser className="h-8 w-8 text-green-500" />
+        <div className={`fixed top-6 right-6 z-50 max-w-sm w-full transform transition-all duration-500 ease-out ${
+          showNotification ? 'translate-x-0 opacity-100 scale-100' : 'translate-x-full opacity-0 scale-95'
+        }`}>
+          <div className={`relative overflow-hidden rounded-2xl shadow-2xl border ${
+            notificationType === 'success'
+              ? 'bg-gradient-to-r from-green-500 to-emerald-600 border-green-400' 
+              : 'bg-gradient-to-r from-red-500 to-pink-600 border-red-400'
+          }`}>
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent animate-pulse"></div>
+            
+            <div className="relative p-6 flex items-start space-x-4">
+              <div className={`flex-shrink-0 w-12 h-12 rounded-full flex items-center justify-center ${
+                'bg-white/20 backdrop-blur-sm'
+              }`}>
+                <FaCar className={`text-2xl text-white`} />
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
+              
+              <div className="flex-1 min-w-0">
+                <p className={`text-lg font-semibold text-white`}>
+                  {notificationType === 'success' ? '¡Éxito!' : 'Error'}
+                </p>
+                                <p className={`text-sm mt-1 ${
+                  notificationType === 'success' ? 'text-green-100' : 'text-red-100'
+                }`}>
                   {notificationMessage}
                 </p>
               </div>
-              <div className="ml-auto pl-3">
-                <button
-                  onClick={() => setShowNotification(false)}
-                  className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
-                >
-                  <span className="sr-only">Cerrar</span>
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
+              
+              <button
+                onClick={() => setShowNotification(false)}
+                className={`flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center transition-colors hover:bg-white/20 text-white`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoinjoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            
+            <div className={`h-1 ${
+              notificationType === 'success' ? 'bg-green-400' : 'bg-red-400'
+            }`}>
+              <div className={`h-full bg-white animate-pulse`} style={{animationDuration: '4s'}}></div>
             </div>
           </div>
         </div>
@@ -283,20 +397,7 @@ const AjustesPerfil = () => {
           </div>
 
           <form onSubmit={handleSaveProfile} className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">ID de Usuario</label>
-              <div className="relative">
-                <FaUser className="absolute left-3 top-2.5 text-gray-400" />
-                <input
-                  type="text"
-                  value={userId || 'Cargando...'}
-                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-50 cursor-not-allowed"
-                  placeholder="ID del usuario"
-                  readOnly
-                />
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Este es tu identificador único en el sistema</p>
-            </div>
+           
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Nombre</label>
@@ -328,8 +429,43 @@ const AjustesPerfil = () => {
               </div>
             </div>
 
+            {/* Campo de Rol - No editable */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña (opcional)</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Rol de Usuario</label>
+              <div className="relative">
+                <FaUser className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="text"
+                  value={userData.rol === 'admin' ? 'Administrador' : 
+                         userData.rol === 'conductor' ? 'Conductor' : 'Usuario'}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md bg-gray-100 text-gray-600 cursor-not-allowed"
+                  disabled
+                  readOnly
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-1">
+                El rol no se puede modificar desde esta interfaz
+              </p>
+            </div>
+
+            {/* Campo de Teléfono - Opcional */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
+              <div className="relative">
+                <FaPhone className="absolute left-3 top-2.5 text-gray-400" />
+                <input
+                  type="tel"
+                  value={profileData.telefono || ''}
+                  onChange={(e) => setProfileData({...profileData, telefono: e.target.value})}
+                  className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  placeholder="Tu número de teléfono"
+                />
+              </div>
+             
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Nueva contraseña  </label>
               <div className="relative">
                 <FaLock className="absolute left-3 top-2.5 text-gray-400" />
                 <input

@@ -60,7 +60,7 @@ const UserMenu = ({ userData }) => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('userData');
     setOpen(false);
-    navigate('/login');
+    navigate('/index');
   };
 
   const handleProfile = () => {

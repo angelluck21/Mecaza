@@ -3,6 +3,7 @@ import { FaCar, FaPhone, FaEnvelope, FaMapMarkerAlt, FaFacebook, FaTwitter, FaIn
 import { MagnifyingGlassIcon, UserIcon, Bars3Icon } from '@heroicons/react/24/outline';
 // Importar el UserMenu
 import UserMenu from '../components/UserMenu';
+import CarImage from '../components/CarImage';
 import Login from '../Usuarios/login';
 import Registrar from '../Usuarios/Registrar';
 import IndexLogin from './indexLogin';
@@ -21,6 +22,47 @@ const Index = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const navigate = useNavigate();
+
+  // Función helper para construir la URL de la imagen del carro
+  const getCarImageUrl = (imagePath) => {
+    if (!imagePath) return null;
+    
+    // Si ya es una URL completa, devolverla
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // Si empieza con /storage, construir URL completa
+    if (imagePath.startsWith('/storage/')) {
+      return `http://127.0.0.1:8000${imagePath}`;
+    }
+    
+    // Si es solo el nombre del archivo, construir URL
+    if (!imagePath.includes('/')) {
+      return `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+    }
+    
+    // Construir URL completa
+    return `http://127.0.0.1:8000/storage/${imagePath}`;
+  };
+
+  // Función auxiliar para obtener nombre del estado por ID
+  const getEstadoNombre = (estadoId) => {
+    const id = parseInt(estadoId);
+    
+    const estados = {
+      1: '🚗 Disponible',
+      2: '🛣️ En Viaje', 
+      3: '🔧 En Mantenimiento',
+      4: '❌ Fuera de Servicio'
+    };
+    
+    if (id && estados[id]) {
+      return estados[id];
+    }
+    
+    return `🔍 Estado ${estadoId || 'Desconocido'}`;
+  };
 
   // Datos del carrusel
   const carouselData = [
@@ -57,15 +99,53 @@ const Index = () => {
 
     const fetchCars = async () => {
       try {
+        // Obtener carros
         const response = await fetch('http://127.0.0.1:8000/api/listarcarro');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
         console.log('Datos de carros recibidos:', data);
-        const carsData = Array.isArray(data.data) ? data.data : [];
+        let carsData = Array.isArray(data.data) ? data.data : [];
+        
+        // Obtener reservas para calcular asientos disponibles
+        try {
+          const reservasResponse = await fetch('http://127.0.0.1:8000/api/listarreserva');
+          if (reservasResponse.ok) {
+            const reservasData = await reservasResponse.json();
+            let reservasArray = Array.isArray(reservasData) ? reservasData : 
+                               (reservasData.data ? reservasData.data : []);
+            
+            // Calcular asientos disponibles para cada carro
+            carsData = carsData.map(car => {
+              const carroId = car.id_carros || car.id || car.ID;
+              const reservasDelCarro = reservasArray.filter(reserva => {
+                const reservaCarroId = reserva.id_carros || reserva.id_carro || reserva.carro_id || reserva.carroId;
+                return reservaCarroId == carroId && 
+                       reserva.estado !== 'cancelada' && 
+                       reserva.estado !== 'rechazada';
+              });
+              
+              const asientosOcupados = reservasDelCarro.length;
+              const asientosDisponibles = (car.asientos || 4) - asientosOcupados;
+              
+              return {
+                ...car,
+                asientos_disponibles: Math.max(0, asientosDisponibles)
+              };
+            });
+          }
+        } catch (reservasError) {
+          console.log('No se pudieron obtener las reservas, usando asientos totales:', reservasError);
+          // Si no se pueden obtener reservas, usar asientos totales
+          carsData = carsData.map(car => ({
+            ...car,
+            asientos_disponibles: car.asientos || 4
+          }));
+        }
+        
         setCars(carsData);
-        setFilteredCars(carsData); // Inicializar filteredCars con todos los carros
+        setFilteredCars(carsData);
       } catch (err) {
         console.error('Error al obtener carros:', err);
         setCars([]);
@@ -329,20 +409,40 @@ const Index = () => {
                 if (!car) return null;
                 return (
                   <div key={car.id_carros || idx} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-                    {car.imagencarro ? (
-                      <img src={car.imagencarro} alt="Carro" className="w-full h-32 object-cover rounded-lg mb-4" />
-                    ) : (
-                      <div className="w-full h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mb-4 flex items-center justify-center">
-                        <FaCar className="text-blue-600 text-4xl" />
-                      </div>
-                    )}
+                    <CarImage 
+                      imageUrl={getCarImageUrl(car.imagencarro)}
+                      conductorName={car.conductor}
+                    />
                     <div className="text-center w-full">
                       <div className="text-blue-900 font-bold text-lg mb-2">{car.conductor || 'Conductor'}</div>
                       <div className="text-gray-600 mb-2">
                         <span className="font-semibold">Placa:</span> {car.placa || 'No especificada'}
                       </div>
                       <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Asientos:</span> {car.asientos || 'No especificados'}
+                        <span className="font-semibold">Asientos:</span> 
+                        <span className={`${car.asientos_disponibles !== undefined && car.asientos_disponibles < car.asientos ? 'text-orange-600 font-semibold' : 'text-gray-900'}`}>
+                          {car.asientos_disponibles !== undefined ? car.asientos_disponibles : car.asientos}
+                        </span>
+                        <span className="text-gray-500 text-sm ml-1">
+                          de {car.asientos || 'No especificados'}
+                        </span>
+                        {car.asientos_disponibles !== undefined && car.asientos_disponibles < car.asientos && (
+                          <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                            {car.asientos - car.asientos_disponibles} ocupado{car.asientos - car.asientos_disponibles !== 1 ? 's' : ''}
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-gray-600 mb-2">
+                        <span className="font-semibold">Estado:</span> 
+                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                          (car.estado === 1 || car.Estado === 1) ? 'bg-green-100 text-green-800' : 
+                          (car.estado === 2 || car.Estado === 2) ? 'bg-yellow-100 text-yellow-800' :
+                          (car.estado === 3 || car.Estado === 3) ? 'bg-orange-100 text-orange-800' :
+                          (car.estado === 4 || car.Estado === 4) ? 'bg-red-100 text-red-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {getEstadoNombre(car.estado || car.Estado || car.id_estados)}
+                        </span>
                       </div>
                       <div className="text-gray-600 mb-2">
                         <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}
@@ -451,7 +551,7 @@ const Index = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-md w-full text-center">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaUser className="text-blue-600 text-2xl" />
+              <FaUserIcon className="text-blue-600 text-2xl" />
             </div>
             <h3 className="text-2xl font-bold text-gray-900 mb-4">¡Regístrate para continuar!</h3>
             <p className="text-gray-600 mb-6">

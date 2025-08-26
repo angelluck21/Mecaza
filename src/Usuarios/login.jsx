@@ -61,13 +61,54 @@ function Login() {
         userRol,
         responseData: response.data
       });
+
+      // Extraer el ID del usuario de la respuesta del servidor
+      const userId = response.data.id_users || response.data.id || response.data.ID || response.data.user_id || response.data.userId || response.data.user?.id || response.data.user?.id_users;
+      
+      // Debug: Verificar la respuesta del servidor
+      console.log('=== DEBUG RESPUESTA DEL SERVIDOR ===');
+      console.log('response.data completo:', response.data);
+      console.log('response.data.id_users:', response.data.id_users);
+      console.log('response.data.user:', response.data.user);
+      console.log('userId extraído:', userId);
+      console.log('=====================================');
+      
+      console.log('ID del usuario extraído en login:', userId); // Debug log
+      
+      if (!userId) {
+        console.warn('⚠️ ADVERTENCIA: No se pudo obtener el ID del usuario del servidor en login');
+        console.log('Estructura completa de la respuesta del login:', response.data);
+      }
+      
+      // Guardar el ID en localStorage
+      localStorage.setItem('id_users', userId || '');
+      localStorage.setItem('token', response.data.token || '');
+      
+      console.log('Login Debug:', {
+        correo,
+        userId,
+        token: response.data.token,
+        responseData: response.data
+      });
       
       const userData = {
+        id_users: userId, // ID principal
+        id: userId,       // Fallback
+        ID: userId,       // Fallback
+        user_id: userId,  // Fallback
+        userId: userId,   // Fallback
         Nombre: response.data.user?.Nombre || response.data.Nombre || response.data.user?.nombre || response.data.nombre || correo.split('@')[0],
         Correo: correo,
         token: response.data.token,
         rol: userRol
       };
+      
+      // Debug: Verificar que el ID se está capturando
+      console.log('=== DEBUG LOGIN ===');
+      console.log('userId extraído:', userId);
+      console.log('userData a guardar:', userData);
+      console.log('response.data completo:', response.data);
+      console.log('===================');
       
       localStorage.setItem('userData', JSON.stringify(userData));
       console.log('Datos guardados en localStorage:', userData); // Debug log

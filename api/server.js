@@ -1,7 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const app = express();
-const PORT = 3001;
+const PORT = 8000;
 
 // Middleware
 app.use(cors());
@@ -34,6 +34,55 @@ let reservas = [
     asiento: "C2",
     comentario: "Carlos López",
     estado: "confirmada",
+    created_at: "2024-01-15T09:45:00Z"
+  }
+];
+
+// Base de datos simulada para carros
+let carros = [
+  {
+    id: 1,
+    id_carros: 1,
+    Conductor: "Juan Pérez",
+    Telefono: "+57 300 123 4567",
+    Placa: "ABC123",
+    Asientos: 4,
+    Destino: "Medellín",
+    Horasalida: "08:00",
+    Fecha: "2024-01-20",
+    Estado: 1,
+    Userid: 1,
+    Imagencarro: "https://images.unsplash.com/photo-1549317661-bd32c8ce0db2?w=400&h=300&fit=crop",
+    created_at: "2024-01-15T10:30:00Z"
+  },
+  {
+    id: 2,
+    id_carros: 2,
+    Conductor: "María García",
+    Telefono: "+57 310 987 6543",
+    Placa: "XYZ789",
+    Asientos: 6,
+    Destino: "Caucasia",
+    Horasalida: "14:30",
+    Fecha: "2024-01-21",
+    Estado: 1,
+    Userid: 2,
+    Imagencarro: "https://images.unsplash.com/photo-1552519507-da3b142c6e3d?w=400&h=300&fit=crop",
+    created_at: "2024-01-15T11:15:00Z"
+  },
+  {
+    id: 3,
+    id_carros: 3,
+    Conductor: "Carlos López",
+    Telefono: "+57 315 456 7890",
+    Placa: "DEF456",
+    Asientos: 4,
+    Destino: "Zaragoza",
+    Horasalida: "16:00",
+    Fecha: "2024-01-22",
+    Estado: 1,
+    Userid: 3,
+    Imagencarro: "https://images.unsplash.com/photo-1563720223185-11003d516935?w=400&h=300&fit=crop",
     created_at: "2024-01-15T09:45:00Z"
   }
 ];
@@ -223,6 +272,112 @@ app.get('/api/reserva/:id', (req, res) => {
   }
 });
 
+// POST - Agregar carro
+app.post('/api/agregarcarros', (req, res) => {
+  try {
+    const { Conductor, Telefono, Placa, Asientos, Destino, Horasalida, Fecha, Estado, Userid } = req.body;
+    
+    console.log('POST /api/agregarcarros - Agregando nuevo carro');
+    console.log('Datos recibidos:', req.body);
+    
+    // Validación de campos requeridos
+    if (!Conductor || !Telefono || !Placa || !Asientos || !Destino || !Horasalida || !Fecha) {
+      return res.status(422).json({
+        success: false,
+        message: 'Error de validación',
+        errors: {
+          Conductor: !Conductor ? 'El campo Conductor es requerido' : null,
+          Telefono: !Telefono ? 'El campo Telefono es requerido' : null,
+          Placa: !Placa ? 'El campo Placa es requerido' : null,
+          Asientos: !Asientos ? 'El campo Asientos es requerido' : null,
+          Destino: !Destino ? 'El campo Destino es requerido' : null,
+          Horasalida: !Horasalida ? 'El campo Horasalida es requerido' : null,
+          Fecha: !Fecha ? 'El campo Fecha es requerido' : null
+        }
+      });
+    }
+    
+    // Validación de formato de fecha
+    const fechaObj = new Date(Fecha);
+    if (isNaN(fechaObj.getTime())) {
+      return res.status(422).json({
+        success: false,
+        message: 'Error de validación',
+        errors: {
+          Fecha: 'El formato de fecha no es válido'
+        }
+      });
+    }
+    
+    const nuevoCarro = {
+      id: carros.length + 1,
+      Conductor: Conductor.trim(),
+      Telefono: Telefono.trim(),
+      Placa: Placa.trim(),
+      Asientos: parseInt(Asientos) || 0,
+      Destino: Destino.trim(),
+      Horasalida: Horasalida.trim(),
+      Fecha: Fcha.trim(),
+      Estado: Estado || 1,
+      Userid: Userid || 0,
+      created_at: new Date().toISOString()
+    };
+    
+    carros.push(nuevoCarro);
+    
+    console.log(`Nuevo carro agregado con ID: ${nuevoCarro.id}`);
+    
+    res.status(201).json({
+      success: true,
+      data: nuevoCarro,
+      message: 'Carro agregado exitosamente'
+    });
+    
+  } catch (error) {
+    console.error('Error al agregar carro:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// GET - Listar todos los carros
+app.get('/api/carros', (req, res) => {
+  try {
+    console.log('GET /api/carros - Obteniendo todos los carros');
+    res.json({
+      success: true,
+      data: carros,
+      message: 'Carros obtenidos exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener carros:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// GET - Listar todos los carros (ruta alternativa)
+app.get('/api/listarcarro', (req, res) => {
+  try {
+    console.log('GET /api/listarcarro - Obteniendo todos los carros');
+    res.json({
+      success: true,
+      data: carros,
+      message: 'Carros obtenidos exitosamente'
+    });
+  } catch (error) {
+    console.error('Error al obtener carros:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
 // Ruta de prueba
 app.get('/api/test', (req, res) => {
   res.json({
@@ -242,6 +397,9 @@ app.listen(PORT, () => {
   console.log(`   POST /api/crearreserva - Crear nueva reserva`);
   console.log(`   PUT  /api/confirmarreserva/:id - Confirmar/Rechazar reserva`);
   console.log(`   DELETE /api/eliminarreserva/:id - Eliminar reserva`);
+  console.log(`   GET  /api/carros - Listar todos los carros`);
+  console.log(`   GET  /api/listarcarro - Listar todos los carros (ruta alternativa)`);
+  console.log(`   POST /api/agregarcarros - Agregar nuevo carro`);
 });
 
 module.exports = app; 

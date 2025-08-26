@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaCar, FaPhone, FaEnvelope, FaMapMarkerAlt, FaFacebook, FaTwitter, FaInstagram } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon, Cog6ToothIcon, UserIcon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
+import CarImage from '../components/CarImage';
 
 const IndexLogin = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -13,6 +14,59 @@ const IndexLogin = () => {
   const [currentSlide, setCurrentSlide] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const navigate = useNavigate();
+
+  // Función helper para construir la URL de la imagen del carro
+  const getCarImageUrl = (imagePath) => {
+    if (!imagePath || imagePath.trim() === '') {
+      console.log('🔍 No hay imagen del carro en indexLogin:', imagePath);
+      return null;
+    }
+    
+    console.log('🔍 Procesando imagen del carro en indexLogin:', imagePath);
+    
+    // Si ya es una URL completa, devolverla
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      console.log('🔍 URL completa detectada en indexLogin:', imagePath);
+      return imagePath;
+    }
+    
+    // Si empieza con /storage, construir URL completa
+    if (imagePath.startsWith('/storage/')) {
+      const fullUrl = `http://127.0.0.1:8000${imagePath}`;
+      console.log('🔍 URL construida desde /storage en indexLogin:', fullUrl);
+      return fullUrl;
+    }
+    
+    // Si es solo el nombre del archivo, construir URL
+    if (!imagePath.includes('/')) {
+      const fullUrl = `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+      console.log('🔍 URL construida desde nombre de archivo en indexLogin:', fullUrl);
+      return fullUrl;
+    }
+    
+    // Construir URL completa
+    const fullUrl = `http://127.0.0.1:8000/storage/${imagePath}`;
+    console.log('🔍 URL construida desde ruta relativa en indexLogin:', fullUrl);
+    return fullUrl;
+  };
+
+  // Función auxiliar para obtener nombre del estado por ID
+  const getEstadoNombre = (estadoId) => {
+    const id = parseInt(estadoId);
+    
+    const estados = {
+      1: '🚗 Disponible',
+      2: '🛣️ En Viaje', 
+      3: '🔧 En Mantenimiento',
+      4: '❌ Fuera de Servicio'
+    };
+    
+    if (id && estados[id]) {
+      return estados[id];
+    }
+    
+    return `🔍 Estado ${estadoId || 'Desconocido'}`;
+  };
 
   const carouselData = [
     {
@@ -52,12 +106,50 @@ const IndexLogin = () => {
 
     const fetchCars = async () => {
       try {
+        // Obtener carros
         const response = await fetch('http://127.0.0.1:8000/api/listarcarro');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
         const data = await response.json();
-        const carsData = Array.isArray(data.data) ? data.data : [];
+        let carsData = Array.isArray(data.data) ? data.data : [];
+        
+        // Obtener reservas para calcular asientos disponibles
+        try {
+          const reservasResponse = await fetch('http://127.0.0.1:8000/api/listarreserva');
+          if (reservasResponse.ok) {
+            const reservasData = await reservasResponse.json();
+            let reservasArray = Array.isArray(reservasData) ? reservasData : 
+                               (reservasData.data ? reservasData.data : []);
+            
+            // Calcular asientos disponibles para cada carro
+            carsData = carsData.map(car => {
+              const carroId = car.id_carros || car.id || car.ID;
+              const reservasDelCarro = reservasArray.filter(reserva => {
+                const reservaCarroId = reserva.id_carros || reserva.id_carro || reserva.carro_id || reserva.carroId;
+                return reservaCarroId == carroId && 
+                       reserva.estado !== 'cancelada' && 
+                       reserva.estado !== 'rechazada';
+              });
+              
+              const asientosOcupados = reservasDelCarro.length;
+              const asientosDisponibles = (car.asientos || 4) - asientosOcupados;
+              
+              return {
+                ...car,
+                asientos_disponibles: Math.max(0, asientosDisponibles)
+              };
+            });
+          }
+        } catch (reservasError) {
+          console.log('No se pudieron obtener las reservas, usando asientos totales:', reservasError);
+          // Si no se pueden obtener reservas, usar asientos totales
+          carsData = carsData.map(car => ({
+            ...car,
+            asientos_disponibles: car.asientos || 4
+          }));
+        }
+        
         setCars(carsData);
         setFilteredCars(carsData);
       } catch (err) {
@@ -280,20 +372,49 @@ const IndexLogin = () => {
               if (!car) return null;
               return (
                 <div key={car.id_carros || idx} className="bg-white rounded-xl shadow-lg p-6 flex flex-col items-center transform transition-all duration-300 hover:scale-105 hover:shadow-2xl">
-                  {car.imagencarro ? (
-                    <img src={car.imagencarro} alt="Carro" className="w-full h-32 object-cover rounded-lg mb-4" />
-                  ) : (
-                    <div className="w-full h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mb-4 flex items-center justify-center">
-                      <FaCar className="text-blue-600 text-4xl" />
-                    </div>
-                  )}
+                  {console.log('🔍 Debug imagen carro en indexLogin:', {
+                    carId: car.id_carros || idx,
+                    imagencarro: car.imagencarro,
+                    imagenUrl: getCarImageUrl(car.imagencarro),
+                    conductor: car.conductor
+                  })}
+                  <CarImage 
+                    imageUrl={getCarImageUrl(car.imagencarro)}
+                    conductorName={car.conductor}
+                    className="w-full h-48 object-cover rounded-lg mb-4 shadow-md"
+                    fallbackClassName="w-full h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg mb-4 flex items-center justify-center shadow-md"
+                    fallbackIconSize="text-5xl"
+                  />
                   <div className="text-center w-full">
                     <div className="text-blue-900 font-bold text-lg mb-2">{car.conductor || 'Conductor'}</div>
                     <div className="text-gray-600 mb-2">
                       <span className="font-semibold">Placa:</span> {car.placa || 'No especificada'}
                     </div>
+                        <div className="text-gray-600 mb-2">
+                        <span className="font-semibold">Asientos:</span> 
+                        <span className={`${car.asientos_disponibles !== undefined && car.asientos_disponibles < car.asientos ? 'text-orange-600 font-semibold' : 'text-gray-900'}`}>
+                          {car.asientos_disponibles !== undefined ? car.asientos_disponibles : car.asientos}
+                        </span>
+                        <span className="text-gray-500 text-sm ml-1">
+                          de {car.asientos || 'No especificados'}
+                        </span>
+                        {car.asientos_disponibles !== undefined && car.asientos_disponibles < car.asientos && (
+                          <span className="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded-full">
+                            {car.asientos - car.asientos_disponibles} ocupado{car.asientos - car.asientos_disponibles !== 1 ? 's' : ''}
+                        </span>
+                        )}
+                      </div>
                     <div className="text-gray-600 mb-2">
-                      <span className="font-semibold">Asientos:</span> {car.asientos || 'No especificados'}
+                      <span className="font-semibold">Estado:</span> 
+                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
+                        (car.estado === 1 || car.Estado === 1) ? 'bg-green-100 text-green-800' : 
+                        (car.estado === 2 || car.Estado === 2) ? 'bg-yellow-100 text-yellow-800' :
+                        (car.estado === 3 || car.Estado === 3) ? 'bg-orange-100 text-orange-800' :
+                        (car.estado === 4 || car.Estado === 4) ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {getEstadoNombre(car.estado || car.Estado || car.id_estados)}
+                      </span>
                     </div>
                     <div className="text-gray-600 mb-2">
                       <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}

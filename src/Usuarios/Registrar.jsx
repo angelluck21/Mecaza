@@ -77,13 +77,30 @@ function Registrar() {
       
       showNotification(rolMessages[selectedRol], 'success');
       
-      // Guardar datos del usuario en localStorage
+      // Extraer el ID del usuario de la respuesta del servidor
+      const userId = response.data.id_users || response.data.id || response.data.ID || response.data.user_id || response.data.userId || response.data.user?.id || response.data.user?.id_users;
+      
+      console.log('ID del usuario extraído:', userId); // Debug log
+      
+      if (!userId) {
+        console.warn('⚠️ ADVERTENCIA: No se pudo obtener el ID del usuario del servidor');
+        console.log('Estructura completa de la respuesta:', response.data);
+      }
+      
+      // Guardar datos del usuario en localStorage con el ID explícito
       const userData = {
-        ...response.data,
+        id_users: userId, // ID principal
+        id: userId,       // Fallback
+        ID: userId,       // Fallback
+        user_id: userId,  // Fallback
+        userId: userId,   // Fallback
         rol: selectedRol,
         Correo: formData.Correo,
-        Nombre: formData.Nombre
+        Nombre: formData.Nombre,
+        // Incluir todos los datos adicionales del servidor
+        ...response.data
       };
+      
       localStorage.setItem('userData', JSON.stringify(userData));
       console.log('Datos guardados en localStorage:', userData); // Debug log
       

@@ -255,7 +255,7 @@ const ConductorNotificaciones = () => {
                 <p className="text-blue-700 text-sm">
                   Revisa y confirma las reservas de los usuarios
                 </p>
-              </div>
+             </div>
 
               {reservasPendientes.map((reserva, index) => (
                 <div key={index} className="bg-yellow-50 border border-yellow-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">

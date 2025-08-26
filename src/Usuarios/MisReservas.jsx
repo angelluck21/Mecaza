@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaTrash, FaEdit, FaCheck, FaTimes, FaSync } from 'react-icons/fa';
+import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaTrash, FaSync, FaCarSide } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
+import CarImage from '../components/CarImage';
 import axios from 'axios';
 
 const MisReservas = () => {
@@ -10,12 +11,49 @@ const MisReservas = () => {
   const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const [reservations, setReservations] = useState([]);
-  const [editingReservation, setEditingReservation] = useState(null);
-  const [editForm, setEditForm] = useState({
-    ubicacion: '',
-    comentario: ''
-  });
+  const [cars, setCars] = useState([]);
+
+  const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [reservationToDelete, setReservationToDelete] = useState(null);
   const navigate = useNavigate();
+
+  // Función helper para construir la URL de la imagen del carro
+  const getCarImageUrl = (imagePath) => {
+    if (!imagePath || imagePath.trim() === '') {
+      return null;
+    }
+    
+    // Si ya es una URL completa, devolverla
+    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
+      return imagePath;
+    }
+    
+    // Si empieza con /storage, construir URL completa
+    if (imagePath.startsWith('/storage/')) {
+      return `http://127.0.0.1:8000${imagePath}`;
+    }
+    
+    // Si es solo el nombre del archivo, construir URL
+    if (!imagePath.includes('/')) {
+      return `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+    }
+    
+    // Construir URL completa
+    return `http://127.0.0.1:8000/storage/${imagePath}`;
+  };
+
+  // Función para obtener información del carro asociado a una reserva
+  const getCarInfo = (reservation) => {
+    const carroId = reservation.id_carros || reservation.id_carro || reservation.carro_id;
+    if (!carroId) return null;
+    
+    return cars.find(car => 
+      (car.id_carros == carroId) || 
+      (car.id == carroId) || 
+      (car.ID == carroId)
+    );
+  };
 
   useEffect(() => {
     // Obtener datos del usuario del localStorage
@@ -35,52 +73,40 @@ const MisReservas = () => {
       return;
     }
 
-    // Obtener reservas del usuario
-    fetchUserReservations();
+    // Cargar datos iniciales
+    fetchInitialData();
   }, [navigate]);
 
-  const fetchUserReservations = async () => {
+  const fetchInitialData = async () => {
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/listarreserva', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
+      // Cargar carros y reservas en paralelo
+      const [carsResponse, reservationsResponse] = await Promise.all([
+        axios.get('http://127.0.0.1:8000/api/listarcarro'),
+        axios.get('http://127.0.0.1:8000/api/listarreserva')
+      ]);
 
-      
-      
-      console.log('Reservas recibidas:', response.data);
-      
-      // Manejar diferentes estructuras de respuesta
+      // Procesar carros
+      let carsData = [];
+      if (carsResponse.data && Array.isArray(carsResponse.data.data)) {
+        carsData = carsResponse.data.data;
+      } else if (Array.isArray(carsResponse.data)) {
+        carsData = carsResponse.data;
+      }
+      setCars(carsData);
+
+      // Procesar reservas - mostrar todas las reservas disponibles
       let reservasArray = [];
-      if (response.data && Array.isArray(response.data)) {
-        reservasArray = response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        reservasArray = response.data.data;
-      } else if (response.data && response.data.data) {
-        reservasArray = [response.data.data];
-      } else {
-        reservasArray = [];
+      if (reservationsResponse.data && Array.isArray(reservationsResponse.data.data)) {
+        reservasArray = reservationsResponse.data.data;
+      } else if (Array.isArray(reservationsResponse.data)) {
+        reservasArray = reservationsResponse.data;
       }
       
-      // Debug: mostrar la estructura de la primera reserva si existe
-      if (reservasArray.length > 0) {
-        console.log('Estructura de la primera reserva:', reservasArray[0]);
-        console.log('Campos disponibles:', Object.keys(reservasArray[0]));
-      }
-      
-      // Filtrar reservas del usuario actual
-      const userReservations = reservasArray.filter(reservation => 
-        reservation.id_users == userData.id || 
-        reservation.id_users == userData.id_users || 
-        reservation.id_users == userData.ID
-      );
-      
-      setReservations(userReservations);
+      // Por ahora mostrar todas las reservas para que aparezcan
+      setReservations(reservasArray);
+      setLastUpdate(new Date());
     } catch (error) {
-      console.error('Error al obtener reservas:', error);
-      setReservations([]);
+      console.error('Error al cargar datos iniciales:', error);
     } finally {
       setIsLoading(false);
     }
@@ -89,6 +115,12 @@ const MisReservas = () => {
   // Función para actualizar el estado de una reserva
   const updateReservationStatus = async (reservationId, newStatus) => {
     try {
+      // Verificar que tengamos un ID válido
+      if (!reservationId) {
+        console.error('ID de reserva no válido para actualizar estado:', reservationId);
+        return;
+      }
+      
       const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
         estado: newStatus
       }, {
@@ -101,7 +133,7 @@ const MisReservas = () => {
       console.log('Estado de reserva actualizado:', response.data);
       
       // Recargar las reservas para mostrar el nuevo estado
-      await fetchUserReservations();
+      await fetchInitialData();
     } catch (error) {
       console.error('Error al actualizar estado de reserva:', error);
     }
@@ -111,64 +143,28 @@ const MisReservas = () => {
     navigate(-1);
   };
 
-  const handleEditReservation = (reservation) => {
-    setEditingReservation(reservation);
-    setEditForm({
-      ubicacion: reservation.ubicacion || '',
-      comentario: reservation.comentario || ''
-    });
-  };
-  
 
-  const handleUpdateReservation = async () => {
-    try {
-      // Usar el ID correcto basado en la estructura del backend
-      const reservationId = editingReservation.id || editingReservation.id_reservarviaje || editingReservation.ID;
-      
-      const response = await fetch(`http://127.0.0.1:8000/api/actualizarreserva/${reservationId}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({
-          ubicacion: editForm.ubicacion,
-          comentario: editForm.comentario
-        })
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al actualizar la reserva');
-      }
-
-      const result = await response.json();
-      console.log('Reserva actualizada exitosamente:', result);
-      
-      // Actualizar la lista de reservas
-      await fetchUserReservations();
-      setEditingReservation(null);
-      setEditForm({ ubicacion: '', comentario: '' });
-      
-      alert('Reserva actualizada exitosamente');
-    } catch (error) {
-      console.error('Error al actualizar reserva:', error);
-      alert(`Error al actualizar la reserva: ${error.message}`);
-    }
-  };
 
   const handleDeleteReservation = async (reservation) => {
-    if (!window.confirm('¿Estás seguro de que quieres cancelar esta reserva?')) {
+    // Abrir modal de confirmación
+    setReservationToDelete(reservation);
+    setShowDeleteModal(true);
+  };
+
+  const confirmDelete = async () => {
+    if (!reservationToDelete) return;
+    
+    // Según la consola, el campo correcto es id_reservarviajes (con 's')
+    const reservationId = reservationToDelete.id_reservarviajes || reservationToDelete.id_reservarviaje || reservationToDelete.id || reservationToDelete.ID;
+    
+    // Verificar que tengamos un ID válido
+    if (!reservationId) {
+      alert('Error: No se pudo identificar la reserva a eliminar');
+      console.error('ID de reserva no encontrado:', reservationToDelete);
       return;
     }
 
-    // Usar el ID correcto basado en la estructura del backend
-    const reservationId = reservation.id || reservation.id_reservarviaje || reservation.ID;
-
     try {
-      console.log('Eliminando reserva:', reservation);
-      console.log('ID de reserva:', reservationId);
-      
       const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarreserva/${reservationId}`, {
         headers: {
           'Authorization': 'Bearer ' + localStorage.getItem('authToken'),
@@ -179,23 +175,23 @@ const MisReservas = () => {
       
       console.log('Reserva eliminada:', response.data);
       
-      // Mostrar mensaje de éxito basado en la respuesta del controlador
       if (response.data && response.data.message) {
         alert(response.data.message);
       } else {
         alert('Reserva eliminada exitosamente');
       }
       
-      // Recargar la lista de reservas
-      await fetchUserReservations();
+      await fetchInitialData();
+      
+      // Cerrar modal y limpiar estado
+      setShowDeleteModal(false);
+      setReservationToDelete(null);
     } catch (error) {
       console.error('Error al eliminar reserva:', error);
       
-      // Manejar diferentes tipos de errores
       let errorMessage = 'Error al eliminar la reserva';
       
       if (error.response) {
-        // Error de respuesta del servidor
         if (error.response.data && error.response.data.message) {
           errorMessage = error.response.data.message;
         } else if (error.response.status === 404) {
@@ -206,12 +202,16 @@ const MisReservas = () => {
           errorMessage = 'No tienes permisos para eliminar esta reserva';
         }
       } else if (error.request) {
-        // Error de conexión
         errorMessage = 'Error de conexión. Verifica que el servidor esté ejecutándose.';
       }
       
       alert(errorMessage);
     }
+  };
+
+  const closeDeleteModal = () => {
+    setShowDeleteModal(false);
+    setReservationToDelete(null);
   };
 
   const getStatusColor = (status) => {
@@ -254,11 +254,10 @@ const MisReservas = () => {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-   
+      {/* Navbar */}
       <nav className="bg-white shadow-lg relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center h-16">
-           
             <div className="flex items-center space-x-3">
               <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
               <span className="text-2xl font-bold text-blue-900">Mecaza</span>
@@ -307,172 +306,233 @@ const MisReservas = () => {
         </div>
       </nav>
 
+      {/* Contenido principal */}
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
         <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
-              Mis Reservas
-            </h1>
-            <p className="text-lg text-gray-600">
-              Gestiona tus reservas de viaje
-            </p>
-            <button
-              onClick={fetchUserReservations}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center mx-auto"
-            >
-                              <FaSync className="mr-2" />
-              Actualizar Estado
-            </button>
-          </div>
+                     {/* Header */}
+           <div className="text-center mb-8">
+             <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
+               Mis Reservas
+             </h1>
+             <p className="text-lg text-gray-600 mb-6">
+               Gestiona tus reservas de viaje de manera organizada
+             </p>
+                           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
+                <p className="text-sm text-blue-800">
+                  <FaSync className="inline mr-2 text-blue-600" />
+                  <strong>Reservas disponibles:</strong> Todas las reservas del sistema
+                </p>
+              </div>
+           </div>
 
-          {reservations.length === 0 ? (
-            <div className="text-center py-12">
-              <FaCar className="text-gray-400 text-6xl mx-auto mb-4" />
-              <h3 className="text-xl font-semibold text-gray-600 mb-2">No tienes reservas</h3>
-              <p className="text-gray-500 mb-6">Aún no has realizado ninguna reserva de viaje.</p>
-              <button
-                onClick={() => navigate('/indexLogin')}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
-              >
-                Explorar Viajes
-              </button>
-            </div>
-          ) : (
+          
+
+           {/* Lista de reservas */}
+           {reservations.length === 0 ? (
+             <div className="text-center py-12">
+               <FaCar className="text-gray-400 text-6xl mx-auto mb-4" />
+               <h3 className="text-xl font-semibold text-gray-600 mb-2">No tienes reservas</h3>
+               <p className="text-gray-500 mb-6">Aún no has realizado ninguna reserva de viaje.</p>
+               <button
+                 onClick={() => navigate('/indexLogin')}
+                 className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+               >
+                 Explorar Viajes
+               </button>
+             </div>
+           ) : (
             <div className="space-y-6">
-              {reservations.map((reservation) => (
-                <div key={reservation.id || reservation.id_reservarviaje || reservation.ID} className="bg-gray-50 rounded-lg p-6 border border-gray-200">
-                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between mb-4">
-                        <h3 className="text-xl font-bold text-gray-900">
-                          Reserva #{reservation.id || reservation.id_reservarviaje || reservation.ID}
-                        </h3>
-                        <span className={`px-3 py-1 rounded-full text-sm font-medium ${getStatusColor(reservation.estado)}`}>
-                          {getStatusText(reservation.estado)}
-                        </span>
+              {reservations.map((reservation) => {
+                const carInfo = getCarInfo(reservation);
+                return (
+                                     <div key={reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID} 
+                        className="bg-gray-50 rounded-xl p-6 border border-gray-200 hover:shadow-lg transition-all duration-300">
+                    
+                     {/* Header de la reserva */}
+                     <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-6">
+                       <div className="flex items-center space-x-4">
+                         <div className="bg-blue-100 p-3 rounded-full">
+                           <FaCarSide className="text-blue-600 text-xl" />
+                         </div>
+                         <div>
+                           <h3 className="text-xl font-bold text-gray-900">
+                             Reserva #{reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID}
+                           </h3>
+                          <p className="text-sm text-gray-500">
+                            Creada el {reservation.created_at ? new Date(reservation.created_at).toLocaleDateString('es-ES') : 'Fecha no disponible'}
+                          </p>
+                        </div>
                       </div>
                       
-                      <div className="grid md:grid-cols-2 gap-4">
-                        <div className="space-y-2">
-                          <div className="flex items-center">
-                            <FaUser className="text-blue-600 mr-2" />
-                            <span className="font-semibold">Conductor:</span>
-                            <span className="ml-2 text-gray-700">{reservation.regate || 'No especificado'}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <FaCar className="text-blue-600 mr-2" />
-                            <span className="font-semibold">Placa:</span>
-                            <span className="ml-2 text-gray-700">{reservation.ubicacion || 'No especificada'}</span>
-                          </div>
-                          <div className="flex items-center">
-                            <FaPhone className="text-blue-600 mr-2" />
-                            <span className="font-semibold">Teléfono:</span>
-                            <span className="ml-2 text-gray-700">{reservation.comentario || 'No especificado'}</span>
-                          </div>
-                        </div>
+                      <span className={`px-4 py-2 rounded-full text-sm font-medium ${getStatusColor(reservation.estado)} mt-4 md:mt-0`}>
+                        {getStatusText(reservation.estado)}
+                      </span>
+                    </div>
+
+                    {/* Contenido de la reserva */}
+                    <div className="grid md:grid-cols-3 gap-6">
+                      {/* Información del carro */}
+                      <div className="md:col-span-1">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                          <FaCar className="text-blue-600 mr-2" />
+                          Información del Vehículo
+                        </h4>
                         
-                        <div className="space-y-2">
-                          <div className="flex items-center">
-                            <FaMapMarkerAlt className="text-green-600 mr-2" />
-                            <span className="font-semibold">Ubicación:</span>
-                            <span className="ml-2 text-gray-700">{reservation.ubicacion || 'No especificada'}</span>
+                        {carInfo ? (
+                          <div className="space-y-3">
+                            {/* Imagen del carro */}
+                            <div className="mb-3">
+                              <CarImage 
+                                imageUrl={getCarImageUrl(carInfo.imagencarro)}
+                                conductorName={carInfo.conductor || 'Conductor'}
+                                className="w-full h-32 object-cover rounded-lg shadow-md"
+                                fallbackClassName="w-full h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg flex items-center justify-center shadow-md"
+                                fallbackIconSize="text-3xl"
+                              />
+                            </div>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center">
+                                <FaUser className="text-blue-600 mr-2 w-4" />
+                                <span className="font-medium">Conductor:</span>
+                                <span className="ml-2 text-gray-700">{carInfo.conductor || 'No especificado'}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <FaCar className="text-blue-600 mr-2 w-4" />
+                                <span className="font-medium">Placa:</span>
+                                <span className="ml-2 text-gray-700">{carInfo.placa || 'No especificada'}</span>
+                              </div>
+                              <div className="flex items-center">
+                                <FaMapMarkerAlt className="text-blue-600 mr-2 w-4" />
+                                <span className="font-medium">Destino:</span>
+                                <span className="ml-2 text-gray-700">{carInfo.destino || 'No especificado'}</span>
+                              </div>
+                            </div>
                           </div>
+                        ) : (
+                          <div className="text-gray-500 text-sm">
+                            Información del vehículo no disponible
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Información del pasajero */}
+                      <div className="md:col-span-1">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                          <FaUser className="text-green-600 mr-2" />
+                          Información del Pasajero
+                        </h4>
+                        
+                                                 <div className="space-y-2 text-sm">
+                           <div className="flex items-center">
+                             <FaUser className="text-green-600 mr-2 w-4" />
+                             <span className="font-medium">Nombre:</span>
+                             <span className="ml-2 text-gray-700">{reservation.comentario || reservation.Nombre || 'No especificado'}</span>
+                           </div>
+                           <div className="flex items-center">
+                             <FaCar className="text-green-600 mr-2 w-4" />
+                             <span className="font-medium">Puesto:</span>
+                             <span className="ml-2 text-gray-700">{reservation.asiento || reservation.Asiento || 'No especificado'}</span>
+                           </div>
+                         </div>
+                      </div>
+
+                      {/* Información del viaje */}
+                      <div className="md:col-span-1">
+                        <h4 className="font-semibold text-gray-900 mb-3 flex items-center">
+                          <FaCalendar className="text-purple-600 mr-2" />
+                          Detalles del Viaje
+                        </h4>
+                        
+                        <div className="space-y-2 text-sm">
                           <div className="flex items-center">
-                            <FaCalendar className="text-green-600 mr-2" />
-                            <span className="font-semibold">Fecha de reserva:</span>
+                            <FaCalendar className="text-purple-600 mr-2 w-4" />
+                            <span className="font-medium">Fecha:</span>
                             <span className="ml-2 text-gray-700">
-                              {reservation.created_at ? new Date(reservation.created_at).toLocaleDateString('es-ES') : 'No especificada'}
+                              {carInfo?.fecha ? new Date(carInfo.fecha).toLocaleDateString('es-ES') : 'No especificada'}
                             </span>
                           </div>
-                          {reservation.comentario && (
-                            <div className="flex items-start">
-                              <span className="font-semibold mr-2">Comentario:</span>
-                              <span className="text-gray-700">{reservation.comentario}</span>
-                            </div>
-                          )}
+                          <div className="flex items-center">
+                            <FaClock className="text-purple-600 mr-2 w-4" />
+                            <span className="font-medium">Hora:</span>
+                            <span className="ml-2 text-gray-700">{carInfo?.horasalida || 'No especificada'}</span>
+                          </div>
+                          <div className="flex items-center">
+                            <FaMapMarkerAlt className="text-purple-600 mr-2 w-4" />
+                            <span className="font-medium">Ubicación:</span>
+                            <span className="ml-2 text-gray-700">{reservation.ubicacion || 'No especificada'}</span>
+                          </div>
                         </div>
                       </div>
                     </div>
-                    
-                    <div className="flex space-x-2 mt-4 md:mt-0">
-                      <button
-                        onClick={() => handleEditReservation(reservation)}
-                        className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors flex items-center"
-                      >
-                        <FaEdit className="mr-1" />
-                        Editar
-                      </button>
-                      <button
-                        onClick={() => handleDeleteReservation(reservation)}
-                        className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
-                      >
-                        <FaTrash className="mr-1" />
-                        Cancelar
-                      </button>
-                    </div>
+
+                                         {/* Acción de eliminar */}
+                     <div className="mt-6 pt-4 border-t border-gray-200">
+                       <button
+                         onClick={() => handleDeleteReservation(reservation)}
+                         className="group w-full bg-gradient-to-r from-red-500 via-red-600 to-red-700 text-white px-8 py-4 rounded-2xl hover:from-red-600 hover:via-red-700 hover:to-red-800 transition-all duration-500 transform hover:scale-105 hover:-translate-y-1 shadow-2xl hover:shadow-red-500/25 flex items-center justify-center font-bold text-lg border-2 border-red-400 hover:border-red-300"
+                       >
+                         <div className="mr-4 p-2 bg-red-400/20 rounded-full group-hover:bg-red-300/30 transition-all duration-300">
+                           <FaTrash className="text-2xl group-hover:rotate-12 transition-transform duration-300" />
+                         </div>
+                         <span className="group-hover:tracking-wide transition-all duration-300">
+                           Cancelar Reserva
+                         </span>
+                       </button>
+                     </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>
-      </div>
+             </div>
 
-      {/* Modal de edición */}
-      {editingReservation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Editar Reserva</h3>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Ubicación de recogida
-                </label>
-                <input
-                  type="text"
-                  value={editForm.ubicacion}
-                  onChange={(e) => setEditForm({...editForm, ubicacion: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ingresa tu ubicación de recogida"
-                />
-              </div>
-              <div>
-                <label className="block-2 text-sm font-medium text-gray-700 mb-2">
-                  Comentario adicional
-                </label>
-                <textarea
-                  value={editForm.comentario}
-                  onChange={(e) => setEditForm({...editForm, comentario: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  rows="3"
-                  placeholder="Comentarios adicionales..."
-                />
-              </div>
-            </div>
-            <div className="flex space-x-4 mt-6">
-              <button
-                onClick={handleUpdateReservation}
-                className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors flex items-center justify-center"
-              >
-                <FaCheck className="mr-2" />
-                Actualizar
-              </button>
-              <button
-                onClick={() => {
-                  setEditingReservation(null);
-                  setEditForm({ ubicacion: '', comentario: '' });
-                }}
-                className="flex-1 bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors flex items-center justify-center"
-              >
-                <FaTimes className="mr-2" />
-                Cancelar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-};
+       {/* Modal de confirmación de eliminación */}
+       {showDeleteModal && (
+         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+           <div className="bg-white rounded-3xl shadow-2xl max-w-md w-full transform transition-all duration-300 scale-100 animate-in">
+             {/* Header del modal */}
+             <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-6 rounded-t-3xl text-center">
+               <div className="w-20 h-20 bg-red-400/30 rounded-full flex items-center justify-center mx-auto mb-4">
+                 <FaTrash className="text-3xl text-white" />
+               </div>
+               <h3 className="text-2xl font-bold">Confirmar Cancelación</h3>
+               <p className="text-red-100 mt-2">¿Estás seguro de que quieres cancelar esta reserva?</p>
+             </div>
+
+             {/* Contenido del modal */}
+             <div className="p-6 text-center">
+               <div className="bg-gray-50 rounded-xl p-4 mb-6">
+                 <p className="text-gray-600 font-medium">
+                   Reserva #{reservationToDelete?.id_reservarviajes || reservationToDelete?.id_reservarviaje || reservationToDelete?.id || reservationToDelete?.ID}
+                 </p>
+                 <p className="text-sm text-gray-500 mt-1">
+                   Esta acción no se puede deshacer
+                 </p>
+               </div>
+
+               {/* Botones de acción */}
+               <div className="flex space-x-4">
+                 <button
+                   onClick={closeDeleteModal}
+                   className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-xl hover:bg-gray-200 transition-all duration-300 font-semibold border-2 border-gray-200 hover:border-gray-300"
+                 >
+                   Cancelar
+                 </button>
+                 <button
+                   onClick={confirmDelete}
+                   className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white px-6 py-3 rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 font-bold shadow-lg hover:shadow-xl transform hover:scale-105"
+                 >
+                   Sí, Eliminar
+                 </button>
+               </div>
+             </div>
+           </div>
+         </div>
+       )}
+     </div>
+   );
+ };
 
 export default MisReservas;
