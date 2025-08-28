@@ -14,6 +14,7 @@ const VerDetalles = () => {
   const [selectedSeat, setSelectedSeat] = useState(null);
   const [pickupLocation, setPickupLocation] = useState('');
   const [nombre, setNombre] = useState('');
+  const [telefono, setTelefono] = useState(''); // Nuevo estado para el teléfono
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isReserving, setIsReserving] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
@@ -49,21 +50,75 @@ const VerDetalles = () => {
     return `http://127.0.0.1:8000/storage/${imagePath}`;
   };
 
-  // Función helper para obtener el nombre del estado optimizada con useMemo
+  // Función helper para obtener el nombre del estado optimizada
   const getEstadoNombre = (estadoId) => {
-    const estado = estados.find(e => (e.id_estados || e.id) == estadoId);
-    if (estado) {
-      return estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados || `Estado ${estadoId}`;
+    console.log(`🔍 getEstadoNombre en VerDetalles llamado con: ${estadoId} (tipo: ${typeof estadoId})`);
+    
+    // Si no hay estado, retornar desconocido
+    if (estadoId === null || estadoId === undefined || estadoId === '') {
+      console.log('🔍 Estado vacío o nulo en VerDetalles, retornando desconocido');
+      return '🔍 Estado Desconocido';
     }
     
-    // Fallback a nombres por defecto si no se encuentran en la lista
+    // Primero intentar buscar en la lista de estados del backend
+    const estado = estados.find(e => (e.id_estados || e.id) == estadoId);
+    if (estado) {
+      const nombreEstado = estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados;
+      console.log(`🔍 Estado encontrado en backend: ${nombreEstado}`);
+      
+      // Verificar si el nombre del backend es correcto para el ID
+      const estadoNumero = parseInt(estadoId);
+      
+      // Validar que cada ID corresponda al nombre correcto
+      if (estadoNumero === 1 && !nombreEstado.toLowerCase().includes('esperando')) {
+        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 1 es "${nombreEstado}", pero debería ser "Esperando Pasajeros"`);
+        return '🚗 Esperando Pasajeros';
+      } else if (estadoNumero === 2 && !nombreEstado.toLowerCase().includes('viaje')) {
+        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 2 es "${nombreEstado}", pero debería ser "En Viaje"`);
+        return '🛣️ En Viaje';
+      } else if (estadoNumero === 3 && !nombreEstado.toLowerCase().includes('mantenimiento')) {
+        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 3 es "${nombreEstado}", pero debería ser "En Mantenimiento"`);
+        return '🔧 En Mantenimiento';
+      } else if (estadoNumero === 4 && !nombreEstado.toLowerCase().includes('fuera') && !nombreEstado.toLowerCase().includes('servicio')) {
+        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 4 es "${nombreEstado}", pero debería ser "Fuera de Servicio"`);
+        return '❌ Fuera de Servicio';
+      }
+      
+      return nombreEstado;
+    }
+    
+    // Si no se encuentra en el backend, usar nombres por defecto
+    let id;
+    if (typeof estadoId === 'string') {
+      id = parseInt(estadoId.trim());
+      console.log(`🔍 Estado string "${estadoId}" convertido a número: ${id}`);
+    } else {
+      id = estadoId;
+      console.log(`🔍 Estado ya es número: ${id}`);
+    }
+    
+    // Si no es un número válido, retornar el valor original
+    if (isNaN(id)) {
+      console.log(`🔍 Estado no numérico detectado en VerDetalles: ${estadoId} (tipo: ${typeof estadoId})`);
+      return `🔍 Estado: ${estadoId}`;
+    }
+    
     const estadosDefault = {
-      1: 'Disponible',
-      2: 'En Mantenimiento', 
-      3: 'En Viaje',
-      4: 'No Disponible'
+      1: '🚗 Esperando Pasajeros',
+      2: '🛣️ En Viaje', 
+      3: '🔧 En Mantenimiento',
+      4: '❌ Fuera de Servicio'
     };
-    return estadosDefault[estadoId] || `Estado ${estadoId}`;
+    
+    console.log(`🔍 Buscando estado ID en VerDetalles: ${id} en estados disponibles:`, Object.keys(estadosDefault));
+    
+    if (estadosDefault[id]) {
+      console.log(`🔍 Estado encontrado en VerDetalles: ${estadosDefault[id]}`);
+      return estadosDefault[id];
+    }
+    
+    console.log(`🔍 Estado ID no reconocido en VerDetalles: ${id}`);
+    return `🔍 Estado ${id} (No reconocido)`;
   };
 
   useEffect(() => {
@@ -73,14 +128,39 @@ const VerDetalles = () => {
       try {
         const user = JSON.parse(storedUserData);
         setUserData(user);
+        
+        // Debug: mostrar datos del usuario obtenidos del localStorage
+        console.log('🔍 Datos del usuario desde localStorage:', user);
+        console.log('🔍 Campos disponibles en user:', Object.keys(user || {}));
+        console.log('🔍 Búsqueda de teléfono en localStorage:', {
+          Telefono: user?.Telefono,
+          telefono: user?.telefono,
+          phone: user?.phone,
+          tel: user?.tel
+        });
+        console.log('🔍 Verificación detallada del teléfono:', {
+          'user.Telefono': user?.Telefono,
+          'user.telefono': user?.telefono,
+          'user.phone': user?.phone,
+          'user.tel': user?.tel,
+          'typeof user.Telefono': typeof user?.Telefono,
+          'user.Telefono === null': user?.Telefono === null,
+          'user.Telefono === undefined': user?.Telefono === undefined,
+          'user.Telefono === ""': user?.Telefono === ""
+        });
+        
         // Establecer automáticamente el nombre del usuario desde localStorage
         const userName = user.Nombre || user.nombre || user.name || '';
         setNombre(userName);
+        
+        console.log('✅ Nombre del usuario establecido:', userName);
       } catch (error) {
+        console.error('❌ Error al parsear datos del usuario:', error);
         navigate('/login');
         return;
       }
     } else {
+      console.log('❌ No hay datos de usuario en localStorage');
       navigate('/login');
       return;
     }
@@ -193,6 +273,28 @@ const VerDetalles = () => {
             parseInt(reserva.Asiento || reserva.asiento || 0)
           ).filter(asiento => asiento > 0);
           
+          // Obtener el teléfono del conductor del carro
+          const telefonoConductor = carroEncontrado.telefono || carroEncontrado.Telefono || carroEncontrado.phone || 'No disponible';
+          
+          console.log('🔍 Datos del carro encontrado:', carroEncontrado);
+          console.log('🔍 Búsqueda de teléfono del conductor en carroEncontrado:', {
+            telefono: carroEncontrado.telefono,
+            Telefono: carroEncontrado.Telefono,
+            phone: carroEncontrado.phone
+          });
+          console.log('✅ Teléfono del conductor obtenido:', telefonoConductor);
+          
+          // Debug del estado antes de establecer los datos
+          console.log('🔍 Debug estado del carro antes de establecer carDetails:', {
+            'carroEncontrado.estado': carroEncontrado.estado,
+            'carroEncontrado.Estado': carroEncontrado.Estado,
+            'carroEncontrado.id_estados': carroEncontrado.id_estados,
+            'carroEncontrado.id_estado': carroEncontrado.id_estado,
+            'tipo estado': typeof carroEncontrado.estado,
+            'tipo Estado': typeof carroEncontrado.Estado,
+            'tipo id_estados': typeof carroEncontrado.id_estados
+          });
+          
           // Establecer datos del carro
           const carDetailsToSet = {
             id_carros: carroEncontrado.id_carros,
@@ -204,11 +306,14 @@ const VerDetalles = () => {
             horasalida: carroEncontrado.horasalida || carroEncontrado.Horasalida,
             fecha: carroEncontrado.fecha || carroEncontrado.Fecha,
             imagencarro: carroEncontrado.imagencarro || carroEncontrado.Imagencarro,
-            telefono: carroEncontrado.telefono || carroEncontrado.Telefono,
+            // Obtener el teléfono del conductor del carro
+            telefono: telefonoConductor,
             email: carroEncontrado.email,
             estado: carroEncontrado.estado || carroEncontrado.Estado || carroEncontrado.id_estados,
             id_estados: carroEncontrado.id_estados || carroEncontrado.estado || carroEncontrado.Estado
           };
+          
+          console.log('🔍 carDetailsToSet establecido:', carDetailsToSet);
           
           // Actualizar estados
           setReservasExistentes(reservasDelCarro);
@@ -256,10 +361,10 @@ const VerDetalles = () => {
       return;
     }
     
-    if (!selectedSeat || !pickupLocation.trim() || !nombre.trim()) {
-      alert('Por favor selecciona un puesto, agrega tu ubicación de recogida y tu nombre');
-      return;
-    }
+         if (!selectedSeat || !pickupLocation.trim() || !nombre.trim() || !telefono.trim()) {
+       alert('Por favor selecciona un puesto, agrega tu ubicación de recogida, tu nombre y tu teléfono');
+       return;
+     }
     
     // Verificar que el asiento seleccionado no esté ocupado
     if (asientosOcupados.includes(selectedSeat)) {
@@ -281,6 +386,8 @@ const VerDetalles = () => {
       return;
     }
     
+              // El teléfono ahora se ingresa manualmente, no se valida del usuario
+     console.log('✅ Teléfono ingresado por el usuario:', telefono);
     setShowConfirmation(true);
   };
 
@@ -297,30 +404,63 @@ const VerDetalles = () => {
       return;
     }
    
-    try {
-      // Preparar los datos a enviar - CORREGIDO
-      const dataToSend = {
-        Regate: 0,
-        Nombre: nombre.trim(),
-        Ubicacion: pickupLocation,
-        Asiento: selectedSeat, // Asegurar que se envíe el asiento seleccionado
-        Usuario: userId,
-        id_carros: carroId,
-        estado: 'pendiente',
-        // Agregar información del conductor para el email
-        conductorEmail: carDetails.email || 'conductor@mecaza.com',
-        conductorNombre: carDetails.conductor,
-        placa: carDetails.placa,
-        destino: carDetails.destino,
-        fecha: carDetails.fecha,
-        hora: carDetails.horasalida
-      };
+         try {
+        // Usar el teléfono ingresado por el usuario
+        console.log('🔍 Teléfono ingresado por el usuario para la reserva:', telefono);
+        
+        // Validar que todos los campos requeridos estén presentes
+        if (!nombre.trim() || !pickupLocation.trim() || !selectedSeat || !userId || !carroId || !telefono.trim()) {
+          throw new Error('Todos los campos son obligatorios. Por favor, completa toda la información incluyendo tu teléfono.');
+        }
+        
+        // Validar que el teléfono no sea vacío
+        if (!telefono.trim()) {
+          throw new Error('Por favor ingresa tu número de teléfono para continuar con la reserva.');
+        }
+       
+               // Preparar los datos a enviar - CAMPOS COMPLETOS PARA LA BASE DE DATOS
+        const dataToSend = {
+          Nombre: nombre.trim(),
+          Ubicacion: pickupLocation,
+          Asiento: selectedSeat,
+          Usuario: userId,
+          id_carros: carroId,
+          // Campo teléfono ingresado por el usuario - Cambiado a "Telefono" para coincidir con el backend
+          Telefono: telefono.trim(),
+          // Campos adicionales que pueden ser requeridos por la base de datos
+          comentario: nombre.trim(), // Usar el nombre como comentario si es necesario
+          estado: 'pendiente', // Estado inicial de la reserva
+          // Campos de fecha y hora si son requeridos
+          fecha_reserva: new Date().toISOString().split('T')[0], // Fecha actual
+          hora_reserva: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+        };
 
-      // Debug: verificar que el asiento se esté enviando
-      console.log('🔍 Datos a enviar:', dataToSend);
-      console.log('🔍 Asiento seleccionado:', selectedSeat);
+                     // Debug: verificar que todos los campos se estén enviando correctamente
+        console.log('🔍 Datos a enviar:', dataToSend);
+        console.log('🔍 Asiento seleccionado:', selectedSeat);
+        console.log('🔍 Teléfono ingresado por el usuario:', telefono);
+        console.log('🔍 Campo Telefono en payload:', dataToSend.Telefono);
+        console.log('🔍 Tipo de teléfono:', typeof telefono);
+        console.log('🔍 Teléfono es null/undefined:', telefono === null || telefono === undefined);
+       console.log('🔍 Método HTTP:', 'POST');
+       console.log('🔍 URL:', 'http://127.0.0.1:8000/api/agregarreserva');
+       console.log('🔍 Token de autorización:', localStorage.getItem('authToken') ? 'Presente' : 'Ausente');
+       console.log('🔍 Payload completo:', JSON.stringify(dataToSend, null, 2));
+               console.log('🔍 Verificación del campo Telefono en dataToSend:', {
+          'dataToSend.Telefono': dataToSend.Telefono,
+          'typeof dataToSend.Telefono': typeof dataToSend.Telefono,
+          'dataToSend.Telefono === telefono': dataToSend.Telefono === telefono
+        });
        
       // Llamada real a la API usando las rutas proporcionadas
+      const bodyString = JSON.stringify(dataToSend);
+      console.log('🔍 Body de la petición (string):', bodyString);
+              console.log('🔍 Verificación del campo Telefono en el body:', {
+          'bodyString.includes("Telefono")': bodyString.includes('"Telefono"'),
+          'bodyString.includes(telefono)': bodyString.includes(telefono),
+          'bodyString.length': bodyString.length
+        });
+      
       const response = await fetch('http://127.0.0.1:8000/api/agregarreserva', {
         method: 'POST',
         headers: {
@@ -328,12 +468,25 @@ const VerDetalles = () => {
           'Content-Type': 'application/json',
           'Accept': 'application/json'
         },
-        body: JSON.stringify(dataToSend)
+        body: bodyString
       });
 
+      console.log('🔍 Respuesta del servidor - Status:', response.status);
+      console.log('🔍 Respuesta del servidor - Headers:', Object.fromEntries(response.headers.entries()));
+      
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al reservar el viaje');
+        console.error('❌ Error del servidor:', errorData);
+        console.error('❌ Status code:', response.status);
+        console.error('❌ Error completo:', errorData.error || 'Sin detalles del error');
+        
+        // Mostrar más detalles del error para debugging
+        let errorMessage = errorData.message || 'Error al reservar el viaje';
+        if (errorData.error) {
+          errorMessage += ` - Detalles: ${errorData.error}`;
+        }
+        
+        throw new Error(errorMessage);
       }
 
       const responseData = await response.json();
@@ -570,23 +723,88 @@ const VerDetalles = () => {
                                     <div>
                                       <span className="font-semibold text-gray-700">Estado del Carro:</span>
                                       <div className="flex items-center space-x-2">
-                                        <span className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                                          (carDetails.estado === 1 || carDetails.Estado === 1 || carDetails.id_estados === 1) ? 'bg-green-100 text-green-800' : 
-                                          (carDetails.estado === 2 || carDetails.Estado === 2 || carDetails.id_estados === 2) ? 'bg-yellow-100 text-yellow-800' :
-                                          (carDetails.estado === 3 || carDetails.Estado === 3 || carDetails.id_estados === 3) ? 'bg-orange-100 text-orange-800' :
-                                          (carDetails.estado === 4 || carDetails.Estado === 4 || carDetails.id_estados === 4) ? 'bg-red-100 text-red-800' :
-                                          'bg-gray-100 text-gray-800'
-                                        }`}>
-                                          {getEstadoNombre(carDetails.estado || carDetails.Estado || carDetails.id_estados || 1)}
-                                        </span>
-
+                                        {(() => {
+                                          // Obtener el estado del carro, verificando todos los campos posibles
+                                          const estadoId = carDetails.estado || carDetails.Estado || carDetails.id_estados || carDetails.id_estado;
+                                          
+                                          // Debug para ver qué campos están disponibles
+                                          console.log(`🔍 Debug estado carro en VerDetalles:`, {
+                                            estadoId: estadoId,
+                                            tipo: typeof estadoId,
+                                            todosLosCampos: carDetails,
+                                            camposEstado: {
+                                              'carDetails.estado': carDetails.estado,
+                                              'carDetails.Estado': carDetails.Estado,
+                                              'carDetails.id_estados': carDetails.id_estados,
+                                              'carDetails.id_estado': carDetails.id_estado
+                                            }
+                                          });
+                                          
+                                          // Obtener el nombre del estado
+                                          const estadoNombre = getEstadoNombre(estadoId);
+                                          console.log(`🔍 Estado procesado en VerDetalles: ID=${estadoId}, Nombre=${estadoNombre}`);
+                                          
+                                          // Determinar el color del badge basado en el estado
+                                          let badgeClass = 'bg-gray-100 text-gray-800';
+                                          const estadoNumero = parseInt(estadoId) || 0;
+                                          
+                                          console.log(`🔍 Comparando estado en VerDetalles: ${estadoId} (convertido a: ${estadoNumero})`);
+                                          
+                                          if (estadoNumero === 1) {
+                                            badgeClass = 'bg-green-100 text-green-800';
+                                            console.log('🔍 Aplicando color verde (Esperando Pasajeros)');
+                                          } else if (estadoNumero === 2) {
+                                            badgeClass = 'bg-yellow-100 text-yellow-800';
+                                            console.log('🔍 Aplicando color amarillo (En Viaje)');
+                                          } else if (estadoNumero === 3) {
+                                            badgeClass = 'bg-orange-100 text-orange-800';
+                                            console.log('🔍 Aplicando color naranja (En Mantenimiento)');
+                                          } else if (estadoNumero === 4) {
+                                            badgeClass = 'bg-red-100 text-red-800';
+                                            console.log('🔍 Aplicando color rojo (Fuera de Servicio)');
+                                          } else {
+                                            console.log('🔍 Aplicando color gris (Estado desconocido)');
+                                          }
+                                          
+                                          console.log(`🔍 Renderizando badge en VerDetalles: Clase=${badgeClass}, Texto=${estadoNombre}`);
+                                          
+                                          return (
+                                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeClass}`}>
+                                              {estadoNombre}
+                                            </span>
+                                          );
+                                        })()}
                                       </div>
                                     </div>
                                     <div>
                                       <span className="font-semibold text-gray-700">Fecha:</span>
                                       <p className="text-gray-900 flex items-center">
                                         <FaCalendar className="mr-2 text-green-600" />
-                                        {new Date(carDetails.fecha).toLocaleDateString('es-ES')}
+                                        {(() => {
+                                          if (!carDetails.fecha) return 'No especificada';
+                                          
+                                          try {
+                                            // Intentar parsear la fecha directamente
+                                            const fecha = new Date(carDetails.fecha);
+                                            
+                                            // Verificar si la fecha es válida
+                                            if (!isNaN(fecha.getTime())) {
+                                              // Si hay diferencia de zona horaria, mostrar la fecha original
+                                              if (fecha.getUTCDate() !== fecha.getDate()) {
+                                                return carDetails.fecha;
+                                              }
+                                              
+                                              return fecha.toLocaleDateString('es-ES');
+                                            }
+                                            
+                                            // Si no se puede parsear, mostrar la fecha original
+                                            return carDetails.fecha;
+                                            
+                                          } catch (error) {
+                                            console.error('Error al formatear fecha:', error, carDetails.fecha);
+                                            return carDetails.fecha; // Mostrar la fecha original si hay error
+                                          }
+                                        })()}
                                       </p>
                                     </div>
                                     <div>
@@ -718,62 +936,81 @@ const VerDetalles = () => {
             </div>
           </div>
 
-                      {/* Información del pasajero */}
-            <div className="mb-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">Información del Pasajero</h3>
-              <div className="grid md:grid-cols-2 gap-6">
-                {/* Nombre del pasajero */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Tu Nombre</label>
-                  <div className="relative">
-                    <FaUser className="absolute left-3 top-3 text-gray-400" />
-                                        <input
+                                             {/* Información del pasajero */}
+             <div className="mb-8">
+               <h3 className="text-2xl font-bold text-gray-900 mb-4">Información del Pasajero</h3>
+               <div className="grid md:grid-cols-2 gap-6">
+                 {/* Nombre del pasajero */}
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Tu Nombre</label>
+                   <div className="relative">
+                     <FaUser className="absolute left-3 top-3 text-gray-400" />
+                     <input
                        type="text"
                        value={nombre}
                        onChange={(e) => setNombre(e.target.value)}
-                      placeholder="Tu nombre se toma automáticamente de tu cuenta..."
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                      readOnly={nombre.trim() !== ''}
+                       placeholder="Tu nombre se toma automáticamente de tu cuenta..."
+                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
+                       readOnly={nombre.trim() !== ''}
                      />
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">
-                    {nombre.trim() !== '' ? 
-                      '✓ Nombre tomado automáticamente de tu cuenta' : 
-                      'Este nombre aparecerá en la reserva'
-                    }
-                  </p>
-                </div>
-                
-                {/* Ubicación de recogida */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación de Recogida</label>
-                  <div className="relative">
-                    <FaMapMarkerAlt className="absolute left-3 top-3 text-gray-400" />
-                    <input
-                      type="text"
-                      value={pickupLocation}
-                      onChange={(e) => setPickupLocation(e.target.value)}
-                      placeholder="Ingresa tu dirección de recogida..."
-                      className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                  <p className="text-sm text-gray-600 mt-2">
-                    El conductor te recogerá en esta ubicación
-                  </p>
-                </div>
-              </div>
-            </div>
+                   </div>
+                   <p className="text-sm text-gray-600 mt-2">
+                     {nombre.trim() !== '' ? 
+                       '✓ Nombre tomado automáticamente de tu cuenta' : 
+                       'Este nombre aparecerá en la reserva'
+                     }
+                   </p>
+                 </div>
+                 
+                 {/* Teléfono del pasajero */}
+                 <div>
+                   <label className="block text-sm font-medium text-gray-700 mb-2">Tu Teléfono</label>
+                   <div className="relative">
+                     <FaPhone className="absolute left-3 top-3 text-gray-400" />
+                     <input
+                       type="tel"
+                       value={telefono}
+                       onChange={(e) => setTelefono(e.target.value)}
+                       placeholder="Ingresa tu número de teléfono..."
+                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                       required
+                     />
+                   </div>
+                   <p className="text-sm text-gray-600 mt-2">
+                     El conductor te contactará en este número
+                   </p>
+                 </div>
+               </div>
+               
+               {/* Ubicación de recogida - Ahora en una fila separada */}
+               <div className="mt-6">
+                 <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación de Recogida</label>
+                 <div className="relative">
+                   <FaMapMarkerAlt className="absolute left-3 top-3 text-gray-400" />
+                   <input
+                     type="text"
+                     value={pickupLocation}
+                     onChange={(e) => setPickupLocation(e.target.value)}
+                     placeholder="Ingresa tu dirección de recogida..."
+                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                   />
+                 </div>
+                 <p className="text-sm text-gray-600 mt-2">
+                   El conductor te recogerá en esta ubicación
+                 </p>
+               </div>
+             </div>
 
           {/* Botón de confirmación */}
           <div className="text-center">
-                          <button
-                onClick={handleConfirmReservation}
-                disabled={!selectedSeat || !pickupLocation.trim() || !nombre.trim() || carDetails.asientos_disponibles <= 0}
-                 className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
-               >
-                <FaCheck className="mr-2" />
-                {carDetails.asientos_disponibles <= 0 ? 'Sin Asientos Disponibles' : 'Confirmar Reserva'}
-              </button>
+                                           <button
+                   onClick={handleConfirmReservation}
+                   disabled={!selectedSeat || !pickupLocation.trim() || !nombre.trim() || !telefono.trim() || carDetails.asientos_disponibles <= 0}
+                   className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
+                 >
+                   <FaCheck className="mr-2" />
+                   {carDetails.asientos_disponibles <= 0 ? 'Sin Asientos Disponibles' : 'Confirmar Reserva'}
+                 </button>
               {carDetails.asientos_disponibles <= 0 && (
                 <p className="text-red-600 text-sm mt-2">
                   ⚠️ No hay asientos disponibles en este carro
@@ -788,29 +1025,55 @@ const VerDetalles = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-md w-full">
             <h3 className="text-2xl font-bold text-gray-900 mb-4">Confirmar Reserva</h3>
-                          <div className="space-y-4 mb-6">
-                <div>
-                  <span className="font-semibold">Conductor:</span> {carDetails.conductor}
-                </div>
-                <div>
-                  <span className="font-semibold">Destino:</span> {carDetails.destino}
-                </div>
-                <div>
-                  <span className="font-semibold">Fecha:</span> {new Date(carDetails.fecha).toLocaleDateString('es-ES')}
-                </div>
-                <div>
-                  <span className="font-semibold">Hora:</span> {carDetails.horasalida}
-                </div>
-                                <div>
-                    <span className="font-semibold">Pasajero:</span> {nombre || 'No especificado'}
+                                                     <div className="space-y-4 mb-6">
+                 <div>
+                   <span className="font-semibold">Conductor:</span> {carDetails.conductor}
                  </div>
-                <div>
-                  <span className="font-semibold">Puesto:</span> {selectedSeat ? `Asiento ${selectedSeat}` : 'No seleccionado'}
-                </div>
-                <div>
-                  <span className="font-semibold">Ubicación:</span> {pickupLocation || 'No especificada'}
-                </div>
-              </div>
+                 <div>
+                   <span className="font-semibold">Destino:</span> {carDetails.destino}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Fecha:</span> {(() => {
+                     if (!carDetails.fecha) return 'No especificada';
+                     
+                     try {
+                       const fecha = new Date(carDetails.fecha);
+                       
+                       if (!isNaN(fecha.getTime())) {
+                         // Si hay diferencia de zona horaria, mostrar la fecha original
+                         if (fecha.getUTCDate() !== fecha.getDate()) {
+                           return carDetails.fecha;
+                         }
+                         
+                         return fecha.toLocaleDateString('es-ES');
+                       }
+                       
+                       return carDetails.fecha;
+                       
+                     } catch (error) {
+                       return carDetails.fecha;
+                     }
+                   })()}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Hora:</span> {carDetails.horasalida}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Pasajero:</span> {nombre || 'No especificado'}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Puesto:</span> {selectedSeat ? `Asiento ${selectedSeat}` : 'No seleccionado'}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Ubicación:</span> {pickupLocation || 'No especificada'}
+                 </div>
+                 <div>
+                   <span className="font-semibold">Teléfono:</span> {telefono || 'No ingresado'}
+                 </div>
+                 <div className="text-xs text-gray-500 mt-2">
+                   <span className="font-semibold">Campo a enviar:</span> tel = {telefono || 'No ingresado'}
+                 </div>
+               </div>
             <div className="flex space-x-4">
               <button
                 onClick={handleReserveTrip}

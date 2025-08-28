@@ -52,20 +52,46 @@ const IndexLogin = () => {
 
   // Función auxiliar para obtener nombre del estado por ID
   const getEstadoNombre = (estadoId) => {
-    const id = parseInt(estadoId);
+    console.log(`🔍 getEstadoNombre llamado con: ${estadoId} (tipo: ${typeof estadoId})`);
+    
+    // Si no hay estado, retornar desconocido
+    if (estadoId === null || estadoId === undefined || estadoId === '') {
+      console.log('🔍 Estado vacío o nulo, retornando desconocido');
+      return '🔍 Estado Desconocido';
+    }
+    
+    // Convertir a número si es string
+    let id;
+    if (typeof estadoId === 'string') {
+      id = parseInt(estadoId.trim());
+      console.log(`🔍 Estado string "${estadoId}" convertido a número: ${id}`);
+    } else {
+      id = estadoId;
+      console.log(`🔍 Estado ya es número: ${id}`);
+    }
+    
+    // Si no es un número válido, retornar el valor original
+    if (isNaN(id)) {
+      console.log(`🔍 Estado no numérico detectado: ${estadoId} (tipo: ${typeof estadoId})`);
+      return `🔍 Estado: ${estadoId}`;
+    }
     
     const estados = {
-      1: '🚗 Disponible',
+      1: '🚗 Esperando Pasajeros',
       2: '🛣️ En Viaje', 
       3: '🔧 En Mantenimiento',
       4: '❌ Fuera de Servicio'
     };
     
-    if (id && estados[id]) {
+    console.log(`🔍 Buscando estado ID: ${id} en estados disponibles:`, Object.keys(estados));
+    
+    if (estados[id]) {
+      console.log(`🔍 Estado encontrado: ${estados[id]}`);
       return estados[id];
     }
     
-    return `🔍 Estado ${estadoId || 'Desconocido'}`;
+    console.log(`🔍 Estado ID no reconocido: ${id}`);
+    return `🔍 Estado ${id} (No reconocido)`;
   };
 
   const carouselData = [
@@ -149,6 +175,22 @@ const IndexLogin = () => {
             asientos_disponibles: car.asientos || 4
           }));
         }
+        
+        // Debug: mostrar información de los carros obtenidos
+        console.log('🔍 Carros obtenidos del backend:', carsData);
+        carsData.forEach((car, index) => {
+          console.log(`🔍 Carro ${index + 1}:`, {
+            id: car.id_carros || car.id || car.ID,
+            conductor: car.conductor || car.Conductor,
+            placa: car.placa || car.Placa,
+            estado: car.estado || car.Estado || car.id_estados || car.id_estado,
+            fecha: car.fecha || car.Fecha,
+            asientos: car.asientos || car.Asientos,
+            asientos_disponibles: car.asientos_disponibles,
+            // Debug completo del objeto carro para ver todos los campos
+            objetoCompleto: car
+          });
+        });
         
         setCars(carsData);
         setFilteredCars(carsData);
@@ -404,27 +446,118 @@ const IndexLogin = () => {
                         </span>
                         )}
                       </div>
-                    <div className="text-gray-600 mb-2">
-                      <span className="font-semibold">Estado:</span> 
-                      <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                        (car.estado === 1 || car.Estado === 1) ? 'bg-green-100 text-green-800' : 
-                        (car.estado === 2 || car.Estado === 2) ? 'bg-yellow-100 text-yellow-800' :
-                        (car.estado === 3 || car.Estado === 3) ? 'bg-orange-100 text-orange-800' :
-                        (car.estado === 4 || car.Estado === 4) ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {getEstadoNombre(car.estado || car.Estado || car.id_estados)}
-                      </span>
-                    </div>
+                                         <div className="text-gray-600 mb-2">
+                       <span className="font-semibold">Estado:</span> 
+                       {(() => {
+                         // Obtener el estado del carro, verificando todos los campos posibles
+                         const estadoId = car.estado || car.Estado || car.id_estados || car.id_estado;
+                         
+                         // Debug para ver qué campos están disponibles
+                         console.log(`🔍 Debug estado carro ${car.placa || car.Placa}:`, {
+                           estadoId: estadoId,
+                           tipo: typeof estadoId,
+                           todosLosCampos: car,
+                           camposEstado: {
+                             'car.estado': car.estado,
+                             'car.Estado': car.Estado,
+                             'car.id_estados': car.id_estados,
+                             'car.id_estado': car.id_estado
+                           }
+                         });
+                         
+                         // Obtener el nombre del estado
+                         const estadoNombre = getEstadoNombre(estadoId);
+                         console.log(`🔍 Estado procesado: ID=${estadoId}, Nombre=${estadoNombre}`);
+                         
+                         // Determinar el color del badge basado en el estado
+                         let badgeClass = 'bg-gray-100 text-gray-800';
+                         const estadoNumero = parseInt(estadoId) || 0;
+                         
+                         console.log(`🔍 Comparando estado: ${estadoId} (convertido a: ${estadoNumero})`);
+                         
+                         if (estadoNumero === 1) {
+                           badgeClass = 'bg-green-100 text-green-800';
+                           console.log('🔍 Aplicando color verde (Esperando Pasajeros)');
+                         } else if (estadoNumero === 2) {
+                           badgeClass = 'bg-yellow-100 text-yellow-800';
+                           console.log('🔍 Aplicando color amarillo (En Viaje)');
+                         } else if (estadoNumero === 3) {
+                           badgeClass = 'bg-orange-100 text-orange-800';
+                           console.log('🔍 Aplicando color naranja (En Mantenimiento)');
+                         } else if (estadoNumero === 4) {
+                           badgeClass = 'bg-red-100 text-red-800';
+                           console.log('🔍 Aplicando color rojo (Fuera de Servicio)');
+                         } else {
+                           console.log('🔍 Aplicando color gris (Estado desconocido)');
+                         }
+                         
+                         console.log(`🔍 Renderizando badge: Clase=${badgeClass}, Texto=${estadoNombre}`);
+                         
+                         return (
+                           <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
+                             {estadoNombre}
+                           </span>
+                         );
+                       })()}
+                     </div>
                     <div className="text-gray-600 mb-2">
                       <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}
                     </div>
                     <div className="text-gray-600 mb-2">
                       <span className="font-semibold">Hora:</span> {car.horasalida || 'No especificada'}
                     </div>
-                    <div className="text-gray-600 mb-2">
-                      <span className="font-semibold">Fecha de salida:</span> {car.fecha ? new Date(car.fecha).toLocaleDateString('es-ES') : 'No especificada'}
-                    </div>
+                                         <div className="text-gray-600 mb-2">
+                       <span className="font-semibold">Fecha de salida:</span> {(() => {
+                         if (!car.fecha) return 'No especificada';
+                         
+                         console.log(`🔍 Debug fecha carro ${car.placa || car.Placa}:`, {
+                           fechaOriginal: car.fecha,
+                           tipo: typeof car.fecha,
+                           campos: {
+                             'car.fecha': car.fecha,
+                             'car.Fecha': car.Fecha
+                           },
+                           fechaParseada: new Date(car.fecha),
+                           fechaISO: new Date(car.fecha).toISOString(),
+                           fechaLocal: new Date(car.fecha).toLocaleDateString('es-ES'),
+                           fechaUTC: new Date(car.fecha).getUTCDate(),
+                           fechaLocalDate: new Date(car.fecha).getDate(),
+                           diferencia: new Date(car.fecha).getUTCDate() - new Date(car.fecha).getDate()
+                         });
+                         
+                         try {
+                           // Intentar parsear la fecha directamente
+                           const fecha = new Date(car.fecha);
+                           
+                           // Verificar si la fecha es válida
+                           if (!isNaN(fecha.getTime())) {
+                             console.log(`🔍 Fecha válida parseada: ${fecha.toISOString()}`);
+                             console.log(`🔍 Fecha formateada: ${fecha.toLocaleDateString('es-ES')}`);
+                             
+                             // Verificar si la fecha parseada es diferente a la original
+                             const fechaFormateada = fecha.toLocaleDateString('es-ES');
+                             console.log(`🔍 Comparación: Original "${car.fecha}" vs Formateada "${fechaFormateada}"`);
+                             
+                             // Si hay diferencia de zona horaria, mostrar la fecha original
+                             if (fecha.getUTCDate() !== fecha.getDate()) {
+                               console.log(`🔍 ⚠️ Diferencia de zona horaria detectada! UTC: ${fecha.getUTCDate()}, Local: ${fecha.getDate()}`);
+                               console.log(`🔍 Mostrando fecha original del backend: ${car.fecha}`);
+                               return car.fecha;
+                             }
+                             
+                             return fechaFormateada;
+                           }
+                           
+                           // Si no se puede parsear, mostrar la fecha original
+                           console.log(`🔍 Fecha no válida, mostrando original: ${car.fecha}`);
+                           return car.fecha;
+                           
+                         } catch (error) {
+                           console.error('Error al formatear fecha:', error, car.fecha);
+                           return car.fecha; // Mostrar la fecha original si hay error
+                         }
+                       })()}
+                     </div>
                   </div>
                   <button 
                     onClick={() => navigate(`/ver-detalles/${car.id_carros || idx}`)}

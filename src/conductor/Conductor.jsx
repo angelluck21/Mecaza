@@ -41,6 +41,16 @@ const Conductor = () => {
      // Valor por defecto para evitar null
   });
   
+  // Debug: log del estado inicial de carData
+  useEffect(() => {
+    console.log('🔍 Estado inicial de carData:', carData);
+  }, []);
+  
+  // Debug: log cada vez que cambie carData
+  useEffect(() => {
+    console.log('🔄 carData actualizado:', carData);
+  }, [carData]);
+  
 
   
   useEffect(() => {
@@ -811,7 +821,7 @@ const Conductor = () => {
      
      // Mapeo de estados con nombres más descriptivos
      const estados = {
-       1: '🚗 Disponible',
+       1: '🚗 Esperando Pasajeros',
        2: '🛣️ En Viaje', 
        3: '🔧 En Mantenimiento',
        4: '❌ Fuera de Servicio'
@@ -826,7 +836,7 @@ const Conductor = () => {
      // Si no es un ID válido, devolver un mensaje descriptivo
      console.log(`❌ Estado ID ${estadoId} no válido, devolviendo estado por defecto`);
      return `🔍 Estado ${estadoId || 'Desconocido'}`;
-   };
+     };
 
   // Función helper para construir la URL de la imagen del carro
   const getCarImageUrl = (imagePath) => {
@@ -936,6 +946,8 @@ const Conductor = () => {
      showToastNotification(`Estado seleccionado: ${estados.find(e => e.id === estadoId)?.nombre || 'Desconocido'}`, 'info');
    };
 
+  
+
   const handleGetEstados = async () => {
     setIsLoadingEstados(true);
     console.log('🔄 Iniciando carga de estados...');
@@ -974,7 +986,7 @@ const Conductor = () => {
         }
       } else if (response.data && Array.isArray(response.data)) {
         estadosArray = response.data;
-      } else {
+        } else {
         estadosArray = [];
       }
       
@@ -1566,7 +1578,7 @@ const Conductor = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Telefono</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
                 <input
                   type="text"
                   value={carData.Telefono}
