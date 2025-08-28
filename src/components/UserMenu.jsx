@@ -102,12 +102,15 @@ const UserMenu = ({ userData }) => {
             >
               Ver perfil
             </button>
-            <button
-              onClick={handleMyReservations}
-              className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
-            >
-              Mis Reservas
-            </button>
+            {/* Solo mostrar "Mis Reservas" para usuarios que NO sean conductores */}
+            {userData?.rol !== 'conductor' && (
+              <button
+                onClick={handleMyReservations}
+                className="block w-full text-left px-4 py-2 hover:bg-blue-50 text-gray-700 hover:text-blue-900 transition-colors"
+              >
+                Mis Reservas
+              </button>
+            )}
             {(userData?.rol === 'conductor' || userData?.rol === 'admin') && (
               <button
                 onClick={handleNotifications}

@@ -805,7 +805,7 @@ const VerDetalles = () => {
                     <span className="font-semibold">Pasajero:</span> {nombre || 'No especificado'}
                  </div>
                 <div>
-                  <span className="font-semibold">Puesto:</span> {selectedSeat === 'conductor' ? 'Conductor' : selectedSeat === 'copiloto' ? 'Copiloto' : selectedSeat === 'trasero' ? 'Trasero' : 'No seleccionado'}
+                  <span className="font-semibold">Puesto:</span> {selectedSeat ? `Asiento ${selectedSeat}` : 'No seleccionado'}
                 </div>
                 <div>
                   <span className="font-semibold">Ubicación:</span> {pickupLocation || 'No especificada'}

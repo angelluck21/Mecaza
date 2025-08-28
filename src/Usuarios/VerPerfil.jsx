@@ -14,31 +14,78 @@ const VerPerfil = () => {
   const [notificationType, setNotificationType] = useState('success');
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Obtener datos del usuario del localStorage
-    const storedUserData = localStorage.getItem('userData');
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        
-        // Sincronizar el campo teléfono si no existe
-        if (!user.tel && (user.Telefono || user.telefono || user.phone)) {
-          user.tel = user.Telefono || user.telefono || user.phone;
-        }
-        
-        setUserData(user);
-      } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
+
+useEffect(() => {
+  const fetchUserData = async () => {
+    try {
+      // Obtener datos del usuario del localStorage
+      const storedUserData = localStorage.getItem('userData');
+      const authToken = localStorage.getItem('authToken');
+      
+      if (!storedUserData || !authToken) {
+        console.log('No hay datos de usuario o token, redirigiendo al login');
         navigate('/login');
         return;
       }
-    } else {
-      console.log('No hay datos de usuario, redirigiendo al login');
-      navigate('/login');
-      return;
+
+      const user = JSON.parse(storedUserData);
+      const userId = user.id_users || user.id || user.ID || user.id_user || user.user_id || user.userId;
+      
+      if (!userId) {
+        console.error('No se pudo identificar el ID del usuario');
+        navigate('/login');
+        return;
+      }
+
+      // Hacer petición al backend para obtener datos actualizados
+      console.log('🔄 Sincronizando datos del usuario con la base de datos...');
+      const response = await axios.get('http://127.0.0.1:8000/api/listarusuario', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`,
+          'Accept': 'application/json'
+        }
+      });
+
+      if (response.data && response.data.data) {
+        // Buscar el usuario actual en la lista de usuarios
+        const usuarios = response.data.data;
+        const userDataActualizado = usuarios.find(u => 
+          (u.id_users || u.id || u.ID || u.id_user || u.user_id || u.userId) == userId
+        );
+        
+        if (userDataActualizado) {
+          console.log('✅ Datos actualizados del backend:', userDataActualizado);
+          
+          // Actualizar localStorage con los datos frescos
+          localStorage.setItem('userData', JSON.stringify(userDataActualizado));
+          setUserData(userDataActualizado);
+        } else {
+          console.log('⚠️ Usuario no encontrado en la lista, usando datos del localStorage');
+          setUserData(user);
+        }
+      } else {
+        console.log('⚠️ Error en la respuesta del backend, usando datos del localStorage');
+        setUserData(user);
+      }
+      
+    } catch (error) {
+      console.error('Error al sincronizar datos del usuario:', error);
+      // Fallback: usar datos del localStorage
+      const storedUserData = localStorage.getItem('userData');
+      if (storedUserData) {
+        const user = JSON.parse(storedUserData);
+        setUserData(user);
+      } else {
+        navigate('/login');
+        return;
+      }
+    } finally {
+      setIsLoading(false);
     }
-    setIsLoading(false);
-  }, [navigate]);
+  };
+
+  fetchUserData();
+}, [navigate]);
 
   const handleGoBack = () => {
     navigate(-1); // Regresar a la página anterior
@@ -245,7 +292,7 @@ const VerPerfil = () => {
                   Volver
                 </button>
                 <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/login'); }}
+                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/index'); }}
                   className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
                 >
                   Cerrar Sesión
@@ -285,15 +332,30 @@ const VerPerfil = () => {
               </div>
             </div>
 
-            {/* Información del usuario */}
-                         <div className="flex-1 text-center md:text-left">
-               <h2 className="text-2xl font-bold text-gray-900 mb-2">
-                 {userData.Nombre || userData.nombre || userData.name || 'Usuario'}
-               </h2>
+                        {/* Información del usuario */}
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                {userData.Nombre || userData.nombre || userData.name || userData.nombre_usuario || userData.nombreUsuario || userData.NOMBRE || 'Usuario'}
+              </h2>
               <p className="text-gray-600 mb-4">
                 {userData.rol === 'admin' ? 'Administrador' : 
                  userData.rol === 'conductor' ? 'Conductor' : 'Usuario'}
               </p>
+              
+              {/* Debug temporal para ver qué campos están disponibles */}
+              <details className="mt-2 text-xs text-gray-500 cursor-pointer">
+                <summary className="hover:text-blue-600">🔍 Debug: Ver campos disponibles</summary>
+                <div className="mt-2 p-2 bg-gray-100 rounded text-xs text-left">
+                  <div><strong>Nombre:</strong> {userData.Nombre || 'null'}</div>
+                  <div><strong>nombre:</strong> {userData.nombre || 'null'}</div>
+                  <div><strong>name:</strong> {userData.name || 'null'}</div>
+                  <div><strong>nombre_usuario:</strong> {userData.nombre_usuario || 'null'}</div>
+                  <div><strong>nombreUsuario:</strong> {userData.nombreUsuario || 'null'}</div>
+                  <div><strong>NOMBRE:</strong> {userData.NOMBRE || 'null'}</div>
+                  <div><strong>Rol:</strong> {userData.rol || 'null'}</div>
+                  <div><strong>ID:</strong> {userData.id_users || userData.id || userData.ID || 'null'}</div>
+                </div>
+              </details>
             </div>
           </div>
 
@@ -312,7 +374,7 @@ const VerPerfil = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Nombre</label>
-                  <p className="text-gray-900 font-medium">{userData.Nombre || userData.nombre || userData.name || 'No especificado'}</p>
+                  <p className="text-gray-900 font-medium">{userData.Nombre || userData.nombre || userData.name || userData.nombre_usuario || userData.nombreUsuario || userData.NOMBRE || 'No especificado'}</p>
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-500">Rol</label>
@@ -336,10 +398,15 @@ const VerPerfil = () => {
                    <label className="block text-sm font-medium text-gray-500">Correo electrónico</label>
                    <p className="text-gray-900 font-medium">{userData.Correo || userData.correo || userData.email || userData.Email || 'No especificado'}</p>
                  </div>
-                                  <div>
-                     <label className="block text-sm font-medium text-gray-500">Numero ed Telefono</label>
-                     <p className="text-gray-900 font-medium">{userData.tel || userData.Telefono || userData.telefono || userData.phone || 'No especificado'}</p>
-                   </div>
+                                                                     <div>
+                      <label className="block text-sm font-medium text-gray-500">Número de Teléfono</label>
+                      <p className="text-gray-900 font-medium">
+                        {userData.tel || userData.Telefono || userData.telefono || userData.phone || userData.TELEFONO || 'No registrado'}
+                      </p>
+                  
+                      
+
+                    </div>
                 <div>
                    <label className="block text-sm font-medium text-gray-500">Estado de la cuenta</label>
                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">

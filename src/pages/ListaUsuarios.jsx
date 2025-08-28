@@ -243,7 +243,7 @@ const ListaUsuarios = () => {
                   ← Volver
                 </button>
                 <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/login'); }}
+                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/index'); }}
                   className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
                 >
                   Cerrar Sesión

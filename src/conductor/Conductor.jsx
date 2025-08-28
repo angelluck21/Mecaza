@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaMapMarkerAlt, FaClock, FaUserFriends, FaDollarSign, FaUser, FaBell, FaCheck, FaTimes, FaExternalLinkAlt } from 'react-icons/fa';
+import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaMapMarkerAlt, FaClock, FaUserFriends, FaDollarSign, FaUser, FaBell, FaCheck, FaTimes, FaExternalLinkAlt, FaPhone } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../components/UserMenu';
 import axios from 'axios';
@@ -103,7 +103,7 @@ const Conductor = () => {
     localStorage.removeItem('userData');
     localStorage.removeItem('authToken');
     setUserData(null);
-    navigate('/');
+    navigate('/index');
   };
 
   // Mostrar loading mientras verifica autenticación
@@ -368,11 +368,18 @@ const Conductor = () => {
       const conductorLogueado = userData.Nombre || userData.nombre || '';
       console.log('Conductor logueado:', conductorLogueado);
       
-      // Filtrar solo los carros del conductor logueado
+      // Filtrar solo los carros del conductor logueado (comparación estricta)
       const carrosDelConductor = carrosArray.filter(carro => {
         const conductorCarro = carro.conductor || carro.Conductor || '';
-        const perteneceAlConductor = conductorCarro.toLowerCase().includes(conductorLogueado.toLowerCase()) ||
-                                    conductorLogueado.toLowerCase().includes(conductorCarro.toLowerCase());
+        
+        // Validar que ambos nombres existan
+        if (!conductorCarro || !conductorLogueado) {
+          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
+          return false;
+        }
+        
+        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
+        const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
         
         console.log(`Carro ${carro.placa || carro.Placa}: Conductor "${conductorCarro}" vs Logueado "${conductorLogueado}" -> ${perteneceAlConductor}`);
         
@@ -382,16 +389,23 @@ const Conductor = () => {
       console.log('Carros del conductor logueado:', carrosDelConductor);
       console.log('Total de carros del conductor:', carrosDelConductor.length);
       
-      // Obtener los IDs de los carros del conductor
+      // Obtener los IDs de los carros del conductor (convertir a string para comparación)
       const idsCarrosConductor = carrosDelConductor.map(carro => 
-        carro.id_carros || carro.id
+        String(carro.id_carros || carro.id || carro.ID)
       );
       
       console.log('IDs de carros del conductor:', idsCarrosConductor);
       
-      // Filtrar solo las reservas de los carros del conductor
+      // Filtrar solo las reservas de los carros del conductor (comparación más estricta)
       const reservasDelConductor = reservasArray.filter(reserva => {
-        const carroId = reserva.id_carros || reserva.id_carro || reserva.carro_id;
+        const carroId = String(reserva.id_carros || reserva.id_carro || reserva.carro_id || reserva.carroId);
+        
+        // Verificar que el carroId sea válido
+        if (!carroId || carroId === 'undefined' || carroId === 'null') {
+          console.log(`Reserva ${reserva.id || 'N/A'}: Carro ID inválido "${carroId}" -> NO PERTENECE al conductor`);
+          return false;
+        }
+        
         const perteneceAlConductor = idsCarrosConductor.includes(carroId);
         
         console.log(`Reserva ${reserva.id || 'N/A'}: Carro ID ${carroId} -> ${perteneceAlConductor ? 'PERTENECE' : 'NO PERTENECE'} al conductor`);
@@ -402,7 +416,7 @@ const Conductor = () => {
       console.log('Reservas del conductor logueado:', reservasDelConductor);
       console.log('Total de reservas del conductor:', reservasDelConductor.length);
       
-      // Enriquecer las reservas con información completa del carro
+      // Enriquecer las reservas con información completa del carro y usuario
       const reservasEnriquecidas = reservasDelConductor.map(reserva => {
         const carroId = reserva.id_carros || reserva.id_carro || reserva.carro_id;
         const carroEncontrado = carrosDelConductor.find(carro => 
@@ -417,16 +431,40 @@ const Conductor = () => {
           conductor: carroEncontrado ? (carroEncontrado.conductor || carroEncontrado.Conductor) : 'N/A'
         };
         
+        // Obtener información del usuario que hizo la reserva
+        const usuarioInfo = {
+          id: reserva.Usuario || reserva.usuario || reserva.user_id || 'N/A',
+          nombre: reserva.Nombre || reserva.nombre || reserva.comentario || reserva.Comentario || 'No especificado',
+          telefono: reserva.telefono || reserva.Telefono || reserva.phone || 'No especificado',
+          ubicacion: reserva.Ubicacion || reserva.ubicacion || 'No especificada'
+        };
+        
         console.log(`Reserva ${reserva.id || 'N/A'}: Info del carro enriquecida:`, carroInfo);
+        console.log(`Reserva ${reserva.id || 'N/A'}: Info del usuario enriquecida:`, usuarioInfo);
         
         return {
           ...reserva,
-          carroInfo
+          carroInfo,
+          usuarioInfo
         };
       });
       
       console.log('Reservas enriquecidas del conductor:', reservasEnriquecidas);
       console.log('Total de reservas enriquecidas:', reservasEnriquecidas.length);
+      
+      // Validación adicional: mostrar mensaje si no hay carros del conductor
+      if (carrosDelConductor.length === 0) {
+        showToastNotification('No tienes carros registrados en el sistema', 'warning');
+        setReservas([]);
+        return;
+      }
+      
+      // Validación: mostrar mensaje si no hay reservas para los carros del conductor
+      if (reservasDelConductor.length === 0) {
+        showToastNotification('No hay reservas para tus carros registrados', 'info');
+        setReservas([]);
+        return;
+      }
       
       setReservas(reservasEnriquecidas);
       
@@ -492,9 +530,16 @@ const Conductor = () => {
         
         console.log(`Comparando: "${conductorCarro}" con "${conductorLogueado}"`);
         
-        // Comparar nombres de conductor (ignorar mayúsculas/minúsculas)
-        return conductorCarro.toLowerCase().includes(conductorLogueado.toLowerCase()) ||
-               conductorLogueado.toLowerCase().includes(conductorCarro.toLowerCase());
+        // Validar que ambos nombres existan
+        if (!conductorCarro || !conductorLogueado) {
+          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
+          return false;
+        }
+        
+        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
+        const match = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
+        console.log(`¿Coincide? ${match}`);
+        return match;
       });
       
       console.log('Carros del conductor logueado:', carrosDelConductor);
@@ -518,6 +563,7 @@ const Conductor = () => {
       
       if (carrosDelConductor.length === 0) {
         console.log('No se encontraron carros para este conductor');
+        showToastNotification('No tienes carros registrados en el sistema', 'warning');
         setCarros([]);
         return;
       }
@@ -592,6 +638,7 @@ const Conductor = () => {
       }
     
       setCarros(carrosDelConductor);
+      showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
     } catch (error) {
       console.error('Error al obtener carros:', error);
       console.log('Error response:', error.response);
@@ -651,8 +698,15 @@ const Conductor = () => {
       const conductorLogueado = userData.Nombre || userData.nombre || '';
       const carrosDelConductor = carrosArray.filter(carro => {
         const conductorCarro = carro.conductor || carro.Conductor || '';
-        const perteneceAlConductor = conductorCarro.toLowerCase().includes(conductorLogueado.toLowerCase()) ||
-                                    conductorLogueado.toLowerCase().includes(conductorCarro.toLowerCase());
+        
+        // Validar que ambos nombres existan
+        if (!conductorCarro || !conductorLogueado) {
+          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
+          return false;
+        }
+        
+        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
+        const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
         
         console.log(`Carro ${carro.placa || carro.Placa}:`, {
           conductorCarro,
@@ -665,6 +719,12 @@ const Conductor = () => {
       
       console.log('Carros del conductor logueado:', carrosDelConductor);
       console.log('Total de carros del conductor:', carrosDelConductor.length);
+      
+      if (carrosDelConductor.length === 0) {
+        showToastNotification('No tienes carros registrados en el sistema', 'warning');
+        setMyCars([]);
+        return;
+      }
       
       // Obtener estados para mostrar nombres en lugar de números
       try {
@@ -705,6 +765,7 @@ const Conductor = () => {
         });
         
         setMyCars(carrosConEstados);
+        showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
       } catch (estadosError) {
         console.error('Error al obtener estados:', estadosError);
         // Si no se pueden obtener los estados, usar nombres por defecto
@@ -713,6 +774,7 @@ const Conductor = () => {
           estadoNombre: getEstadoNombre(carro.id_estados || carro.Estado)
         }));
         setMyCars(carrosConEstados);
+        showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
       }
       
     } catch (error) {
@@ -789,70 +851,90 @@ const Conductor = () => {
     return `http://127.0.0.1:8000/storage/${imagePath}`;
   };
 
-  const handleUpdateEstado = async () => {
-    if (!selectedCarro || !newEstado) {
-      showToastNotification('Por favor selecciona un carro y un estado', 'error');
-      return;
-    }
+     const handleUpdateEstado = async () => {
+     if (!selectedCarro) {
+       showToastNotification('Por favor selecciona un carro', 'error');
+       return;
+     }
 
-    try {
-      const response = await axios.put(`http://127.0.0.1:8000/api/actualizarestadocarro/${selectedCarro.id_carros || selectedCarro.id}`, {
-        Estadoid: newEstado
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-      
-      console.log('Estado actualizado:', response.data);
-      showToastNotification('Estado del carro actualizado correctamente', 'success');
-      
-      // Actualizar la lista de carros
-      handleViewCarros();
-      
-      // Cerrar modales
-      setShowUpdateEstadoModal(false);
-      setSelectedCarro(null);
-      setNewEstado('');
-    } catch (error) {
-      console.error('Error al actualizar estado:', error);
-      showToastNotification('Error al actualizar el estado del carro', 'error');
-    }
-  };
+     try {
+       // Preparar datos para enviar según la API Laravel
+       const updateData = {};
 
-  // Función para asignar estado directamente desde el botón "Usar"
-  const handleAssignEstado = async (estadoId) => {
-    if (!selectedCarro) {
-      showToastNotification('Error: No se seleccionó ningún carro', 'error');
-      return;
-    }
+       // Agregar estado si se ha seleccionado uno nuevo
+       if (newEstado) {
+         updateData.Estado = newEstado;
+       }
 
-    try {
-      const response = await axios.put(`http://127.0.0.1:8000/api/actualizarestadocarro/${selectedCarro.id_carros || selectedCarro.id}`, {
-        Estadoid: estadoId
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-      
-      console.log('Estado actualizado:', response.data);
-      showToastNotification('Estado del carro actualizado correctamente', 'success');
-      
-      // Actualizar la lista de carros
-      handleViewCarros();
-      
-      // Cerrar modales
-      setShowUpdateEstadoModal(false);
-      setSelectedCarro(null);
-      setNewEstado('');
-    } catch (error) {
-      console.error('Error al actualizar estado:', error);
-      showToastNotification('Error al actualizar el estado del carro', 'error');
-    }
-  };
+       // Agregar fecha y hora si se han modificado
+       if (selectedCarro.nuevaFecha && selectedCarro.nuevaFecha !== selectedCarro.fecha && selectedCarro.nuevaFecha !== selectedCarro.Fecha) {
+         updateData.Fecha = selectedCarro.nuevaFecha;
+       }
+       
+       if (selectedCarro.nuevaHora && selectedCarro.nuevaHora !== selectedCarro.horasalida && selectedCarro.nuevaHora !== selectedCarro.Horasalida) {
+         updateData.Horasalida = selectedCarro.nuevaHora;
+       }
+
+       // Verificar que haya algo que actualizar
+       if (Object.keys(updateData).length === 0) {
+         showToastNotification('No hay cambios para actualizar', 'warning');
+         return;
+       }
+
+       console.log('Datos a enviar para actualización completa (Laravel):', updateData);
+
+       const response = await axios.put(`http://127.0.0.1:8000/api/actualizarestadocarro/${selectedCarro.id_carros || selectedCarro.id}`, updateData, {
+         headers: {
+           'Content-Type': 'application/json',
+           'Accept': 'application/json',
+         }
+       });
+       
+       console.log('Carro actualizado completamente:', response.data);
+       
+       let mensaje = 'Carro actualizado correctamente';
+       if (updateData.Estado && (updateData.Fecha || updateData.Horasalida)) {
+         mensaje = 'Carro actualizado correctamente (estado, fecha y/o hora)';
+       } else if (updateData.Estado) {
+         mensaje = 'Estado del carro actualizado correctamente';
+       } else if (updateData.Fecha || updateData.Horasalida) {
+         mensaje = 'Fecha y/o hora del carro actualizada correctamente';
+       }
+       
+       showToastNotification(mensaje, 'success');
+       
+       // Actualizar la lista de carros
+       handleViewCarros();
+       
+       // Cerrar modales
+       setShowUpdateEstadoModal(false);
+       setSelectedCarro(null);
+       setNewEstado('');
+     } catch (error) {
+       console.error('Error al actualizar carro:', error);
+       showToastNotification('Error al actualizar el carro', 'error');
+     }
+   };
+
+     // Function to assign state directly from the "Usar" button
+   const handleAssignEstado = async (estadoId) => {
+     if (!selectedCarro) {
+       showToastNotification('Por favor selecciona un carro', 'error');
+       return;
+     }
+     
+     // Solo seleccionar el estado, NO hacer llamada a la API
+     setNewEstado(estadoId);
+     
+     // Actualizar el estado local del carro seleccionado para mostrar el cambio
+     setSelectedCarro(prev => ({
+       ...prev,
+       Estado: estadoId,
+       id_estados: estadoId
+     }));
+     
+     showToastNotification(`Estado seleccionado: ${estados.find(e => e.id === estadoId)?.nombre || 'Desconocido'}`, 'info');
+   };
 
   const handleGetEstados = async () => {
     setIsLoadingEstados(true);
@@ -1693,16 +1775,16 @@ const Conductor = () => {
                        {/* Botones de acción */}
                        <div className="border-t border-gray-200 mt-4 pt-4">
                          <div className="grid grid-cols-2 gap-3">
-                           <button
-                             onClick={() => {
-                               setSelectedCarro(carro);
-                               setShowUpdateEstadoModal(true);
-                             }}
-                             className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center justify-center"
-                           >
-                             <FaCog className="mr-2" />
-                             Actualizar Estado
-                           </button>
+                                                       <button
+                              onClick={() => {
+                                setSelectedCarro(carro);
+                                setShowUpdateEstadoModal(true);
+                              }}
+                              className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center justify-center"
+                            >
+                              <FaCog className="mr-2" />
+                              Editar Carro
+                            </button>
                            <button
                              onClick={() => confirmDeleteCarro(carro)}
                              className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center justify-center"
@@ -1748,7 +1830,7 @@ const Conductor = () => {
                 &times;
               </button>
               
-              <h2 className="text-3xl font-bold text-purple-900 mb-8 text-center">Actualizar Estado</h2>
+                             <h2 className="text-3xl font-bold text-purple-900 mb-8 text-center">Actualizar Carro</h2>
               
               <div className="grid md:grid-cols-2 gap-8">
                 {/* Columna izquierda: Formulario de actualización */}
@@ -1789,44 +1871,82 @@ const Conductor = () => {
                      </div>
                    </div>
                   
-                  {/* Estado seleccionado */}
-                  {newEstado && (
-                    <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-green-900 mb-2">Estado Seleccionado:</h4>
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
-                            ID: {newEstado}
-                          </span>
-                                                     <span className="text-green-900 font-medium">
-                             {estados.find(e => (e.id_estados || e.id) == newEstado)?.estados || 
-                              estados.find(e => (e.id_estados || e.id) == newEstado)?.nombre || 
-                              estados.find(e => (e.id_estados || e.id) == newEstado)?.Nombre || 
-                              estados.find(e => (e.id_estados || e.id) == newEstado)?.estado || 
-                              estados.find(e => (e.id_estados || e.id) == newEstado)?.Estado || 
-                              estados.find(e => (e.id_estados || e.id) == newEstado)?.Estados || 
-                              `Estado ${newEstado}`}
+                                     {/* Estado seleccionado */}
+                   {newEstado && (
+                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+                       <h4 className="font-semibold text-green-900 mb-2">Estado Seleccionado:</h4>
+                       <div className="flex items-center justify-between">
+                         <div className="flex items-center space-x-3">
+                           <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
+                             ID: {newEstado}
                            </span>
-                        </div>
-                        <button
-                          onClick={() => setNewEstado('')}
-                          className="text-red-600 hover:text-red-800 text-sm font-medium"
-                        >
-                          Cambiar
-                        </button>
-                      </div>
-                    </div>
-                  )}
+                                                      <span className="text-green-900 font-medium">
+                              {estados.find(e => (e.id_estados || e.id) == newEstado)?.estados || 
+                               estados.find(e => (e.id_estados || e.id) == newEstado)?.nombre || 
+                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Nombre || 
+                               estados.find(e => (e.id_estados || e.id) == newEstado)?.estado || 
+                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Estado || 
+                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Estados || 
+                               `Estado ${newEstado}`}
+                            </span>
+                         </div>
+                         <button
+                           onClick={() => setNewEstado('')}
+                           className="text-red-600 hover:text-red-800 text-sm font-medium"
+                         >
+                           Cambiar
+                         </button>
+                       </div>
+                     </div>
+                   )}
+
+                   {/* Campos de fecha y hora */}
+                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                     <h4 className="font-semibold text-blue-900 mb-3">Modificar Fecha y Hora del Viaje</h4>
+                     <div className="grid grid-cols-2 gap-4">
+                       <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Fecha:</label>
+                         <input
+                           type="date"
+                           value={selectedCarro?.nuevaFecha || selectedCarro?.fecha || selectedCarro?.Fecha || ''}
+                           onChange={(e) => setSelectedCarro(prev => ({...prev, nuevaFecha: e.target.value}))}
+                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         />
+                       </div>
+                       <div>
+                         <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Hora:</label>
+                         <input
+                           type="time"
+                           value={selectedCarro?.nuevaHora || selectedCarro?.horasalida || selectedCarro?.Horasalida || ''}
+                           onChange={(e) => setSelectedCarro(prev => ({...prev, nuevaHora: e.target.value}))}
+                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                         />
+                       </div>
+                     </div>
+                     <p className="text-xs text-blue-600 mt-2">
+                       Deja vacío si no quieres cambiar la fecha o hora
+                     </p>
+                   </div>
                   
+                  {/* Información sobre el funcionamiento */}
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+                    <h4 className="font-semibold text-blue-900 mb-2">ℹ️ Cómo funciona:</h4>
+                    <ul className="text-sm text-blue-800 space-y-1">
+                      <li>• <strong>Botón "Usar":</strong> Solo selecciona el estado (NO actualiza nada)</li>
+                      <li>• <strong>Botón "Actualizar Carro":</strong> Aplica todos los cambios (estado, fecha y hora)</li>
+                      <li>• Primero selecciona el estado, luego modifica fecha/hora si quieres, y finalmente actualiza</li>
+                    </ul>
+                  </div>
+
                   {/* Botones */}
                   <div className="flex space-x-4">
-                    <button
-                      onClick={handleUpdateEstado}
-                      disabled={!newEstado}
-                      className="flex-1 bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      Actualizar
-                    </button>
+                                         <button
+                       onClick={handleUpdateEstado}
+                       disabled={!selectedCarro}
+                       className="flex-1 bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                     >
+                       Actualizar Carro
+                     </button>
                     <button
                       onClick={() => {
                         setShowUpdateEstadoModal(false);
@@ -1973,7 +2093,14 @@ const Conductor = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Nombre:</span>
-                              <span className="font-medium text-gray-900">{reserva.comentario || reserva.Comentario || 'No especificado'}</span>
+                              <span className="font-medium text-gray-900">{reserva.usuarioInfo?.nombre || reserva.comentario || reserva.Comentario || 'No especificado'}</span>
+                            </div>
+                            <div className="flex justify-between">
+                              <span className="text-gray-600">Teléfono:</span>
+                              <span className="font-medium text-gray-900 flex items-center">
+                                <FaPhone className="mr-1 text-blue-500" />
+                                {reserva.usuarioInfo?.telefono || reserva.usuarioInfo?.Telefono || reserva.usuarioInfo?.phone || 'No especificado'}
+                              </span>
                             </div>
                           </div>
                         </div>
@@ -2014,8 +2141,8 @@ const Conductor = () => {
                           <div className="space-y-2">
                             <div className="flex justify-between">
                               <span className="text-gray-600">Estado:</span>
-                              <span className="bg-green-100 text-green-800 px-2 py-1 rounded text-sm font-medium">
-                                Confirmada
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm font-medium">
+                                Pendiente
                               </span>
                             </div>
                           </div>
@@ -2075,7 +2202,6 @@ const Conductor = () => {
                           </div>
                         </div>
                       )}
-
                     </div>
                   ))}
                 </div>

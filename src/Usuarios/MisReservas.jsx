@@ -61,7 +61,11 @@ const MisReservas = () => {
     if (storedUserData) {
       try {
         const user = JSON.parse(storedUserData);
+        console.log('Datos del usuario parseados:', user);
         setUserData(user);
+        
+        // Cargar datos iniciales después de establecer userData
+        fetchInitialData(user);
       } catch (error) {
         console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
@@ -72,12 +76,9 @@ const MisReservas = () => {
       navigate('/login');
       return;
     }
-
-    // Cargar datos iniciales
-    fetchInitialData();
   }, [navigate]);
 
-  const fetchInitialData = async () => {
+  const fetchInitialData = async (userDataParam) => {
     try {
       // Cargar carros y reservas en paralelo
       const [carsResponse, reservationsResponse] = await Promise.all([
@@ -94,7 +95,7 @@ const MisReservas = () => {
       }
       setCars(carsData);
 
-      // Procesar reservas - mostrar todas las reservas disponibles
+      // Procesar reservas - filtrar solo las del usuario logueado
       let reservasArray = [];
       if (reservationsResponse.data && Array.isArray(reservationsResponse.data.data)) {
         reservasArray = reservationsResponse.data.data;
@@ -102,8 +103,25 @@ const MisReservas = () => {
         reservasArray = reservationsResponse.data;
       }
       
-      // Por ahora mostrar todas las reservas para que aparezcan
-      setReservations(reservasArray);
+      // Filtrar solo las reservas del usuario logueado
+      const userId = userDataParam?.id || userDataParam?.ID || userDataParam?.id_users;
+      if (userId) {
+        const reservasDelUsuario = reservasArray.filter(reserva => {
+          const reservaUserId = reserva.id_users || reserva.id_user || reserva.user_id;
+          return reservaUserId == userId;
+        });
+        
+        console.log('Usuario logueado ID:', userId);
+        console.log('Total de reservas del sistema:', reservasArray.length);
+        console.log('Reservas del usuario logueado:', reservasDelUsuario.length);
+        
+        setReservations(reservasDelUsuario);
+      } else {
+        console.log('No se pudo identificar el ID del usuario logueado');
+        console.log('Datos del usuario recibidos:', userDataParam);
+        setReservations([]);
+      }
+      
       setLastUpdate(new Date());
     } catch (error) {
       console.error('Error al cargar datos iniciales:', error);
@@ -133,7 +151,7 @@ const MisReservas = () => {
       console.log('Estado de reserva actualizado:', response.data);
       
       // Recargar las reservas para mostrar el nuevo estado
-      await fetchInitialData();
+      await fetchInitialData(userData);
     } catch (error) {
       console.error('Error al actualizar estado de reserva:', error);
     }
@@ -181,7 +199,7 @@ const MisReservas = () => {
         alert('Reserva eliminada exitosamente');
       }
       
-      await fetchInitialData();
+      await fetchInitialData(userData);
       
       // Cerrar modal y limpiar estado
       setShowDeleteModal(false);
@@ -320,7 +338,7 @@ const MisReservas = () => {
                            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 max-w-md mx-auto">
                 <p className="text-sm text-blue-800">
                   <FaSync className="inline mr-2 text-blue-600" />
-                  <strong>Reservas disponibles:</strong> Todas las reservas del sistema
+                  <strong>Reservas disponibles:</strong> Solo tus reservas personales
                 </p>
               </div>
            </div>
@@ -332,7 +350,7 @@ const MisReservas = () => {
              <div className="text-center py-12">
                <FaCar className="text-gray-400 text-6xl mx-auto mb-4" />
                <h3 className="text-xl font-semibold text-gray-600 mb-2">No tienes reservas</h3>
-               <p className="text-gray-500 mb-6">Aún no has realizado ninguna reserva de viaje.</p>
+               <p className="text-gray-500 mb-6">Aún no has realizado ninguna reserva de viaje personal.</p>
                <button
                  onClick={() => navigate('/indexLogin')}
                  className="bg-blue-600 text-white px-6 py-3 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
