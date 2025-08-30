@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { FaCar, FaPhone, FaEnvelope, FaMapMarkerAlt, FaFacebook, FaTwitter, FaInstagram } from 'react-icons/fa';
+import { FaCar, FaPhone, FaEnvelope, FaMapMarkerAlt, FaFacebook, FaTwitter, FaInstagram, FaUser } from 'react-icons/fa';
 import { MagnifyingGlassIcon, UserIcon, Bars3Icon } from '@heroicons/react/24/outline';
 // Importar el UserMenu
 import UserMenu from '../components/UserMenu';
@@ -48,20 +48,46 @@ const Index = () => {
 
   // Función auxiliar para obtener nombre del estado por ID
   const getEstadoNombre = (estadoId) => {
-    const id = parseInt(estadoId);
+    console.log(`🔍 getEstadoNombre llamado con: ${estadoId} (tipo: ${typeof estadoId})`);
+    
+    // Si no hay estado, retornar desconocido
+    if (estadoId === null || estadoId === undefined || estadoId === '') {
+      console.log('🔍 Estado vacío o nulo, retornando desconocido');
+      return '🔍 Estado Desconocido';
+    }
+    
+    // Convertir a número si es string
+    let id;
+    if (typeof estadoId === 'string') {
+      id = parseInt(estadoId.trim());
+      console.log(`🔍 Estado string "${estadoId}" convertido a número: ${id}`);
+    } else {
+      id = estadoId;
+      console.log(`🔍 Estado ya es número: ${id}`);
+    }
+    
+    // Si no es un número válido, retornar el valor original
+    if (isNaN(id)) {
+      console.log(`🔍 Estado no numérico detectado: ${estadoId} (tipo: ${typeof estadoId})`);
+      return `🔍 Estado: ${estadoId}`;
+    }
     
     const estados = {
-      1: '🚗 Disponible',
+      1: '🚗 Esperando Pasajeros',
       2: '🛣️ En Viaje', 
       3: '🔧 En Mantenimiento',
       4: '❌ Fuera de Servicio'
     };
     
-    if (id && estados[id]) {
+    console.log(`🔍 Buscando estado ID: ${id} en estados disponibles:`, Object.keys(estados));
+    
+    if (estados[id]) {
+      console.log(`🔍 Estado encontrado: ${estados[id]}`);
       return estados[id];
     }
     
-    return `🔍 Estado ${estadoId || 'Desconocido'}`;
+    console.log(`🔍 Estado ID no reconocido: ${id}`);
+    return `🔍 Estado ${id} (No reconocido)`;
   };
 
   // Datos del carrusel
@@ -144,6 +170,22 @@ const Index = () => {
           }));
         }
         
+        // Debug: mostrar información de los carros obtenidos
+        console.log('🔍 Carros obtenidos del backend:', carsData);
+        carsData.forEach((car, index) => {
+          console.log(`🔍 Carro ${index + 1}:`, {
+            id: car.id_carros || car.id || car.ID,
+            conductor: car.conductor || car.Conductor,
+            placa: car.placa || car.Placa,
+            estado: car.estado || car.Estado || car.id_estados || car.id_estado,
+            fecha: car.fecha || car.Fecha,
+            asientos: car.asientos || car.Asientos,
+            asientos_disponibles: car.asientos_disponibles,
+            // Debug completo del objeto carro para ver todos los campos
+            objetoCompleto: car
+          });
+        });
+        
         setCars(carsData);
         setFilteredCars(carsData);
       } catch (err) {
@@ -216,6 +258,17 @@ const Index = () => {
   console.log('Longitud de cars en index:', cars.length);
   console.log('isLoading en index:', isLoading);
   console.log('userData en index:', userData);
+  
+  // Debug adicional para ver el estado de cada carro
+  if (Array.isArray(cars) && cars.length > 0) {
+    cars.forEach((car, index) => {
+      console.log(`🔍 Debug estado carro ${index + 1} en index:`, {
+        placa: car.placa || car.Placa,
+        estado: car.estado || car.Estado || car.id_estados || car.id_estado,
+        estadoNombre: getEstadoNombre(car.estado || car.Estado || car.id_estados || car.id_estado)
+      });
+    });
+  }
 
  
   useEffect(() => {
@@ -434,15 +487,57 @@ const Index = () => {
                       </div>
                       <div className="text-gray-600 mb-2">
                         <span className="font-semibold">Estado:</span> 
-                        <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${
-                          (car.estado === 1 || car.Estado === 1) ? 'bg-green-100 text-green-800' : 
-                          (car.estado === 2 || car.Estado === 2) ? 'bg-yellow-100 text-yellow-800' :
-                          (car.estado === 3 || car.Estado === 3) ? 'bg-orange-100 text-orange-800' :
-                          (car.estado === 4 || car.Estado === 4) ? 'bg-red-100 text-red-800' :
-                          'bg-gray-100 text-gray-800'
-                        }`}>
-                          {getEstadoNombre(car.estado || car.Estado || car.id_estados)}
-                        </span>
+                        {(() => {
+                          // Obtener el estado del carro, verificando todos los campos posibles
+                          const estadoId = car.estado || car.Estado || car.id_estados || car.id_estado;
+                          
+                          // Debug para ver qué campos están disponibles
+                          console.log(`🔍 Debug estado carro ${car.placa || car.Placa}:`, {
+                            estadoId: estadoId,
+                            tipo: typeof estadoId,
+                            todosLosCampos: car,
+                            camposEstado: {
+                              'car.estado': car.estado,
+                              'car.Estado': car.Estado,
+                              'car.id_estados': car.id_estados,
+                              'car.id_estado': car.id_estado
+                            }
+                          });
+                          
+                          // Obtener el nombre del estado
+                          const estadoNombre = getEstadoNombre(estadoId);
+                          console.log(`🔍 Estado procesado: ID=${estadoId}, Nombre=${estadoNombre}`);
+                          
+                          // Determinar el color del badge basado en el estado
+                          let badgeClass = 'bg-gray-100 text-gray-800';
+                          const estadoNumero = parseInt(estadoId) || 0;
+                          
+                          console.log(`🔍 Comparando estado: ${estadoId} (convertido a: ${estadoNumero})`);
+                          
+                          if (estadoNumero === 1) {
+                            badgeClass = 'bg-green-100 text-green-800';
+                            console.log('🔍 Aplicando color verde (Esperando Pasajeros)');
+                          } else if (estadoNumero === 2) {
+                            badgeClass = 'bg-yellow-100 text-yellow-800';
+                            console.log('🔍 Aplicando color amarillo (En Viaje)');
+                          } else if (estadoNumero === 3) {
+                            badgeClass = 'bg-orange-100 text-orange-800';
+                            console.log('🔍 Aplicando color naranja (En Mantenimiento)');
+                          } else if (estadoNumero === 4) {
+                            badgeClass = 'bg-red-100 text-red-800';
+                            console.log('🔍 Aplicando color rojo (Fuera de Servicio)');
+                          } else {
+                            console.log('🔍 Aplicando color gris (Estado desconocido)');
+                          }
+                          
+                          console.log(`🔍 Renderizando badge: Clase=${badgeClass}, Texto=${estadoNombre}`);
+                          
+                          return (
+                            <span className={`ml-2 px-2 py-1 rounded-full text-xs font-medium ${badgeClass}`}>
+                              {estadoNombre}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="text-gray-600 mb-2">
                         <span className="font-semibold">Destino:</span> {car.destino || 'No especificado'}
@@ -451,7 +546,31 @@ const Index = () => {
                         <span className="font-semibold">Hora:</span> {car.horasalida || 'No especificada'}
                       </div>
                       <div className="text-gray-600 mb-2">
-                        <span className="font-semibold">Fecha:</span> {car.fecha ? new Date(car.fecha).toLocaleDateString('es-ES') : 'No especificada'}
+                        <span className="font-semibold">Fecha:</span> {(() => {
+                          if (!car.fecha) return 'No especificada';
+                          
+                          try {
+                            // Intentar parsear la fecha directamente
+                            const fecha = new Date(car.fecha);
+                            
+                            // Verificar si la fecha es válida
+                            if (!isNaN(fecha.getTime())) {
+                              // Si hay diferencia de zona horaria, mostrar la fecha original
+                              if (fecha.getUTCDate() !== fecha.getDate()) {
+                                return car.fecha;
+                              }
+                              
+                              return fecha.toLocaleDateString('es-ES');
+                            }
+                            
+                            // Si no se puede parsear, mostrar la fecha original
+                            return car.fecha;
+                            
+                          } catch (error) {
+                            console.error('Error al formatear fecha:', error, car.fecha);
+                            return car.fecha; // Mostrar la fecha original si hay error
+                          }
+                        })()}
                       </div>
                     </div>
                     <button 
@@ -472,7 +591,7 @@ const Index = () => {
           <p className="text-lg">
             {userData 
               ? '¿Necesitas más información? Contacta con tu conductor.'
-              : 'Regístrate para reservar viajes y acceder a más funcionalidades.'
+              : 'Regístrate para ver detalles completos de los viajes y reservar tu asiento.'
             }
           </p>
         </div>
@@ -551,30 +670,40 @@ const Index = () => {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div className="bg-white rounded-xl p-8 max-w-md w-full text-center">
             <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaUserIcon className="text-blue-600 text-2xl" />
+              <FaUser className="text-blue-600 text-2xl" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">¡Regístrate para continuar!</h3>
+            <h3 className="text-2xl font-bold text-gray-900 mb-4">¡Regístrate para ver los detalles del viaje!</h3>
             <p className="text-gray-600 mb-6">
-              Para ver los detalles completos del viaje y hacer tu reserva, necesitas crear una cuenta en Mecaza.
+              Para poder ver toda la información del viaje, detalles del conductor, precios y reservar tu asiento, necesitas crear una cuenta en Mecaza. Es rápido y gratuito.
             </p>
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+              <p className="text-sm text-blue-800">
+                <strong>¿Qué obtienes al registrarte?</strong><br/>
+                • Ver detalles completos del viaje<br/>
+                • Información del conductor y vehículo<br/>
+                • Precios y rutas disponibles<br/>
+                • Reservar asientos específicos<br/>
+                • Historial de tus viajes
+              </p>
+            </div>
             <div className="space-y-3">
               <button
                 onClick={() => { setShowRegisterModal(false); navigate('/registrar'); }}
                 className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
               >
-                Registrarse
+                🚀 Crear Cuenta y Ver Detalles
               </button>
               <button
                 onClick={() => { setShowRegisterModal(false); navigate('/login'); }}
                 className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
               >
-                Ya tengo cuenta
+                🔑 Ya tengo cuenta
               </button>
               <button
                 onClick={() => setShowRegisterModal(false)}
                 className="w-full text-gray-500 py-2 px-4 hover:text-gray-700 transition-colors"
               >
-                Cancelar
+                ❌ Cancelar
               </button>
             </div>
           </div>

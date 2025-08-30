@@ -111,6 +111,15 @@ const MisReservas = () => {
           return reservaUserId == userId;
         });
         
+        console.log('🔍 Debug usuario logueado:', {
+          id: userId,
+          nombre: userDataParam?.nombre || userDataParam?.Nombre || userDataParam?.name,
+          email: userDataParam?.email || userDataParam?.Email,
+          datosCompletos: userDataParam
+        });
+        
+        console.log('🔍 Debug reservas del usuario:', reservasDelUsuario);
+        
         console.log('Usuario logueado ID:', userId);
         console.log('Total de reservas del sistema:', reservasArray.length);
         console.log('Reservas del usuario logueado:', reservasDelUsuario.length);
@@ -445,7 +454,21 @@ const MisReservas = () => {
                            <div className="flex items-center">
                              <FaUser className="text-green-600 mr-2 w-4" />
                              <span className="font-medium">Nombre:</span>
-                             <span className="ml-2 text-gray-700">{reservation.comentario || reservation.Nombre || 'No especificado'}</span>
+                             <span className="ml-2 text-gray-700">
+                               {(() => {
+                                 const nombre = userData?.nombre || userData?.Nombre || userData?.name;
+                                 console.log(`🔍 Debug nombre usuario en reserva ${reservation.id_reservarviajes}:`, {
+                                   nombre: nombre,
+                                   userData: userData,
+                                   camposDisponibles: {
+                                     'userData.nombre': userData?.nombre,
+                                     'userData.Nombre': userData?.Nombre,
+                                     'userData.name': userData?.name
+                                   }
+                                 });
+                                 return nombre || 'No especificado';
+                               })()}
+                             </span>
                            </div>
                            <div className="flex items-center">
                              <FaCar className="text-green-600 mr-2 w-4" />
