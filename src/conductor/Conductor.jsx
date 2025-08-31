@@ -262,7 +262,7 @@ const Conductor = () => {
       console.log('FormData a enviar:', formData);
       console.log('Estado seleccionado:', carData.Estado);
       console.log('ID del usuario a enviar:', userId);
-      console.log('Enviando petición a:', 'http://127.0.0.1:8000/api/agregarcarros');
+      console.log('Enviando petición a:', 'https://api-mecaza.geekcorplab.com/api/agregarcarros');
       
       // Verificar cada campo del FormData
       for (let [key, value] of formData.entries()) {
@@ -275,7 +275,7 @@ const Conductor = () => {
       console.log('Tipo de Userid:', typeof formDataUserId);
       
       // Enviar datos al endpoint que conecta con AgregarcarrosController::Create
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarcarros', formData, {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarcarros', formData, {
         headers: {
           'Accept': 'application/json',
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`
@@ -331,7 +331,7 @@ const Conductor = () => {
     
     try {
       // Obtener todas las reservas
-      const reservasResponse = await axios.get('http://127.0.0.1:8000/api/listarreserva', {
+      const reservasResponse = await axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva', {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -342,7 +342,7 @@ const Conductor = () => {
       console.log('Todas las reservas obtenidas:', reservasResponse.data);
       
       // Obtener todos los carros
-      const carrosResponse = await axios.get('http://127.0.0.1:8000/api/listarcarro', {
+      const carrosResponse = await axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro', {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -508,7 +508,7 @@ const Conductor = () => {
     setShowCarrosModal(true);
     
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/listarcarro', {
+      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro', {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

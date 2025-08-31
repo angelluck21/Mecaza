@@ -59,7 +59,7 @@ function Registrar() {
       console.log('Datos a enviar:', datosParaEnviar); // Debug log
       console.log('Token de autenticación:', localStorage.getItem('authToken')); // Debug log
       
-      const response = await axios.post('http://127.0.0.1:8000/api/registro', datosParaEnviar, {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/registro', datosParaEnviar, {
         headers: {
           'Authorization':  'Bearer ' + localStorage.getItem('authToken'),
           'Content-Type': 'application/json',

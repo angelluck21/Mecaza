@@ -38,16 +38,16 @@ const VerDetalles = () => {
     
     // Si empieza con /storage, construir URL completa
     if (imagePath.startsWith('/storage/')) {
-      return `http://127.0.0.1:8000${imagePath}`;
+      return `https://api-mecaza.geekcorplab.com${imagePath}`;
     }
     
     // Si es solo el nombre del archivo, construir URL
     if (!imagePath.includes('/')) {
-      return `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+      return `https://api-mecaza.geekcorplab.com/storage/carros/${imagePath}`;
     }
     
     // Construir URL completa
-    return `http://127.0.0.1:8000/storage/${imagePath}`;
+    return `https://api-mecaza.geekcorplab.com/storage/${imagePath}`;
   };
 
   // Función helper para obtener el nombre del estado optimizada
@@ -168,7 +168,7 @@ const VerDetalles = () => {
     // Función para cargar estados
     const fetchEstados = async () => {
       try {
-        const response = await fetch('http://127.0.0.1:8000/api/listarestados');
+        const response = await fetch('https://api-mecaza.geekcorplab.com/api/listarestados');
         
         if (!response.ok) {
           throw new Error(`Error HTTP: ${response.status}`);
@@ -193,7 +193,7 @@ const VerDetalles = () => {
     const fetchCarDetails = async () => {
       try {
         // Cargar carros
-        const carrosResponse = await fetch(`http://127.0.0.1:8000/api/listarcarro`);
+        const carrosResponse = await fetch(`https://api-mecaza.geekcorplab.com/api/listarcarro`);
         
         if (!carrosResponse.ok) {
           throw new Error(`Error HTTP: ${carrosResponse.status}`);
@@ -224,7 +224,7 @@ const VerDetalles = () => {
         }
         
         // Cargar precios
-        const preciosResponse = await fetch('http://127.0.0.1:8000/api/listarprecio');
+        const preciosResponse = await fetch('https://api-mecaza.geekcorplab.com/api/listarprecio');
         
         if (preciosResponse.ok) {
           const preciosData = await preciosResponse.json();
@@ -248,7 +248,7 @@ const VerDetalles = () => {
         }
         
         // Cargar reservas
-        const reservasResponse = await fetch('http://127.0.0.1:8000/api/listarreserva');
+        const reservasResponse = await fetch('https://api-mecaza.geekcorplab.com/api/listarreserva');
         
         if (reservasResponse.ok) {
           const reservasData = await reservasResponse.json();

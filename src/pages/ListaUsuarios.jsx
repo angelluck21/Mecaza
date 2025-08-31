@@ -65,7 +65,7 @@ const ListaUsuarios = () => {
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/usuarios', {
+      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/usuarios', {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -123,7 +123,7 @@ const ListaUsuarios = () => {
   const handleDeleteUser = async (userId) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
       try {
-        const response = await axios.delete(`http://127.0.0.1:8000/api/usuarios/${userId}`, {
+        const response = await axios.delete(`https://api-mecaza.geekcorplab.com/api/usuarios/${userId}`, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',

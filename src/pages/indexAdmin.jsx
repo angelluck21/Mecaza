@@ -80,8 +80,8 @@ const IndexAdmin = () => {
     try {
       // Cargar solo las estadísticas que sí existen
       const [vehiculosResponse, reservasResponse] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/listarcarro'),
-        axios.get('http://127.0.0.1:8000/api/listarreserva')
+        axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro'),
+        axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva')
       ]);
 
       // Procesar total de vehículos
@@ -199,7 +199,7 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarprecio', dataToSend, {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -257,7 +257,7 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarestados', dataToSend, {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarestados', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

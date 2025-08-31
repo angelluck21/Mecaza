@@ -32,7 +32,7 @@ function Login() {
     const contrasena = e.target.contrasenaS.value;
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/login', {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/login', {
         Correo: correo,
         Contrasena: contrasena,
        

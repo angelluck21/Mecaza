@@ -110,7 +110,7 @@ const IndexAdmin = () => {
     
     try {
       // Llamada a la ruta /agregarprecio que conecta con PrecioviajeController::Create
-      const response = await axios.put('http://127.0.0.1:8000/api/agregarprecio', dataToSend, {
+      const response = await axios.put('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
@@ -168,7 +168,7 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('http://127.0.0.1:8000/api/agregarestados', dataToSend, {
+      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarestados', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

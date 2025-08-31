@@ -31,16 +31,16 @@ const MisReservas = () => {
     
     // Si empieza con /storage, construir URL completa
     if (imagePath.startsWith('/storage/')) {
-      return `http://127.0.0.1:8000${imagePath}`;
+      return `https://api-mecaza.geekcorplab.com${imagePath}`;
     }
     
     // Si es solo el nombre del archivo, construir URL
     if (!imagePath.includes('/')) {
-      return `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+      return `https://api-mecaza.geekcorplab.com/storage/carros/${imagePath}`;
     }
     
     // Construir URL completa
-    return `http://127.0.0.1:8000/storage/${imagePath}`;
+    return `https://api-mecaza.geekcorplab.com/storage/${imagePath}`;
   };
 
   // Función para obtener información del carro asociado a una reserva
@@ -82,8 +82,8 @@ const MisReservas = () => {
     try {
       // Cargar carros y reservas en paralelo
       const [carsResponse, reservationsResponse] = await Promise.all([
-        axios.get('http://127.0.0.1:8000/api/listarcarro'),
-        axios.get('http://127.0.0.1:8000/api/listarreserva')
+        axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro'),
+        axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva')
       ]);
 
       // Procesar carros
@@ -148,7 +148,7 @@ const MisReservas = () => {
         return;
       }
       
-      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
+      const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/confirmarreserva/${reservationId}`, {
         estado: newStatus
       }, {
         headers: {
@@ -192,7 +192,7 @@ const MisReservas = () => {
     }
 
     try {
-      const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarreserva/${reservationId}`, {
+      const response = await axios.delete(`https://api-mecaza.geekcorplab.com/api/eliminarreserva/${reservationId}`, {
         headers: {
           'Authorization': 'Bearer ' + localStorage.getItem('authToken'),
           'Content-Type': 'application/json',

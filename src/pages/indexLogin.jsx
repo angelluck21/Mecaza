@@ -32,20 +32,20 @@ const IndexLogin = () => {
     
     // Si empieza con /storage, construir URL completa
     if (imagePath.startsWith('/storage/')) {
-      const fullUrl = `http://127.0.0.1:8000${imagePath}`;
+      const fullUrl = `https://api-mecaza.geekcorplab.com${imagePath}`;
       console.log('🔍 URL construida desde /storage en indexLogin:', fullUrl);
       return fullUrl;
     }
     
     // Si es solo el nombre del archivo, construir URL
     if (!imagePath.includes('/')) {
-      const fullUrl = `http://127.0.0.1:8000/storage/carros/${imagePath}`;
+      const fullUrl = `https://api-mecaza.geekcorplab.com/storage/carros/${imagePath}`;
       console.log('🔍 URL construida desde nombre de archivo en indexLogin:', fullUrl);
       return fullUrl;
     }
     
     // Construir URL completa
-    const fullUrl = `http://127.0.0.1:8000/storage/${imagePath}`;
+    const fullUrl = `https://api-mecaza.geekcorplab.com/storage/${imagePath}`;
     console.log('🔍 URL construida desde ruta relativa en indexLogin:', fullUrl);
     return fullUrl;
   };
@@ -133,7 +133,7 @@ const IndexLogin = () => {
     const fetchCars = async () => {
       try {
         // Obtener carros
-        const response = await fetch('http://127.0.0.1:8000/api/listarcarro');
+        const response = await fetch('https://api-mecaza.geekcorplab.com/api/listarcarro');
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
         }
@@ -142,7 +142,7 @@ const IndexLogin = () => {
         
         // Obtener reservas para calcular asientos disponibles
         try {
-          const reservasResponse = await fetch('http://127.0.0.1:8000/api/listarreserva');
+          const reservasResponse = await fetch('https://api-mecaza.geekcorplab.com/api/listarreserva');
           if (reservasResponse.ok) {
             const reservasData = await reservasResponse.json();
             let reservasArray = Array.isArray(reservasData) ? reservasData : 

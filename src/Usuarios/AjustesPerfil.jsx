@@ -142,7 +142,7 @@ const AjustesPerfil = () => {
         formData.append('foto_perfil', profileImage);
         formData.append('user_id', userId);
 
-        const imageResponse = await fetch('http://127.0.0.1:8000/api/actualizar-foto-perfil', {
+        const imageResponse = await fetch('https://api-mecaza.geekcorplab.com/api/actualizar-foto-perfil', {
           method: 'POST',
           body: formData,
           headers: {
@@ -163,7 +163,7 @@ const AjustesPerfil = () => {
           console.log('Teléfono del formulario:', profileData.telefono);
           console.log('Teléfono final enviado:', dataToSend.Telefono);
           console.log('Token de autorización:', localStorage.getItem('authToken') ? 'Presente' : 'Ausente');
-          console.log('URL de la petición:', `http://127.0.0.1:8000/api/actualizarusuario/${userId}`);
+          console.log('URL de la petición:', `https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`);
           console.log('Headers de la petición:', {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -175,7 +175,7 @@ const AjustesPerfil = () => {
           throw new Error('No se pudo identificar el ID del usuario');
         }
         
-        const response = await axios.put(`http://127.0.0.1:8000/api/actualizarusuario/${userId}`, dataToSend, {
+          const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`, dataToSend, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',

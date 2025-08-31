@@ -39,7 +39,7 @@ useEffect(() => {
 
       // Hacer petición al backend para obtener datos actualizados
       console.log('🔄 Sincronizando datos del usuario con la base de datos...');
-      const response = await axios.get('http://127.0.0.1:8000/api/listarusuario', {
+      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/listarusuario', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
           'Accept': 'application/json'
@@ -143,7 +143,7 @@ useEffect(() => {
         return;
       }
 
-      const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarusuario/${userId}`, {
+      const response = await axios.delete(`https://api-mecaza.geekcorplab.com/api/eliminarusuario/${userId}`, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',

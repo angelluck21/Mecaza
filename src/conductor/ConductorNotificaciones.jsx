@@ -39,7 +39,7 @@ const ConductorNotificaciones = () => {
   const fetchReservasPendientes = async () => {
     setIsLoadingReservas(true);
     try {
-      const response = await axios.get('http://127.0.0.1:8000/api/listarreserva', {
+      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva', {
         headers: {
           'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
           'Content-Type': 'application/json',
@@ -79,7 +79,7 @@ const ConductorNotificaciones = () => {
     try {
       const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
       
-      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
+      const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/confirmarreserva/${reservationId}`, {
         estado: 'confirmada'
       }, {
         headers: {
@@ -108,7 +108,7 @@ const ConductorNotificaciones = () => {
     try {
       const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
       
-      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
+      const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/confirmarreserva/${reservationId}`, {
         estado: 'rechazada'
       }, {
         headers: {
