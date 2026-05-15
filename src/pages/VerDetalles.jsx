@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaEnvelope, FaArrowLeft, FaCheck, FaTimes } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
-import CarImage from '../components/CarImage';
+import UserMenu from '../components/ui/UserMenu';
+import CarImage from '../components/ui/CarImage';
 
 const VerDetalles = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -52,11 +52,9 @@ const VerDetalles = () => {
 
   // Función helper para obtener el nombre del estado optimizada
   const getEstadoNombre = (estadoId) => {
-    console.log(`🔍 getEstadoNombre en VerDetalles llamado con: ${estadoId} (tipo: ${typeof estadoId})`);
     
     // Si no hay estado, retornar desconocido
     if (estadoId === null || estadoId === undefined || estadoId === '') {
-      console.log('🔍 Estado vacío o nulo en VerDetalles, retornando desconocido');
       return '🔍 Estado Desconocido';
     }
     
@@ -64,23 +62,18 @@ const VerDetalles = () => {
     const estado = estados.find(e => (e.id_estados || e.id) == estadoId);
     if (estado) {
       const nombreEstado = estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados;
-      console.log(`🔍 Estado encontrado en backend: ${nombreEstado}`);
       
       // Verificar si el nombre del backend es correcto para el ID
       const estadoNumero = parseInt(estadoId);
       
       // Validar que cada ID corresponda al nombre correcto
       if (estadoNumero === 1 && !nombreEstado.toLowerCase().includes('esperando')) {
-        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 1 es "${nombreEstado}", pero debería ser "Esperando Pasajeros"`);
         return '🚗 Esperando Pasajeros';
       } else if (estadoNumero === 2 && !nombreEstado.toLowerCase().includes('viaje')) {
-        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 2 es "${nombreEstado}", pero debería ser "En Viaje"`);
         return '🛣️ En Viaje';
       } else if (estadoNumero === 3 && !nombreEstado.toLowerCase().includes('mantenimiento')) {
-        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 3 es "${nombreEstado}", pero debería ser "En Mantenimiento"`);
         return '🔧 En Mantenimiento';
       } else if (estadoNumero === 4 && !nombreEstado.toLowerCase().includes('fuera') && !nombreEstado.toLowerCase().includes('servicio')) {
-        console.log(`🔍 ⚠️ ERROR: El backend dice que ID 4 es "${nombreEstado}", pero debería ser "Fuera de Servicio"`);
         return '❌ Fuera de Servicio';
       }
       
@@ -91,15 +84,12 @@ const VerDetalles = () => {
     let id;
     if (typeof estadoId === 'string') {
       id = parseInt(estadoId.trim());
-      console.log(`🔍 Estado string "${estadoId}" convertido a número: ${id}`);
     } else {
       id = estadoId;
-      console.log(`🔍 Estado ya es número: ${id}`);
     }
     
     // Si no es un número válido, retornar el valor original
     if (isNaN(id)) {
-      console.log(`🔍 Estado no numérico detectado en VerDetalles: ${estadoId} (tipo: ${typeof estadoId})`);
       return `🔍 Estado: ${estadoId}`;
     }
     
@@ -110,14 +100,11 @@ const VerDetalles = () => {
       4: '❌ Fuera de Servicio'
     };
     
-    console.log(`🔍 Buscando estado ID en VerDetalles: ${id} en estados disponibles:`, Object.keys(estadosDefault));
     
     if (estadosDefault[id]) {
-      console.log(`🔍 Estado encontrado en VerDetalles: ${estadosDefault[id]}`);
       return estadosDefault[id];
     }
     
-    console.log(`🔍 Estado ID no reconocido en VerDetalles: ${id}`);
     return `🔍 Estado ${id} (No reconocido)`;
   };
 
@@ -129,38 +116,17 @@ const VerDetalles = () => {
         const user = JSON.parse(storedUserData);
         setUserData(user);
         
-        // Debug: mostrar datos del usuario obtenidos del localStorage
-        console.log('🔍 Datos del usuario desde localStorage:', user);
-        console.log('🔍 Campos disponibles en user:', Object.keys(user || {}));
-        console.log('🔍 Búsqueda de teléfono en localStorage:', {
-          Telefono: user?.Telefono,
-          telefono: user?.telefono,
-          phone: user?.phone,
-          tel: user?.tel
-        });
-        console.log('🔍 Verificación detallada del teléfono:', {
-          'user.Telefono': user?.Telefono,
-          'user.telefono': user?.telefono,
-          'user.phone': user?.phone,
-          'user.tel': user?.tel,
-          'typeof user.Telefono': typeof user?.Telefono,
-          'user.Telefono === null': user?.Telefono === null,
-          'user.Telefono === undefined': user?.Telefono === undefined,
-          'user.Telefono === ""': user?.Telefono === ""
-        });
+
         
         // Establecer automáticamente el nombre del usuario desde localStorage
         const userName = user.Nombre || user.nombre || user.name || '';
         setNombre(userName);
         
-        console.log('✅ Nombre del usuario establecido:', userName);
       } catch (error) {
-        console.error('❌ Error al parsear datos del usuario:', error);
         navigate('/login');
         return;
       }
     } else {
-      console.log('❌ No hay datos de usuario en localStorage');
       navigate('/login');
       return;
     }
@@ -276,24 +242,7 @@ const VerDetalles = () => {
           // Obtener el teléfono del conductor del carro
           const telefonoConductor = carroEncontrado.telefono || carroEncontrado.Telefono || carroEncontrado.phone || 'No disponible';
           
-          console.log('🔍 Datos del carro encontrado:', carroEncontrado);
-          console.log('🔍 Búsqueda de teléfono del conductor en carroEncontrado:', {
-            telefono: carroEncontrado.telefono,
-            Telefono: carroEncontrado.Telefono,
-            phone: carroEncontrado.phone
-          });
-          console.log('✅ Teléfono del conductor obtenido:', telefonoConductor);
-          
-          // Debug del estado antes de establecer los datos
-          console.log('🔍 Debug estado del carro antes de establecer carDetails:', {
-            'carroEncontrado.estado': carroEncontrado.estado,
-            'carroEncontrado.Estado': carroEncontrado.Estado,
-            'carroEncontrado.id_estados': carroEncontrado.id_estados,
-            'carroEncontrado.id_estado': carroEncontrado.id_estado,
-            'tipo estado': typeof carroEncontrado.estado,
-            'tipo Estado': typeof carroEncontrado.Estado,
-            'tipo id_estados': typeof carroEncontrado.id_estados
-          });
+  
           
           // Establecer datos del carro
           const carDetailsToSet = {
@@ -313,7 +262,6 @@ const VerDetalles = () => {
             id_estados: carroEncontrado.id_estados || carroEncontrado.estado || carroEncontrado.Estado
           };
           
-          console.log('🔍 carDetailsToSet establecido:', carDetailsToSet);
           
           // Actualizar estados
           setReservasExistentes(reservasDelCarro);
@@ -387,7 +335,6 @@ const VerDetalles = () => {
     }
     
               // El teléfono ahora se ingresa manualmente, no se valida del usuario
-     console.log('✅ Teléfono ingresado por el usuario:', telefono);
     setShowConfirmation(true);
   };
 
@@ -406,7 +353,6 @@ const VerDetalles = () => {
    
          try {
         // Usar el teléfono ingresado por el usuario
-        console.log('🔍 Teléfono ingresado por el usuario para la reserva:', telefono);
         
         // Validar que todos los campos requeridos estén presentes
         if (!nombre.trim() || !pickupLocation.trim() || !selectedSeat || !userId || !carroId || !telefono.trim()) {
@@ -435,31 +381,8 @@ const VerDetalles = () => {
           hora_reserva: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
         };
 
-                     // Debug: verificar que todos los campos se estén enviando correctamente
-        console.log('🔍 Datos a enviar:', dataToSend);
-        console.log('🔍 Asiento seleccionado:', selectedSeat);
-        console.log('🔍 Teléfono ingresado por el usuario:', telefono);
-        console.log('🔍 Campo Telefono en payload:', dataToSend.Telefono);
-        console.log('🔍 Tipo de teléfono:', typeof telefono);
-        console.log('🔍 Teléfono es null/undefined:', telefono === null || telefono === undefined);
-       console.log('🔍 Método HTTP:', 'POST');
-       console.log('🔍 URL:', 'http://127.0.0.1:8000/api/agregarreserva');
-       console.log('🔍 Token de autorización:', localStorage.getItem('authToken') ? 'Presente' : 'Ausente');
-       console.log('🔍 Payload completo:', JSON.stringify(dataToSend, null, 2));
-               console.log('🔍 Verificación del campo Telefono en dataToSend:', {
-          'dataToSend.Telefono': dataToSend.Telefono,
-          'typeof dataToSend.Telefono': typeof dataToSend.Telefono,
-          'dataToSend.Telefono === telefono': dataToSend.Telefono === telefono
-        });
-       
       // Llamada real a la API usando las rutas proporcionadas
       const bodyString = JSON.stringify(dataToSend);
-      console.log('🔍 Body de la petición (string):', bodyString);
-              console.log('🔍 Verificación del campo Telefono en el body:', {
-          'bodyString.includes("Telefono")': bodyString.includes('"Telefono"'),
-          'bodyString.includes(telefono)': bodyString.includes(telefono),
-          'bodyString.length': bodyString.length
-        });
       
       const response = await fetch('http://127.0.0.1:8000/api/agregarreserva', {
         method: 'POST',
@@ -471,14 +394,9 @@ const VerDetalles = () => {
         body: bodyString
       });
 
-      console.log('🔍 Respuesta del servidor - Status:', response.status);
-      console.log('🔍 Respuesta del servidor - Headers:', Object.fromEntries(response.headers.entries()));
       
       if (!response.ok) {
         const errorData = await response.json();
-        console.error('❌ Error del servidor:', errorData);
-        console.error('❌ Status code:', response.status);
-        console.error('❌ Error completo:', errorData.error || 'Sin detalles del error');
         
         // Mostrar más detalles del error para debugging
         let errorMessage = errorData.message || 'Error al reservar el viaje';
@@ -490,7 +408,6 @@ const VerDetalles = () => {
       }
 
       const responseData = await response.json();
-      console.log('✅ Respuesta del servidor:', responseData);
 
       setShowConfirmation(false);
       setShowSuccess(true);
@@ -501,7 +418,6 @@ const VerDetalles = () => {
       }, 3000);
       
     } catch (error) {
-      console.error('❌ Error al reservar:', error);
       alert(`Error al reservar el viaje: ${error.message}. Inténtalo de nuevo.`);
     } finally {
       setIsReserving(false);
@@ -727,46 +643,27 @@ const VerDetalles = () => {
                                           // Obtener el estado del carro, verificando todos los campos posibles
                                           const estadoId = carDetails.estado || carDetails.Estado || carDetails.id_estados || carDetails.id_estado;
                                           
-                                          // Debug para ver qué campos están disponibles
-                                          console.log(`🔍 Debug estado carro en VerDetalles:`, {
-                                            estadoId: estadoId,
-                                            tipo: typeof estadoId,
-                                            todosLosCampos: carDetails,
-                                            camposEstado: {
-                                              'carDetails.estado': carDetails.estado,
-                                              'carDetails.Estado': carDetails.Estado,
-                                              'carDetails.id_estados': carDetails.id_estados,
-                                              'carDetails.id_estado': carDetails.id_estado
-                                            }
-                                          });
+
                                           
                                           // Obtener el nombre del estado
                                           const estadoNombre = getEstadoNombre(estadoId);
-                                          console.log(`🔍 Estado procesado en VerDetalles: ID=${estadoId}, Nombre=${estadoNombre}`);
                                           
                                           // Determinar el color del badge basado en el estado
                                           let badgeClass = 'bg-gray-100 text-gray-800';
                                           const estadoNumero = parseInt(estadoId) || 0;
                                           
-                                          console.log(`🔍 Comparando estado en VerDetalles: ${estadoId} (convertido a: ${estadoNumero})`);
                                           
                                           if (estadoNumero === 1) {
                                             badgeClass = 'bg-green-100 text-green-800';
-                                            console.log('🔍 Aplicando color verde (Esperando Pasajeros)');
                                           } else if (estadoNumero === 2) {
                                             badgeClass = 'bg-yellow-100 text-yellow-800';
-                                            console.log('🔍 Aplicando color amarillo (En Viaje)');
                                           } else if (estadoNumero === 3) {
                                             badgeClass = 'bg-orange-100 text-orange-800';
-                                            console.log('🔍 Aplicando color naranja (En Mantenimiento)');
                                           } else if (estadoNumero === 4) {
                                             badgeClass = 'bg-red-100 text-red-800';
-                                            console.log('🔍 Aplicando color rojo (Fuera de Servicio)');
                                           } else {
-                                            console.log('🔍 Aplicando color gris (Estado desconocido)');
                                           }
                                           
-                                          console.log(`🔍 Renderizando badge en VerDetalles: Clase=${badgeClass}, Texto=${estadoNombre}`);
                                           
                                           return (
                                             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeClass}`}>
@@ -801,7 +698,6 @@ const VerDetalles = () => {
                                             return carDetails.fecha;
                                             
                                           } catch (error) {
-                                            console.error('Error al formatear fecha:', error, carDetails.fecha);
                                             return carDetails.fecha; // Mostrar la fecha original si hay error
                                           }
                                         })()}

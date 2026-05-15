@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaTrash, FaSync, FaCarSide } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
-import CarImage from '../components/CarImage';
+import UserMenu from '../../components/ui/UserMenu';
+import CarImage from '../../components/ui/CarImage';
 import axios from 'axios';
 
 const MisReservas = () => {
@@ -61,18 +61,15 @@ const MisReservas = () => {
     if (storedUserData) {
       try {
         const user = JSON.parse(storedUserData);
-        console.log('Datos del usuario parseados:', user);
         setUserData(user);
         
         // Cargar datos iniciales después de establecer userData
         fetchInitialData(user);
       } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
         return;
       }
     } else {
-      console.log('No hay datos de usuario, redirigiendo al login');
       navigate('/login');
       return;
     }
@@ -111,29 +108,21 @@ const MisReservas = () => {
           return reservaUserId == userId;
         });
         
-        console.log('🔍 Debug usuario logueado:', {
           id: userId,
           nombre: userDataParam?.nombre || userDataParam?.Nombre || userDataParam?.name,
           email: userDataParam?.email || userDataParam?.Email,
           datosCompletos: userDataParam
         });
         
-        console.log('🔍 Debug reservas del usuario:', reservasDelUsuario);
         
-        console.log('Usuario logueado ID:', userId);
-        console.log('Total de reservas del sistema:', reservasArray.length);
-        console.log('Reservas del usuario logueado:', reservasDelUsuario.length);
         
         setReservations(reservasDelUsuario);
       } else {
-        console.log('No se pudo identificar el ID del usuario logueado');
-        console.log('Datos del usuario recibidos:', userDataParam);
         setReservations([]);
       }
       
       setLastUpdate(new Date());
     } catch (error) {
-      console.error('Error al cargar datos iniciales:', error);
     } finally {
       setIsLoading(false);
     }
@@ -144,7 +133,6 @@ const MisReservas = () => {
     try {
       // Verificar que tengamos un ID válido
       if (!reservationId) {
-        console.error('ID de reserva no válido para actualizar estado:', reservationId);
         return;
       }
       
@@ -157,12 +145,10 @@ const MisReservas = () => {
         }
       });
 
-      console.log('Estado de reserva actualizado:', response.data);
       
       // Recargar las reservas para mostrar el nuevo estado
       await fetchInitialData(userData);
     } catch (error) {
-      console.error('Error al actualizar estado de reserva:', error);
     }
   };
 
@@ -187,7 +173,6 @@ const MisReservas = () => {
     // Verificar que tengamos un ID válido
     if (!reservationId) {
       alert('Error: No se pudo identificar la reserva a eliminar');
-      console.error('ID de reserva no encontrado:', reservationToDelete);
       return;
     }
 
@@ -200,7 +185,6 @@ const MisReservas = () => {
         }
       });
       
-      console.log('Reserva eliminada:', response.data);
       
       if (response.data && response.data.message) {
         alert(response.data.message);
@@ -214,7 +198,6 @@ const MisReservas = () => {
       setShowDeleteModal(false);
       setReservationToDelete(null);
     } catch (error) {
-      console.error('Error al eliminar reserva:', error);
       
       let errorMessage = 'Error al eliminar la reserva';
       
@@ -457,7 +440,6 @@ const MisReservas = () => {
                              <span className="ml-2 text-gray-700">
                                {(() => {
                                  const nombre = userData?.nombre || userData?.Nombre || userData?.name;
-                                 console.log(`🔍 Debug nombre usuario en reserva ${reservation.id_reservarviajes}:`, {
                                    nombre: nombre,
                                    userData: userData,
                                    camposDisponibles: {

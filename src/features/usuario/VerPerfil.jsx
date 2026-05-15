@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar, FaUser, FaEnvelope, FaCog, FaArrowLeft, FaEdit, FaTrash, FaTimes } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 const VerPerfil = () => {
@@ -23,7 +23,6 @@ useEffect(() => {
       const authToken = localStorage.getItem('authToken');
       
       if (!storedUserData || !authToken) {
-        console.log('No hay datos de usuario o token, redirigiendo al login');
         navigate('/login');
         return;
       }
@@ -32,13 +31,11 @@ useEffect(() => {
       const userId = user.id_users || user.id || user.ID || user.id_user || user.user_id || user.userId;
       
       if (!userId) {
-        console.error('No se pudo identificar el ID del usuario');
         navigate('/login');
         return;
       }
 
       // Hacer petición al backend para obtener datos actualizados
-      console.log('🔄 Sincronizando datos del usuario con la base de datos...');
       const response = await axios.get('https://api-mecaza.geekcorplab.com/api/listarusuario', {
         headers: {
           'Authorization': `Bearer ${authToken}`,
@@ -54,22 +51,18 @@ useEffect(() => {
         );
         
         if (userDataActualizado) {
-          console.log('✅ Datos actualizados del backend:', userDataActualizado);
           
           // Actualizar localStorage con los datos frescos
           localStorage.setItem('userData', JSON.stringify(userDataActualizado));
           setUserData(userDataActualizado);
         } else {
-          console.log('⚠️ Usuario no encontrado en la lista, usando datos del localStorage');
           setUserData(user);
         }
       } else {
-        console.log('⚠️ Error en la respuesta del backend, usando datos del localStorage');
         setUserData(user);
       }
       
     } catch (error) {
-      console.error('Error al sincronizar datos del usuario:', error);
       // Fallback: usar datos del localStorage
       const storedUserData = localStorage.getItem('userData');
       if (storedUserData) {
@@ -121,18 +114,13 @@ useEffect(() => {
       const user = JSON.parse(storedUserData);
       
       // Debug: Mostrar toda la estructura del usuario
-      console.log('Datos completos del usuario:', user);
-      console.log('Claves disponibles:', Object.keys(user));
       
       // Intentar obtener el ID de diferentes formas posibles
       const userId = user.id_users || user.id || user.ID || user.id_user || user.user_id || user.userId;
       const authToken = localStorage.getItem('authToken');
       
-      console.log('ID del usuario a eliminar:', userId);
-      console.log('Token de autenticación:', authToken ? 'Presente' : 'Ausente');
 
       if (!userId) {
-        console.error('No se pudo encontrar el ID del usuario. Estructura disponible:', user);
         showToastNotification('No se pudo identificar tu cuenta de usuario. Por favor, contacta al soporte técnico.', 'error');
         return;
       }
@@ -151,7 +139,6 @@ useEffect(() => {
         }
       });
 
-      console.log('Usuario eliminado:', response.data);
       showToastNotification('Tu cuenta ha sido eliminada exitosamente del sistema Mecaza. Gracias por haber sido parte de nuestra comunidad.', 'success');
       
       // Limpiar localStorage y redirigir al login después de mostrar la notificación
@@ -161,7 +148,6 @@ useEffect(() => {
         navigate('/login');
       }, 2000);
     } catch (error) {
-      console.error('Error al eliminar usuario:', error);
       
       if (error.response) {
         const statusCode = error.response.status;

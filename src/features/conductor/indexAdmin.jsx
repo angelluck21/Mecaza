@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaSync } from 'react-icons/fa';
+import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 const IndexAdmin = () => {
@@ -31,129 +31,34 @@ const IndexAdmin = () => {
   const [isSavingEstado, setIsSavingEstado] = useState(false);
   const [estadoSeleccionado, setEstadoSeleccionado] = useState('');
   const [estadosDisponibles] = useState([
-    { id: 1, nombre: '🚗 Esperando Pasajeros', color: '#10B981' },
-    { id: 2, nombre: '🛣️ En Viaje', color: '#F59E0B' },
-    { id: 3, nombre: '🔧 En Mantenimiento', color: '#EF4444' },
-    { id: 4, nombre: '❌ Fuera de Servicio', color: '#6B7280' }
+    { id: 1, nombre: 'En Viaje', color: '#10B981' },
+    { id: 2, nombre: 'Esperando Pasajeros', color: '#F59E0B' },
+    { id: 3, nombre: 'Cupos Llenos', color: '#EF4444' },
+    { id: 4, nombre: 'Cancelado', color: '#6B7280' },
+    { id: 5, nombre: 'Finalizado', color: '#3B82F6' },
+    { id: 6, nombre: 'En Mantenimiento', color: '#8B5CF6' }
   ]);
-
-  // Estados para las estadísticas
-  const [stats, setStats] = useState({
-    totalVehiculos: 0,
-    usuariosRegistrados: 0,
-    reservasHoy: 0
-  });
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
 
   useEffect(() => {
     const storedUserData = localStorage.getItem('userData');
     if (storedUserData) {
       try {
         const user = JSON.parse(storedUserData);
-        console.log('IndexAdmin - Rol del usuario:', user.rol); // Debug log
         
         // Verificar si es administrador (tanto 'admin' como 'administrador')
         if (user.rol === 'admin' || user.rol === 'administrador') {
-          console.log('IndexAdmin - Usuario autorizado, estableciendo datos'); // Debug log
           setUserData(user);
-          
-          // Cargar estadísticas después de establecer userData
-          fetchStats();
         } else {
-          console.log('IndexAdmin - Usuario no autorizado, redirigiendo a indexLogin'); // Debug log
           navigate('/indexLogin');
         }
       } catch (error) {
-        console.error('IndexAdmin - Error al parsear datos del usuario:', error); // Debug log
         navigate('/login');
       }
     } else {
-      console.log('IndexAdmin - No hay datos de usuario, redirigiendo a login'); // Debug log
       navigate('/login');
     }
     setIsLoading(false);
   }, [navigate]);
-
-  // Función para cargar estadísticas del sistema
-  const fetchStats = async () => {
-    setIsLoadingStats(true);
-    try {
-      // Cargar solo las estadísticas que sí existen
-      const [vehiculosResponse, reservasResponse] = await Promise.all([
-        axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro'),
-        axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva')
-      ]);
-
-      // Procesar total de vehículos
-      let totalVehiculos = 0;
-      if (vehiculosResponse.data && Array.isArray(vehiculosResponse.data.data)) {
-        totalVehiculos = vehiculosResponse.data.data.length;
-      } else if (Array.isArray(vehiculosResponse.data)) {
-        totalVehiculos = vehiculosResponse.data.length;
-      }
-
-      // Procesar reservas de hoy
-      let reservasHoy = 0;
-      if (reservasResponse.data && Array.isArray(reservasResponse.data.data)) {
-        const reservas = reservasResponse.data.data;
-        const hoy = new Date();
-        const fechaHoy = hoy.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-        
-        reservasHoy = reservas.filter(reserva => {
-          if (reserva.created_at) {
-            const fechaReserva = new Date(reserva.created_at).toISOString().split('T')[0];
-            return fechaReserva === fechaHoy;
-          }
-          return false;
-        }).length;
-      } else if (Array.isArray(reservasResponse.data)) {
-        const reservas = reservasResponse.data;
-        const hoy = new Date();
-        const fechaHoy = hoy.toISOString().split('T')[0];
-        
-        reservasHoy = reservas.filter(reserva => {
-          if (reserva.created_at) {
-            const fechaReserva = new Date(reserva.created_at).toISOString().split('T')[0];
-            return fechaReserva === fechaHoy;
-          }
-          return false;
-        }).length;
-      }
-
-      // Para usuarios registrados, usar un valor estimado basado en las reservas
-      // ya que no existe la API de usuarios
-      const usuariosRegistrados = Math.max(1, Math.floor(totalVehiculos * 0.8));
-
-      console.log('🔍 Estadísticas cargadas:', {
-        totalVehiculos,
-        usuariosRegistrados,
-        reservasHoy
-      });
-
-      setStats({
-        totalVehiculos,
-        usuariosRegistrados,
-        reservasHoy
-      });
-
-    } catch (error) {
-      console.error('Error al cargar estadísticas:', error);
-      
-      // En caso de error, mostrar mensaje y mantener valores por defecto
-      if (error.response && error.response.status === 404) {
-        console.log('🔍 API no encontrada, usando valores por defecto');
-      }
-      
-      // Mantener valores por defecto
-      setStats({
-        totalVehiculos: 0,
-        usuariosRegistrados: 0,
-        reservasHoy: 0
-      });
-    } finally {
-      setIsLoadingStats(false);
-    }
-  };
 
   const _handleLogout = () => {
     localStorage.removeItem('userData');
@@ -199,11 +104,11 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
+      // Llamada a la ruta /agregarprecio que conecta con PrecioviajeController::Create
+      const response = await axios.put('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
         }
       });
       
@@ -224,7 +129,7 @@ const IndexAdmin = () => {
     } catch (error) {
       if (error.response) {
         if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
+          showToastNotification('Error del servidor: Verifica que el PrecioviajeController esté configurado correctamente', 'error');
         } else if (error.response.status === 422) {
           showToastNotification('Error de validación: Verifica los datos enviados', 'error');
         } else {
@@ -426,37 +331,9 @@ const IndexAdmin = () => {
             <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
               Panel Administrativo
             </h1>
-            <p className="text-lg text-gray-600 mb-6">
+            <p className="text-lg text-gray-600">
               Gestiona vehículos y usuarios del sistema Mecaza
             </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-              <div className="flex items-start">
-                <FaCog className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
-                <div>
-                  <h4 className="text-sm font-medium text-blue-800">Información de Estadísticas</h4>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Las estadísticas se obtienen de las APIs disponibles. El número de usuarios es una estimación basada en los vehículos registrados.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={fetchStats}
-              disabled={isLoadingStats}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 font-semibold flex items-center mx-auto shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoadingStats ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Actualizando...
-                </>
-              ) : (
-                <>
-                  <FaSync className="mr-2" />
-                  Actualizar Estadísticas
-                </>
-              )}
-            </button>
           </div>
 
           <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
@@ -509,7 +386,6 @@ const IndexAdmin = () => {
                 Consulta estadísticas detalladas de vehículos, usuarios activos y viajes realizados.
               </p>
               <button
-                onClick={() => console.log('Ver estadísticas')}
                 className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
               >
                 <FaUsers className="mr-2" />
@@ -519,33 +395,30 @@ const IndexAdmin = () => {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg">
               <div className="flex items-center">
                 <FaCar className="text-2xl text-green-900 mr-3" />
                 <div>
                   <h3 className="text-xl font-semibold text-green-900">Total Vehículos</h3>
-                  <p className="text-2xl font-bold text-green-700">{stats.totalVehiculos}</p>
-                  <p className="text-xs text-green-600 mt-1">Registrados en el sistema</p>
+                  <p className="text-2xl font-bold text-green-700">24</p>
                 </div>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg">
               <div className="flex items-center">
                 <FaUsers className="text-2xl text-purple-900 mr-3" />
                 <div>
-                  <h3 className="text-xl font-semibold text-purple-900">Usuarios Registrados</h3>
-                  <p className="text-2xl font-bold text-purple-700">{stats.usuariosRegistrados}</p>
-                  <p className="text-xs text-purple-600 mt-1">Estimado del sistema</p>
+                  <h3 className="text-xl font-semibold text-purple-900">Usuarios Activos</h3>
+                  <p className="text-2xl font-bold text-purple-700">156</p>
                 </div>
               </div>
             </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
+            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg">
               <div className="flex items-center">
                 <FaCog className="text-2xl text-orange-900 mr-3" />
                 <div>
-                  <h3 className="text-xl font-semibold text-orange-900">Reservas Hoy</h3>
-                  <p className="text-2xl font-bold text-orange-700">{stats.reservasHoy}</p>
-                  <p className="text-xs text-orange-600 mt-1">Realizadas hoy</p>
+                  <h3 className="text-xl font-semibold text-orange-900">Viajes Hoy</h3>
+                  <p className="text-2xl font-bold text-orange-700">89</p>
                 </div>
               </div>
             </div>
@@ -680,8 +553,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['CaucaMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'CaucaMede': e.target.value}))}
+                      value={preciosData['CaucaMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'CaucaMede': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required
@@ -697,8 +570,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['ZaraMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraMede': e.target.value}))}
+                      value={preciosData['ZaraMede']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraMede': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required
@@ -714,8 +587,8 @@ const IndexAdmin = () => {
                       type="text"
                       min="0"
                       step="0.01"
-                      value={preciosData?.['ZaraCauca'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraCauca': e.target.value}))}
+                      value={preciosData['ZaraCauca']}
+                      onChange={(e) => setPreciosData({...preciosData, 'ZaraCauca': e.target.value})}
                       className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
                       placeholder="0.00"
                       required

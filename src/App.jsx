@@ -1,38 +1,56 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 
-import Login from './Usuarios/login';
-import Registrar from './Usuarios/Registrar';
-import Index from './pages/index';
-import IndexLogin from './pages/indexLogin';
-import IndexAdmin from './pages/indexAdmin';
-import Conductor from './conductor/Conductor';
-import ConductorNotificaciones from './conductor/ConductorNotificaciones';
-import AjustesPerfil from './Usuarios/AjustesPerfil';
-import VerPerfil from './Usuarios/VerPerfil';
+// Auth
+import Login    from './features/auth/Login';
+import Registrar from './features/auth/Registrar';
+
+// Usuario
+import IndexLogin   from './features/usuario/IndexLogin';
+import MisReservas  from './features/usuario/MisReservas';
+import VerPerfil    from './features/usuario/VerPerfil';
+import AjustesPerfil from './features/usuario/AjustesPerfil';
+
+// Conductor
+import Conductor              from './features/conductor/Conductor';
+import ConductorNotificaciones from './features/conductor/ConductorNotificaciones';
+
+// Admin
+import IndexAdmin    from './features/admin/indexAdmin';
+import ListaUsuarios from './features/admin/ListaUsuarios';
+
+// Pages
+import Home       from './pages/Home';
 import VerDetalles from './pages/VerDetalles';
-import MisReservas from './Usuarios/MisReservas';
-import ListaUsuarios from './pages/ListaUsuarios';
 
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/" element={<Index />} />
-        <Route path="/index" element={<Index />} />
-        <Route path="/login" element={<Login />} />
+        {/* Públicas */}
+        <Route path="/"       element={<Home />} />
+        <Route path="/index"  element={<Home />} />
+        <Route path="/login"  element={<Login />} />
         <Route path="/registrar" element={<Registrar />} />
-        <Route path="/indexLogin" element={<IndexLogin />} />
-        <Route path="/indexAdmin" element={<IndexAdmin />} />
-        <Route path="/conductor" element={<Conductor />} />
-        <Route path="/conductor-notificaciones" element={<ConductorNotificaciones />} />
-        <Route path="/ver-perfil" element={<VerPerfil />} />
-        <Route path="/ajustes-perfil" element={<AjustesPerfil />} />
-        <Route path="/ver-detalles/:carId" element={<VerDetalles />} />
+
+        {/* Usuario autenticado */}
+        <Route path="/indexLogin"  element={<IndexLogin />} />
         <Route path="/mis-reservas" element={<MisReservas />} />
-        <Route path="/lista-usuarios" element={<ListaUsuarios />} />
-        <Route path="/usuario/:userId" element={<VerPerfil />} />
+        <Route path="/ver-perfil"   element={<VerPerfil />} />
+        <Route path="/ajustes-perfil" element={<AjustesPerfil />} />
+        <Route path="/usuario/:userId"        element={<VerPerfil />} />
         <Route path="/editar-usuario/:userId" element={<AjustesPerfil />} />
+
+        {/* Detalles de viaje */}
+        <Route path="/ver-detalles/:carId" element={<VerDetalles />} />
+
+        {/* Conductor */}
+        <Route path="/conductor"               element={<Conductor />} />
+        <Route path="/conductor-notificaciones" element={<ConductorNotificaciones />} />
+
+        {/* Admin */}
+        <Route path="/indexAdmin"     element={<IndexAdmin />} />
+        <Route path="/lista-usuarios" element={<ListaUsuarios />} />
       </Routes>
     </BrowserRouter>
   );

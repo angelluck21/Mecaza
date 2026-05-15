@@ -2,13 +2,13 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaMapMarkerAlt, FaClock, FaUserFriends, FaDollarSign, FaUser, FaBell, FaCheck, FaTimes, FaExternalLinkAlt, FaPhone } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 
 const Conductor = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userData, setUserData] = useState(null);
+    const [userData, setUserData] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
   const [showAddCarModal, setShowAddCarModal] = useState(false);
@@ -31,24 +31,22 @@ const Conductor = () => {
   const [notificationMessage, setNotificationMessage] = useState('');
   const [carData, setCarData] = useState({
     Placa: '',
-    Conductor: '', // Valor por defecto para evitar null
+    Conductor: '', 
     Imagencarro: '',
     Asientos: '',
     Destino: '',
     Horasalida: '',
     Fecha: '',
     Telefono: '',
-     // Valor por defecto para evitar null
+   
   });
   
-  // Debug: log del estado inicial de carData
+  
   useEffect(() => {
-    console.log('🔍 Estado inicial de carData:', carData);
   }, []);
   
-  // Debug: log cada vez que cambie carData
+ 
   useEffect(() => {
-    console.log('🔄 carData actualizado:', carData);
   }, [carData]);
   
 
@@ -58,7 +56,6 @@ const Conductor = () => {
     const authToken = localStorage.getItem('authToken');
     
     if (!authToken) {
-      console.log('No hay token de autenticación');
       navigate('/login');
       return;
     }
@@ -67,7 +64,7 @@ const Conductor = () => {
       try {
         const user = JSON.parse(storedUserData);
         
-        // Verificar si es conductor o admin
+        
         if (user.rol === 'conductor' || user.rol === 'admin') {
           setUserData(user);
         } else {
@@ -75,36 +72,33 @@ const Conductor = () => {
           navigate('/indexLogin');
         }
       } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
       }
     } else {
-      console.log('No hay datos de usuario almacenados');
       navigate('/login');
     }
     setIsLoading(false);
   }, [navigate]);
 
-  // Cargar estados automáticamente cuando se abra el modal
+  
   useEffect(() => {
     if (showUpdateEstadoModal) {
       handleGetEstados();
     }
   }, [showUpdateEstadoModal]);
 
-  // Cargar estados automáticamente cuando se abra el modal de agregar carro
+  
   useEffect(() => {
     if (showAddCarModal) {
       handleGetEstados();
       
-      // Pre-llenar el campo Conductor con el nombre del usuario logueado
+      
       const conductorLogueado = userData?.Nombre || userData?.nombre || userData?.name || '';
       if (conductorLogueado) {
         setCarData(prev => ({
           ...prev,
           Conductor: conductorLogueado
         }));
-        console.log('Campo Conductor pre-llenado con:', conductorLogueado);
       }
     }
   }, [showAddCarModal, userData]);
@@ -116,7 +110,7 @@ const Conductor = () => {
     navigate('/index');
   };
 
-  // Mostrar loading mientras verifica autenticación
+  
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
@@ -235,11 +229,6 @@ const Conductor = () => {
         return;
       }
       
-      console.log('ID del usuario logueado (original):', userId);
-      console.log('ID del usuario logueado (convertido):', userIdNum);
-      console.log('userData completo:', userData);
-      console.log('Conductor logueado:', conductorLogueado);
-      console.log('Conductor en formulario:', carData.Conductor.trim());
       
       // Crear FormData para enviar datos con imagen
       const formData = new FormData();
@@ -259,20 +248,13 @@ const Conductor = () => {
         formData.append('Imagencarro', compressedImage);
       }
       
-      console.log('FormData a enviar:', formData);
-      console.log('Estado seleccionado:', carData.Estado);
-      console.log('ID del usuario a enviar:', userId);
-      console.log('Enviando petición a:', 'https://api-mecaza.geekcorplab.com/api/agregarcarros');
       
       // Verificar cada campo del FormData
       for (let [key, value] of formData.entries()) {
-        console.log(`FormData - ${key}:`, value);
       }
       
       // Verificar que el Userid esté presente
       const formDataUserId = formData.get('Userid');
-      console.log('Userid en FormData:', formDataUserId);
-      console.log('Tipo de Userid:', typeof formDataUserId);
       
       // Enviar datos al endpoint que conecta con AgregarcarrosController::Create
       const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarcarros', formData, {
@@ -282,7 +264,6 @@ const Conductor = () => {
         }
       });
       
-      console.log('Respuesta del servidor:', response.data);
       
       if (response.data && response.data.success) {
         showToastNotification('¡Vehículo registrado exitosamente! 🚗');
@@ -307,7 +288,6 @@ const Conductor = () => {
       }
       
     } catch (error) {
-      console.error('Error al guardar carro:', error);
       
       if (error.response) {
         if (error.response.status === 500) {
@@ -339,7 +319,6 @@ const Conductor = () => {
         }
       });
       
-      console.log('Todas las reservas obtenidas:', reservasResponse.data);
       
       // Obtener todos los carros
       const carrosResponse = await axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro', {
@@ -350,7 +329,6 @@ const Conductor = () => {
         }
       });
       
-      console.log('Todos los carros obtenidos:', carrosResponse.data);
       
       // Procesar las respuestas
       let reservasArray = [];
@@ -371,12 +349,9 @@ const Conductor = () => {
         carrosArray = [carrosResponse.data.data];
       }
       
-      console.log('Reservas procesadas:', reservasArray);
-      console.log('Carros procesados:', carrosArray);
       
       // Obtener el nombre del conductor logueado
       const conductorLogueado = userData.Nombre || userData.nombre || '';
-      console.log('Conductor logueado:', conductorLogueado);
       
       // Filtrar solo los carros del conductor logueado (comparación estricta)
       const carrosDelConductor = carrosArray.filter(carro => {
@@ -384,27 +359,22 @@ const Conductor = () => {
         
         // Validar que ambos nombres existan
         if (!conductorCarro || !conductorLogueado) {
-          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
           return false;
         }
         
         // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
         const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
         
-        console.log(`Carro ${carro.placa || carro.Placa}: Conductor "${conductorCarro}" vs Logueado "${conductorLogueado}" -> ${perteneceAlConductor}`);
         
         return perteneceAlConductor;
       });
       
-      console.log('Carros del conductor logueado:', carrosDelConductor);
-      console.log('Total de carros del conductor:', carrosDelConductor.length);
       
       // Obtener los IDs de los carros del conductor (convertir a string para comparación)
       const idsCarrosConductor = carrosDelConductor.map(carro => 
         String(carro.id_carros || carro.id || carro.ID)
       );
       
-      console.log('IDs de carros del conductor:', idsCarrosConductor);
       
       // Filtrar solo las reservas de los carros del conductor (comparación más estricta)
       const reservasDelConductor = reservasArray.filter(reserva => {
@@ -412,19 +382,15 @@ const Conductor = () => {
         
         // Verificar que el carroId sea válido
         if (!carroId || carroId === 'undefined' || carroId === 'null') {
-          console.log(`Reserva ${reserva.id || 'N/A'}: Carro ID inválido "${carroId}" -> NO PERTENECE al conductor`);
           return false;
         }
         
         const perteneceAlConductor = idsCarrosConductor.includes(carroId);
         
-        console.log(`Reserva ${reserva.id || 'N/A'}: Carro ID ${carroId} -> ${perteneceAlConductor ? 'PERTENECE' : 'NO PERTENECE'} al conductor`);
         
         return perteneceAlConductor;
       });
       
-      console.log('Reservas del conductor logueado:', reservasDelConductor);
-      console.log('Total de reservas del conductor:', reservasDelConductor.length);
       
       // Enriquecer las reservas con información completa del carro y usuario
       const reservasEnriquecidas = reservasDelConductor.map(reserva => {
@@ -433,7 +399,6 @@ const Conductor = () => {
           (carro.id_carros || carro.id) == carroId
         );
         
-        console.log(`Reserva ${reserva.id || 'N/A'}: Encontrado carro:`, carroEncontrado);
         
         const carroInfo = {
           id: carroEncontrado ? (carroEncontrado.id_carros || carroEncontrado.id) : 'N/A',
@@ -449,8 +414,6 @@ const Conductor = () => {
           ubicacion: reserva.Ubicacion || reserva.ubicacion || 'No especificada'
         };
         
-        console.log(`Reserva ${reserva.id || 'N/A'}: Info del carro enriquecida:`, carroInfo);
-        console.log(`Reserva ${reserva.id || 'N/A'}: Info del usuario enriquecida:`, usuarioInfo);
         
         return {
           ...reserva,
@@ -459,8 +422,6 @@ const Conductor = () => {
         };
       });
       
-      console.log('Reservas enriquecidas del conductor:', reservasEnriquecidas);
-      console.log('Total de reservas enriquecidas:', reservasEnriquecidas.length);
       
       // Validación adicional: mostrar mensaje si no hay carros del conductor
       if (carrosDelConductor.length === 0) {
@@ -479,8 +440,6 @@ const Conductor = () => {
       setReservas(reservasEnriquecidas);
       
     } catch (error) {
-      console.error('Error al obtener reservas:', error);
-      console.log('Error response:', error.response);
       
       if (error.response) {
         const statusCode = error.response.status;
@@ -516,7 +475,6 @@ const Conductor = () => {
         }
       });
       
-      console.log('Carros obtenidos:', response.data);
       
       // Manejar diferentes estructuras de respuesta
       let carrosArray = [];
@@ -530,49 +488,24 @@ const Conductor = () => {
         carrosArray = [];
       }
       
-      console.log('Carros procesados:', carrosArray);
-      console.log('Ejemplo de carro:', carrosArray[0]);
       
       // Filtrar solo los carros del conductor logueado
       let carrosDelConductor = carrosArray.filter(carro => {
         const conductorCarro = carro.conductor || carro.Conductor || '';
         const conductorLogueado = userData.Nombre || userData.nombre || '';
         
-        console.log(`Comparando: "${conductorCarro}" con "${conductorLogueado}"`);
         
         // Validar que ambos nombres existan
         if (!conductorCarro || !conductorLogueado) {
-          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
           return false;
         }
         
         // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
         const match = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
-        console.log(`¿Coincide? ${match}`);
         return match;
       });
       
-      console.log('Carros del conductor logueado:', carrosDelConductor);
-      console.log('Total de carros del conductor:', carrosDelConductor.length);
-      
-      // Debug: Verificar campos de imagen de cada carro
-      carrosDelConductor.forEach((carro, index) => {
-        console.log(`Carro ${index + 1} - Campos de imagen:`, {
-          placa: carro.placa || carro.Placa,
-          imagencarro: carro.imagencarro,
-          'carro.imagencarro': carro.imagencarro,
-          'carro.Imagencarro': carro.Imagencarro,
-          'carro.imagen': carro.imagen,
-          'carro.Imagen': carro.Imagen
-        });
-        
-        // Mostrar todos los campos disponibles del carro
-        console.log(`Carro ${index + 1} - Todos los campos:`, Object.keys(carro));
-        console.log(`Carro ${index + 1} - Datos completos:`, carro);
-      });
-      
       if (carrosDelConductor.length === 0) {
-        console.log('No se encontraron carros para este conductor');
         showToastNotification('No tienes carros registrados en el sistema', 'warning');
         setCarros([]);
         return;
@@ -588,7 +521,6 @@ const Conductor = () => {
           }
         });
         
-        console.log('Respuesta completa de estados:', estadosResponse.data);
         
         let estadosArray = [];
         // Según el backend, los datos vienen en response.data.data
@@ -602,35 +534,24 @@ const Conductor = () => {
           estadosArray = [];
         }
         
-        console.log('Estados procesados:', estadosArray);
-        console.log('Ejemplo de estado:', estadosArray[0]);
         
         // Crear un mapa de estados para acceso rápido
         const estadosMap = {};
         estadosArray.forEach(estado => {
-          console.log('Procesando estado:', estado);
-          console.log('Campos disponibles:', Object.keys(estado));
           
           const id = estado.id_estados || estado.id;
           const nombre = estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados || `Estado ${id}`;
           estadosMap[id] = nombre;
-          console.log(`Mapeando estado ID ${id} -> ${nombre}`);
-          console.log('Estado completo:', estado);
         });
       
-        console.log('Mapa de estados creado:', estadosMap);
         
         // Agregar el nombre del estado a cada carro
         carrosDelConductor = carrosDelConductor.map(carro => {
-          console.log('Procesando carro:', carro);
-          console.log('Campos del carro:', Object.keys(carro));
           
           const estadoId = carro.id_estados || carro.Estado;
-          console.log(`Carro ${carro.placa || carro.Placa}: ID estado original: ${estadoId}, tipo: ${typeof estadoId}`);
           
           // Usar getEstadoNombre directamente para asegurar que funcione
           const estadoNombre = getEstadoNombre(estadoId);
-          console.log(`Carro ${carro.placa || carro.Placa}: Nombre del estado: ${estadoNombre}`);
           
           return {
             ...carro,
@@ -639,7 +560,6 @@ const Conductor = () => {
         });
       
       } catch (estadosError) {
-        console.error('Error al obtener estados:', estadosError);
         // Si no se pueden obtener los estados, usar nombres por defecto
         carrosDelConductor = carrosDelConductor.map(carro => ({
           ...carro,
@@ -650,8 +570,6 @@ const Conductor = () => {
       setCarros(carrosDelConductor);
       showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
     } catch (error) {
-      console.error('Error al obtener carros:', error);
-      console.log('Error response:', error.response);
       
       if (error.response) {
         const statusCode = error.response.status;
@@ -688,7 +606,6 @@ const Conductor = () => {
         }
       });
       
-      console.log('Todos los carros obtenidos:', response.data);
       
       // Manejar diferentes estructuras de respuesta
       let carrosArray = [];
@@ -702,7 +619,6 @@ const Conductor = () => {
         carrosArray = [];
       }
       
-      console.log('Carros procesados:', carrosArray);
       
       // Filtrar solo los carros del conductor logueado
       const conductorLogueado = userData.Nombre || userData.nombre || '';
@@ -711,24 +627,15 @@ const Conductor = () => {
         
         // Validar que ambos nombres existan
         if (!conductorCarro || !conductorLogueado) {
-          console.log('Nombre de conductor faltante:', { conductorCarro, conductorLogueado });
           return false;
         }
         
         // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
         const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
         
-        console.log(`Carro ${carro.placa || carro.Placa}:`, {
-          conductorCarro,
-          conductorLogueado,
-          perteneceAlConductor
-        });
-        
         return perteneceAlConductor;
       });
       
-      console.log('Carros del conductor logueado:', carrosDelConductor);
-      console.log('Total de carros del conductor:', carrosDelConductor.length);
       
       if (carrosDelConductor.length === 0) {
         showToastNotification('No tienes carros registrados en el sistema', 'warning');
@@ -777,7 +684,6 @@ const Conductor = () => {
         setMyCars(carrosConEstados);
         showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
       } catch (estadosError) {
-        console.error('Error al obtener estados:', estadosError);
         // Si no se pueden obtener los estados, usar nombres por defecto
         const carrosConEstados = carrosDelConductor.map(carro => ({
           ...carro,
@@ -788,7 +694,6 @@ const Conductor = () => {
       }
       
     } catch (error) {
-      console.error('Error al obtener carros:', error);
       
       if (error.response) {
         const statusCode = error.response.status;
@@ -814,7 +719,6 @@ const Conductor = () => {
      // Función auxiliar para obtener nombre del estado por ID - CORREGIDA
    const getEstadoNombre = (estadoId) => {
      // Debug: ver qué ID está llegando
-     console.log('🔍 getEstadoNombre recibió:', estadoId, 'tipo:', typeof estadoId);
      
      // Convertir a número si es string
      const id = parseInt(estadoId);
@@ -829,12 +733,10 @@ const Conductor = () => {
      
      // Si el ID es válido y está en nuestro mapeo, devolver el nombre descriptivo
      if (id && estados[id]) {
-       console.log(`✅ Estado ID ${id} -> ${estados[id]}`);
        return estados[id];
      }
      
      // Si no es un ID válido, devolver un mensaje descriptivo
-     console.log(`❌ Estado ID ${estadoId} no válido, devolviendo estado por defecto`);
      return `🔍 Estado ${estadoId || 'Desconocido'}`;
      };
 
@@ -891,7 +793,6 @@ const Conductor = () => {
          return;
        }
 
-       console.log('Datos a enviar para actualización completa (Laravel):', updateData);
 
        const response = await axios.put(`http://127.0.0.1:8000/api/actualizarestadocarro/${selectedCarro.id_carros || selectedCarro.id}`, updateData, {
          headers: {
@@ -900,7 +801,6 @@ const Conductor = () => {
          }
        });
        
-       console.log('Carro actualizado completamente:', response.data);
        
        let mensaje = 'Carro actualizado correctamente';
        if (updateData.Estado && (updateData.Fecha || updateData.Horasalida)) {
@@ -921,7 +821,6 @@ const Conductor = () => {
        setSelectedCarro(null);
        setNewEstado('');
      } catch (error) {
-       console.error('Error al actualizar carro:', error);
        showToastNotification('Error al actualizar el carro', 'error');
      }
    };
@@ -950,7 +849,6 @@ const Conductor = () => {
 
   const handleGetEstados = async () => {
     setIsLoadingEstados(true);
-    console.log('🔄 Iniciando carga de estados...');
     
     try {
       const response = await axios.get('http://127.0.0.1:8000/api/listarestados', {
@@ -958,15 +856,6 @@ const Conductor = () => {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         }
-      });
-      
-      console.log('📡 Respuesta completa del servidor:', response);
-      console.log('📊 Datos de estados obtenidos:', response.data);
-      console.log('🔍 Estructura de response.data:', {
-        hasData: !!response.data.data,
-        dataType: typeof response.data.data,
-        isArray: Array.isArray(response.data.data),
-        message: response.data.message
       });
       
       // Según el backend, los datos vienen en response.data.data
@@ -990,35 +879,21 @@ const Conductor = () => {
         estadosArray = [];
       }
       
-      console.log('🔧 Estados procesados para la lista:', estadosArray);
-      console.log('📝 Primer estado (ejemplo):', estadosArray[0]);
       
       if (estadosArray.length > 0) {
-        console.log('✅ Estados encontrados:', estadosArray.length);
         estadosArray.forEach((estado, index) => {
-          console.log(`Estado ${index + 1}:`, {
-            id: estado.id_estados,
-            nombre: estado.estados, // Según Postman, el campo es "estados"
-            completo: estado
-          });
         });
       } else {
-        console.log('⚠️ No se encontraron estados en la respuesta');
-        console.log('🔍 Revisando estructura completa de response.data:', response.data);
       }
       
       setEstados(estadosArray);
     } catch (error) {
-      console.error('❌ Error al obtener estados:', error);
       if (error.response) {
-        console.error('📡 Respuesta de error:', error.response.data);
-        console.error('🔢 Status code:', error.response.status);
       }
       showToastNotification('Error al cargar los estados', 'error');
       setEstados([]);
     } finally {
       setIsLoadingEstados(false);
-      console.log('🏁 Carga de estados finalizada');
     }
   };
 
@@ -1033,7 +908,6 @@ const Conductor = () => {
     
     try {
       const carroId = carroToDelete.id_carros || carroToDelete.id || carroToDelete.ID;
-      console.log('Eliminando carro con ID:', carroId);
       
       const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarcarro/${carroId}`, {
         headers: {
@@ -1043,7 +917,6 @@ const Conductor = () => {
         }
       });
 
-      console.log('Carro eliminado:', response.data);
       
       // Mostrar notificación de éxito con detalles del carro eliminado
       const carroInfo = `🚗 Vehículo ${carroToDelete.placa || carroToDelete.Placa || 'N/A'} eliminado exitosamente`;
@@ -1056,7 +929,6 @@ const Conductor = () => {
       setShowDeleteConfirmModal(false);
       setCarroToDelete(null);
     } catch (error) {
-      console.error('Error al eliminar carro:', error);
       
       if (error.response) {
         const statusCode = error.response.status;
@@ -1112,11 +984,8 @@ const Conductor = () => {
   // Función para confirmar reserva
   const handleConfirmarReserva = async (reserva) => {
     try {
-      console.log('Confirmando reserva:', reserva);
-      console.log('Campos disponibles:', Object.keys(reserva));
       
       const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
-      console.log('ID de reserva:', reservationId);
       
       if (!reservationId || reservationId === 'undefined') {
         showToastNotification('❌ Error: ID de reserva no válido. Verifica los datos de la reserva.', 'error');
@@ -1132,7 +1001,6 @@ const Conductor = () => {
         }
       });
 
-      console.log('Reserva confirmada:', response.data);
       
       // Mostrar notificación de éxito con detalles
       const reservaInfo = `Reserva #${reservationId} confirmada exitosamente`;
@@ -1141,7 +1009,6 @@ const Conductor = () => {
       // Recargar la lista de reservas
       await handleViewReservas();
     } catch (error) {
-      console.error('Error al confirmar reserva:', error);
       
       let errorMessage = '❌ Error al confirmar la reserva';
       
@@ -1168,11 +1035,8 @@ const Conductor = () => {
     }
 
     try {
-      console.log('Rechazando reserva:', reserva);
-      console.log('Campos disponibles:', Object.keys(reserva));
       
       const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
-      console.log('ID de reserva:', reservationId);
       
       if (!reservationId || reservationId === 'undefined') {
         showToastNotification('❌ Error: ID de reserva no válido. Verifica los datos de la reserva.', 'error');
@@ -1188,7 +1052,6 @@ const Conductor = () => {
         }
       });
 
-      console.log('Reserva rechazada:', response.data);
       
       // Mostrar notificación de éxito con detalles
       const reservaInfo = `Reserva #${reservationId} rechazada exitosamente`;
@@ -1197,7 +1060,6 @@ const Conductor = () => {
       // Recargar la lista de reservas
       await handleViewReservas();
     } catch (error) {
-      console.error('Error al rechazar reserva:', error);
       
       let errorMessage = '❌ Error al rechazar la reserva';
       
@@ -1871,7 +1733,6 @@ const Conductor = () => {
                              {(() => {
                                const estadoId = selectedCarro.id_estados || selectedCarro.Estado;
                                const nombreEstado = getEstadoNombre(estadoId);
-                               console.log(`Renderizando estado para carro seleccionado: ID=${estadoId}, Nombre=${nombreEstado}`);
                                return nombreEstado;
                              })()}
                            </span>
@@ -2133,10 +1994,6 @@ const Conductor = () => {
                               <span className="font-medium text-gray-900">
                                 {(() => {
                                   const placa = reserva.carroInfo?.placa || 'N/A';
-                                  console.log(`Renderizando placa para reserva ${reserva.id || 'N/A'}:`, {
-                                    carroInfo: reserva.carroInfo,
-                                    placa: placa
-                                  });
                                   return placa;
                                 })()}
                               </span>

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaArrowLeft, FaCheck, FaTimes, FaBell, FaExternalLinkAlt } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 const ConductorNotificaciones = () => {
@@ -47,7 +47,6 @@ const ConductorNotificaciones = () => {
         }
       });
 
-      console.log('Reservas obtenidas:', response.data);
       
       // Manejar diferentes estructuras de respuesta
       let reservasArray = [];
@@ -68,7 +67,6 @@ const ConductorNotificaciones = () => {
       
       setReservasPendientes(pendientes);
     } catch (error) {
-      console.error('Error al obtener reservas pendientes:', error);
       setReservasPendientes([]);
     } finally {
       setIsLoadingReservas(false);
@@ -89,13 +87,11 @@ const ConductorNotificaciones = () => {
         }
       });
 
-      console.log('Reserva confirmada:', response.data);
       alert('Reserva confirmada exitosamente');
       
       // Recargar la lista de reservas pendientes
       await fetchReservasPendientes();
     } catch (error) {
-      console.error('Error al confirmar reserva:', error);
       alert(`Error al confirmar la reserva: ${error.message}`);
     }
   };
@@ -118,13 +114,11 @@ const ConductorNotificaciones = () => {
         }
       });
 
-      console.log('Reserva rechazada:', response.data);
       alert('Reserva rechazada');
       
       // Recargar la lista de reservas pendientes
       await fetchReservasPendientes();
     } catch (error) {
-      console.error('Error al rechazar reserva:', error);
       alert(`Error al rechazar la reserva: ${error.message}`);
     }
   };

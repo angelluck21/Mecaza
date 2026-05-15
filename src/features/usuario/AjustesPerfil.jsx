@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar, FaUser, FaEnvelope, FaLock, FaSave, FaArrowLeft, FaCamera, FaPhone } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 const AjustesPerfil = () => {
@@ -34,7 +34,6 @@ const AjustesPerfil = () => {
     const authToken = localStorage.getItem('authToken');
     
     if (!storedUserData || !authToken) {
-      console.log('No hay datos de usuario o token, redirigiendo al login');
       navigate('/login');
       return;
     }
@@ -45,14 +44,8 @@ const AjustesPerfil = () => {
       // Verificar que el usuario tenga un ID válido
       const userId = user.id || user.id_users || user.ID || user.user_id || user.userId;
       
-      console.log('=== DEBUG AJUSTES PERFIL ===');
-      console.log('Usuario completo:', user);
-      console.log('ID extraído:', userId);
-      console.log('Token presente:', !!authToken);
-      console.log('============================');
       
       if (!userId) {
-        console.error('Usuario sin ID válido:', user);
         navigate('/login');
         return;
       }
@@ -73,7 +66,6 @@ const AjustesPerfil = () => {
       }
       
     } catch (error) {
-      console.error('Error al parsear datos del usuario:', error);
       navigate('/login');
       return;
     }
@@ -154,28 +146,12 @@ const AjustesPerfil = () => {
           throw new Error('Error al subir la imagen de perfil');
         }
       }
-        
-                                   console.log('=== DEBUG ACTUALIZAR PERFIL ===');
-          console.log('Usuario completo del localStorage:', user);
-          console.log('ID del usuario extraído:', userId);
-          console.log('Datos a enviar:', dataToSend);
-          console.log('Teléfono del usuario original:', getUserPhone(user));
-          console.log('Teléfono del formulario:', profileData.telefono);
-          console.log('Teléfono final enviado:', dataToSend.Telefono);
-          console.log('Token de autorización:', localStorage.getItem('authToken') ? 'Presente' : 'Ausente');
-          console.log('URL de la petición:', `https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`);
-          console.log('Headers de la petición:', {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          });
-          console.log('================================');
-        
+      
         if (!userId) {
           throw new Error('No se pudo identificar el ID del usuario');
         }
         
-          const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`, dataToSend, {
+        const response = await axios.put(`https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`, dataToSend, {
           headers: {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
@@ -204,17 +180,12 @@ const AjustesPerfil = () => {
       setProfileImage(null);
       
          } catch (error) {
-       console.error('Error completo al actualizar perfil:', error);
        
        if (error.response) {
          // El servidor respondió con un código de estado de error
          const statusCode = error.response.status;
          const errorData = error.response.data;
          
-         console.log('=== ERROR DEL SERVIDOR ===');
-         console.log('Status:', statusCode);
-         console.log('Datos del error:', errorData);
-         console.log('==========================');
          
          if (statusCode === 500) {
            showToastNotification('Error interno del servidor. Por favor, contacta al administrador del sistema.', 'error');
@@ -230,11 +201,9 @@ const AjustesPerfil = () => {
          }
        } else if (error.request) {
          // La petición se hizo pero no se recibió respuesta
-         console.error('No se recibió respuesta del servidor:', error.request);
          showToastNotification('No se pudo conectar con el servidor. Verifica tu conexión a internet.', 'error');
        } else {
          // Error en la configuración de la petición
-         console.error('Error en la configuración de la petición:', error.message);
          showToastNotification(`Error de configuración: ${error.message}`, 'error');
        }
      } finally {

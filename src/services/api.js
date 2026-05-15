@@ -1,0 +1,73 @@
+import axios from 'axios';
+import { ENDPOINTS } from '../constants/api';
+import { getAuthHeaders } from '../utils';
+
+const authHeaders = () => ({ headers: getAuthHeaders() });
+
+// ── Auth ─────────────────────────────────────────────────────────────────────
+
+export const loginApi = (correo, contrasena) =>
+  axios.post(ENDPOINTS.LOGIN, { Correo: correo, Contrasena: contrasena }, authHeaders());
+
+export const registrarApi = (data) =>
+  axios.post(ENDPOINTS.REGISTRAR, data, authHeaders());
+
+// ── Carros ───────────────────────────────────────────────────────────────────
+
+export const listarCarrosApi = () =>
+  fetch(ENDPOINTS.LISTAR_CARROS).then((r) => r.json());
+
+export const crearCarroApi = (formData) =>
+  axios.post(ENDPOINTS.CREAR_CARRO, formData, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+      Accept: 'application/json',
+    },
+  });
+
+export const eliminarCarroApi = (id) =>
+  axios.delete(ENDPOINTS.ELIMINAR_CARRO(id), authHeaders());
+
+export const actualizarEstadoCarroApi = (id, estadoId) =>
+  axios.put(ENDPOINTS.ACTUALIZAR_ESTADO_CARRO(id), { id_estados: estadoId }, authHeaders());
+
+// ── Reservas ─────────────────────────────────────────────────────────────────
+
+export const listarReservasApi = () =>
+  fetch(ENDPOINTS.LISTAR_RESERVAS).then((r) => r.json());
+
+export const listarReservasAuthApi = () =>
+  axios.get(ENDPOINTS.LISTAR_RESERVAS, authHeaders());
+
+export const crearReservaApi = (data) =>
+  axios.post(ENDPOINTS.CREAR_RESERVA, data, authHeaders());
+
+export const eliminarReservaApi = (id) =>
+  axios.delete(ENDPOINTS.ELIMINAR_RESERVA(id), authHeaders());
+
+export const actualizarReservaApi = (id, data) =>
+  axios.put(ENDPOINTS.ACTUALIZAR_RESERVA(id), data, authHeaders());
+
+// ── Estados ──────────────────────────────────────────────────────────────────
+
+export const listarEstadosApi = () =>
+  axios.get(ENDPOINTS.LISTAR_ESTADOS, authHeaders());
+
+// ── Usuarios ─────────────────────────────────────────────────────────────────
+
+export const listarUsuariosApi = () =>
+  axios.get(ENDPOINTS.LISTAR_USUARIOS, authHeaders());
+
+export const verUsuarioApi = (id) =>
+  axios.get(ENDPOINTS.VER_USUARIO(id), authHeaders());
+
+export const actualizarUsuarioApi = (id, data) =>
+  axios.put(ENDPOINTS.ACTUALIZAR_USUARIO(id), data, authHeaders());
+
+export const eliminarUsuarioApi = (id) =>
+  axios.delete(ENDPOINTS.ELIMINAR_USUARIO(id), authHeaders());
+
+// ── Precios ──────────────────────────────────────────────────────────────────
+
+export const listarPreciosApi = () =>
+  axios.get(ENDPOINTS.LISTAR_PRECIOS, authHeaders());

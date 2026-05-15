@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar, FaUser, FaEnvelope, FaPhone, FaEye, FaEdit, FaTrash, FaPlus, FaSearch } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/UserMenu';
+import UserMenu from '../../components/ui/UserMenu';
 import axios from 'axios';
 
 const ListaUsuarios = () => {
@@ -23,7 +23,6 @@ const ListaUsuarios = () => {
     const authToken = localStorage.getItem('authToken');
     
     if (!authToken) {
-      console.log('No hay token de autenticación');
       navigate('/login');
       return;
     }
@@ -33,12 +32,10 @@ const ListaUsuarios = () => {
         const user = JSON.parse(storedUserData);
         setUserData(user);
       } catch (error) {
-        console.error('Error al parsear datos del usuario:', error);
         navigate('/login');
         return;
       }
     } else {
-      console.log('No hay datos de usuario almacenados');
       navigate('/login');
       return;
     }
@@ -81,8 +78,6 @@ const ListaUsuarios = () => {
         showToastNotification('Error al cargar usuarios', 'error');
       }
     } catch (error) {
-      console.error('Error al obtener usuarios:', error);
-      console.log('Error response:', error.response);
       
       if (error.response) {
         const statusCode = error.response.status;
@@ -138,7 +133,6 @@ const ListaUsuarios = () => {
           showToastNotification(response.data.message || 'Error al eliminar usuario', 'error');
         }
       } catch (error) {
-        console.error('Error al eliminar usuario:', error);
         showToastNotification('Error al eliminar el usuario', 'error');
       }
     }
