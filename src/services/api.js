@@ -71,3 +71,11 @@ export const eliminarUsuarioApi = (id) =>
 
 export const listarPreciosApi = () =>
   axios.get(ENDPOINTS.LISTAR_PRECIOS, authHeaders());
+
+export const agregarPrecioApi = (data) =>
+  axios.post(ENDPOINTS.AGREGAR_PRECIO, data, authHeaders());
+
+// ── Estados ──────────────────────────────────────────────────────────────────
+
+export const agregarEstadoApi = (data) =>
+  axios.post(ENDPOINTS.AGREGAR_ESTADO, data, authHeaders());

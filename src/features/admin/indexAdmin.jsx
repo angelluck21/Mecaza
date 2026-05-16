@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaSync } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../../components/ui/UserMenu';
-import axios from 'axios';
+import { listarCarrosApi, listarReservasApi, agregarPrecioApi, agregarEstadoApi } from '../../services/api';
 
 const IndexAdmin = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -73,51 +73,27 @@ const IndexAdmin = () => {
   const fetchStats = async () => {
     setIsLoadingStats(true);
     try {
-      // Cargar solo las estadísticas que sí existen
       const [vehiculosResponse, reservasResponse] = await Promise.all([
-        axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro'),
-        axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva')
+        listarCarrosApi(),
+        listarReservasApi(),
       ]);
 
-      // Procesar total de vehículos
-      let totalVehiculos = 0;
-      if (vehiculosResponse.data && Array.isArray(vehiculosResponse.data.data)) {
-        totalVehiculos = vehiculosResponse.data.data.length;
-      } else if (Array.isArray(vehiculosResponse.data)) {
-        totalVehiculos = vehiculosResponse.data.length;
-      }
+      // Procesar total de vehículos (listarCarrosApi usa fetch → devuelve JSON)
+      const vehiculosData = Array.isArray(vehiculosResponse.data)
+        ? vehiculosResponse.data
+        : [];
+      const totalVehiculos = vehiculosData.length;
 
-      // Procesar reservas de hoy
-      let reservasHoy = 0;
-      if (reservasResponse.data && Array.isArray(reservasResponse.data.data)) {
-        const reservas = reservasResponse.data.data;
-        const hoy = new Date();
-        const fechaHoy = hoy.toISOString().split('T')[0]; // Formato YYYY-MM-DD
-        
-        reservasHoy = reservas.filter(reserva => {
-          if (reserva.created_at) {
-            const fechaReserva = new Date(reserva.created_at).toISOString().split('T')[0];
-            return fechaReserva === fechaHoy;
-          }
-          return false;
-        }).length;
-      } else if (Array.isArray(reservasResponse.data)) {
-        const reservas = reservasResponse.data;
-        const hoy = new Date();
-        const fechaHoy = hoy.toISOString().split('T')[0];
-        
-        reservasHoy = reservas.filter(reserva => {
-          if (reserva.created_at) {
-            const fechaReserva = new Date(reserva.created_at).toISOString().split('T')[0];
-            return fechaReserva === fechaHoy;
-          }
-          return false;
-        }).length;
-      }
-
-      // Para usuarios registrados, usar un valor estimado basado en las reservas
-      // ya que no existe la API de usuarios
-      const usuariosRegistrados = Math.max(1, Math.floor(totalVehiculos * 0.8));
+      // Procesar reservas de hoy (listarReservasApi usa fetch → devuelve JSON)
+      const reservasData = Array.isArray(reservasResponse)
+        ? reservasResponse
+        : (reservasResponse.data ?? []);
+      const fechaHoy = new Date().toISOString().split('T')[0];
+      const reservasHoy = reservasData.filter((r) => {
+        if (!r.created_at) return false;
+        return new Date(r.created_at).toISOString().split('T')[0] === fechaHoy;
+      }).length;
+      const usuariosRegistrados = reservasData.length;
 
       setStats({
         totalVehiculos,
@@ -185,13 +161,7 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
+      const response = await agregarPrecioApi(dataToSend);
       
       if (response.data && response.data.success) {
         showToastNotification('¡Precios guardados exitosamente! 💰');
@@ -243,13 +213,7 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarestados', dataToSend, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
+      const response = await agregarEstadoApi(dataToSend);
       
       if (response.data && response.data.success) {
         showToastNotification('¡Estado del viaje guardado exitosamente! 🚗');
@@ -518,9 +482,9 @@ const IndexAdmin = () => {
               <div className="flex items-center">
                 <FaUsers className="text-2xl text-purple-900 mr-3" />
                 <div>
-                  <h3 className="text-xl font-semibold text-purple-900">Usuarios Registrados</h3>
+                  <h3 className="text-xl font-semibold text-purple-900">Total Reservas</h3>
                   <p className="text-2xl font-bold text-purple-700">{stats.usuariosRegistrados}</p>
-                  <p className="text-xs text-purple-600 mt-1">Estimado del sistema</p>
+                  <p className="text-xs text-purple-600 mt-1">Total de reservas</p>
                 </div>
               </div>
             </div>

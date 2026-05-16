@@ -1,4 +1,5 @@
-export const API_BASE_URL = 'https://api-mecaza.geekcorplab.com/api';
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api';
 
 export const ENDPOINTS = {
   // Auth
@@ -28,4 +29,8 @@ export const ENDPOINTS = {
 
   // Precios
   LISTAR_PRECIOS: `${API_BASE_URL}/listarprecios`,
+  AGREGAR_PRECIO: `${API_BASE_URL}/agregarprecio`,
+
+  // Estados (agregar)
+  AGREGAR_ESTADO: `${API_BASE_URL}/agregarestados`,
 };
