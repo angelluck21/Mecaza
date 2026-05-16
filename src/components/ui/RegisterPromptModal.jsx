@@ -1,40 +1,77 @@
 import React from 'react';
-import { FaUser } from 'react-icons/fa';
+import { FaCar } from 'react-icons/fa';
 import { useNavigate } from 'react-router-dom';
+
+const BENEFITS = [
+  'Ver detalles completos del viaje',
+  'Información del conductor y vehículo',
+  'Precios y rutas disponibles',
+  'Reservar asientos específicos',
+  'Historial de tus viajes',
+];
 
 const RegisterPromptModal = ({ onClose }) => {
   const navigate = useNavigate();
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-xl p-8 max-w-md w-full text-center">
-        <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <FaUser className="text-blue-600 text-2xl" />
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+      style={{ background: 'rgba(15, 10, 40, 0.75)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl shadow-violet-900/30 overflow-hidden animate-scale-in">
+
+        {/* Header */}
+        <div className="bg-gradient-to-r from-blue-800 to-violet-700 px-8 py-6 text-white text-center relative overflow-hidden">
+          <div className="absolute -top-8 -right-8 w-32 h-32 bg-white/5 rounded-full" />
+          <div className="absolute -bottom-6 -left-6 w-24 h-24 bg-white/5 rounded-full" />
+          <div className="relative">
+            <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3 rotate-3 hover:rotate-0 transition-transform duration-300">
+              <FaCar className="text-white text-3xl" />
+            </div>
+            <h3 className="text-xl font-extrabold">¡Regístrate para continuar!</h3>
+            <p className="text-blue-200 text-sm mt-1">Accede a todos los detalles del viaje</p>
+          </div>
         </div>
-        <h3 className="text-2xl font-bold text-gray-900 mb-4">¡Regístrate para ver los detalles del viaje!</h3>
-        <p className="text-gray-600 mb-6">
-          Para ver toda la información del viaje, detalles del conductor, precios y reservar tu asiento, necesitas crear una cuenta en Mecaza. Es rápido y gratuito.
-        </p>
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-          <p className="text-sm text-blue-800">
-            <strong>¿Qué obtienes al registrarte?</strong><br />
-            • Ver detalles completos del viaje<br />
-            • Información del conductor y vehículo<br />
-            • Precios y rutas disponibles<br />
-            • Reservar asientos específicos<br />
-            • Historial de tus viajes
-          </p>
-        </div>
-        <div className="space-y-3">
-          <button onClick={() => { onClose(); navigate('/registrar'); }} className="w-full bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors">
-            🚀 Crear Cuenta y Ver Detalles
-          </button>
-          <button onClick={() => { onClose(); navigate('/login'); }} className="w-full bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors">
-            🔑 Ya tengo cuenta
-          </button>
-          <button onClick={onClose} className="w-full text-gray-500 py-2 px-4 hover:text-gray-700 transition-colors">
-            ❌ Cancelar
-          </button>
+
+        {/* Cuerpo */}
+        <div className="px-8 py-6">
+          <div className="bg-gradient-to-br from-violet-50 to-blue-50 border border-violet-100 rounded-xl p-4 mb-5">
+            <p className="text-xs font-semibold text-violet-700 uppercase tracking-wider mb-2">¿Qué obtienes?</p>
+            <ul className="space-y-1.5">
+              {BENEFITS.map((b) => (
+                <li key={b} className="flex items-center gap-2 text-sm text-gray-700">
+                  <span className="w-4 h-4 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center shrink-0">
+                    <svg className="w-2.5 h-2.5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                    </svg>
+                  </span>
+                  {b}
+                </li>
+              ))}
+            </ul>
+          </div>
+
+          <div className="space-y-2.5">
+            <button
+              onClick={() => { onClose(); navigate('/registrar'); }}
+              className="w-full bg-gradient-to-r from-blue-700 to-violet-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-800 hover:to-violet-700 transition-all duration-200 shadow-md hover:shadow-violet-300/50 hover:shadow-lg hover:scale-[1.02] active:scale-95"
+            >
+              🚀 Crear Cuenta Gratis
+            </button>
+            <button
+              onClick={() => { onClose(); navigate('/login'); }}
+              className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200 active:scale-95"
+            >
+              🔑 Ya tengo cuenta
+            </button>
+            <button
+              onClick={onClose}
+              className="w-full text-gray-400 py-2 text-sm hover:text-gray-600 transition-colors"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       </div>
     </div>

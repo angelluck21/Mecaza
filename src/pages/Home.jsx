@@ -13,7 +13,7 @@ import { listarCarrosApi, listarReservasApi } from '../services/api';
 
 const calcularAsientosDisponibles = (carsData, reservasArray) =>
   carsData.map((car) => {
-    const carroId         = car.id_carros || car.id || car.ID;
+    const carroId          = car.id_carros || car.id || car.ID;
     const reservasDelCarro = reservasArray.filter((r) => {
       const rId = r.id_carros || r.id_carro || r.carro_id || r.carroId;
       return rId == carroId && r.estado !== 'cancelada' && r.estado !== 'rechazada';
@@ -49,7 +49,6 @@ const Home = () => {
 
   const navigate = useNavigate();
 
-  // ── Cargar usuario ──────────────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (stored) {
@@ -57,12 +56,11 @@ const Home = () => {
     }
   }, []);
 
-  // ── Cargar carros y reservas ────────────────────────────────────────────────
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const data     = await listarCarrosApi();
-        let carsData   = Array.isArray(data.data) ? data.data : [];
+        const data   = await listarCarrosApi();
+        let carsData = Array.isArray(data.data) ? data.data : [];
 
         try {
           const reservasData  = await listarReservasApi();
@@ -81,69 +79,96 @@ const Home = () => {
         setIsLoading(false);
       }
     };
-
     fetchData();
   }, []);
 
-  // ── Búsqueda ────────────────────────────────────────────────────────────────
   const handleSearch = (value) => {
     setSearchTerm(value);
     setFilteredCars(filtrarCarros(cars, value));
   };
 
   const handleVerDetalles = (carId) => {
-    if (userData) {
-      navigate(`/ver-detalles/${carId}`);
-    } else {
-      setShowRegisterModal(true);
-    }
+    if (userData) navigate(`/ver-detalles/${carId}`);
+    else setShowRegisterModal(true);
   };
 
-  // ── Render ──────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      <Navbar
-        userData={userData}
-        searchTerm={searchTerm}
-        onSearch={handleSearch}
-      />
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900 relative">
 
+      {/* Decoración de fondo */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-violet-700/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
+      </div>
+
+      <Navbar userData={userData} searchTerm={searchTerm} onSearch={handleSearch} />
       <Carousel />
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <h2 className="text-3xl font-bold text-white mb-6 text-center">
-          {userData ? 'Carros Disponibles' : 'Viajes Disponibles'}
-        </h2>
+      {/* Contenido principal */}
+      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 relative z-10">
 
+        {/* Encabezado de sección */}
+        <div className="text-center mb-10 animate-fade-in-up">
+          <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-2">
+            {userData ? 'Viajes disponibles' : 'Encuentra tu próximo viaje'}
+          </h2>
+          <p className="text-blue-200 text-base">
+            {userData
+              ? `Bienvenido de vuelta, ${userData?.Nombre || userData?.nombre || 'viajero'} 👋`
+              : 'Regístrate para reservar tu asiento y viajar seguro'}
+          </p>
+          <div className="mx-auto mt-4 w-16 h-1 rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
+        </div>
+
+        {/* Estados de carga / vacío / grid */}
         {isLoading ? (
-          <div className="text-center text-white text-xl">Cargando viajes...</div>
-        ) : !filteredCars.length ? (
-          <div className="text-center text-white text-lg">
-            {searchTerm ? 'No se encontraron viajes que coincidan con tu búsqueda.' : 'No hay viajes disponibles en este momento.'}
+          <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
+            <div className="w-14 h-14 rounded-full border-4 border-violet-400 border-t-transparent animate-spin mb-4" />
+            <p className="text-blue-200 text-lg">Cargando viajes disponibles...</p>
           </div>
+
+        ) : !filteredCars.length ? (
+          <div className="text-center py-24 animate-fade-in">
+            <div className="text-6xl mb-4">🚗</div>
+            <p className="text-white text-xl font-semibold mb-2">
+              {searchTerm ? 'Sin resultados' : 'No hay viajes disponibles'}
+            </p>
+            <p className="text-blue-200">
+              {searchTerm
+                ? `No encontramos viajes para "${searchTerm}"`
+                : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
+            </p>
+          </div>
+
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
             {filteredCars.map((car, idx) =>
               car ? (
-                <CarCard
+                <div
                   key={car.id_carros || idx}
-                  car={car}
-                  userData={userData}
-                  onVerDetalles={handleVerDetalles}
-                />
+                  className="animate-fade-in-up"
+                  style={{ animationDelay: `${Math.min(idx * 60, 400)}ms` }}
+                >
+                  <CarCard
+                    car={car}
+                    userData={userData}
+                    onVerDetalles={handleVerDetalles}
+                  />
+                </div>
               ) : null
             )}
           </div>
         )}
 
-        <div className="text-center text-blue-100 mt-8">
-          <p className="text-lg">
+        {/* Pie de sección */}
+        {!isLoading && filteredCars.length > 0 && (
+          <p className="text-center text-blue-300 text-sm mt-10 animate-fade-in">
             {userData
-              ? '¿Necesitas más información? Contacta con tu conductor.'
-              : 'Regístrate para ver detalles completos de los viajes y reservar tu asiento.'}
+              ? '¿Necesitas ayuda? Contacta directamente con tu conductor.'
+              : 'Regístrate gratis para ver precios, detalles del conductor y reservar tu asiento.'}
           </p>
-        </div>
-      </div>
+        )}
+      </main>
 
       <Footer />
 
