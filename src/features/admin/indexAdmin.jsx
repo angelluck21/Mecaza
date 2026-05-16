@@ -1,746 +1,289 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaSync } from 'react-icons/fa';
-import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../../components/ui/UserMenu';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { FaCar, FaPlus, FaUsers, FaCog, FaSync, FaTicketAlt } from 'react-icons/fa';
+
+import PageBg        from '../../components/ui/PageBg';
+import InnerNavbar   from '../../components/layout/InnerNavbar';
+import LoadingScreen from '../../components/ui/LoadingScreen';
+import StatCard      from '../../components/ui/StatCard';
+import SectionCard   from '../../components/ui/SectionCard';
+import ToastNotification from '../../components/ui/ToastNotification';
+import { useToast }  from '../../hooks/useToast';
+
 import { listarCarrosApi, listarReservasApi, agregarPrecioApi, agregarEstadoApi } from '../../services/api';
 
+// ── Constantes ────────────────────────────────────────────────────────────────
+
+const ESTADOS = [
+  { id: 1, label: '🚗 Esperando Pasajeros', color: 'bg-green-100 text-green-700 border-green-200' },
+  { id: 2, label: '🛣️ En Viaje',            color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  { id: 3, label: '🔧 En Mantenimiento',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { id: 4, label: '❌ Fuera de Servicio',   color: 'bg-red-100 text-red-700 border-red-200' },
+];
+
+const RUTAS = [
+  { key: 'ZaraMede',  label: 'Zaragoza → Medellín' },
+  { key: 'ZaraCauca', label: 'Zaragoza → Caucasia' },
+  { key: 'CaucaMede', label: 'Caucasia → Medellín' },
+];
+
+// ── Modal base ────────────────────────────────────────────────────────────────
+
+const Modal = ({ title, onClose, children }) => (
+  <div
+    className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+    style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
+    onClick={(e) => e.target === e.currentTarget && onClose()}
+  >
+    <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-scale-in overflow-hidden">
+      <div className="bg-gradient-to-r from-blue-800 to-violet-700 px-6 py-4 flex items-center justify-between">
+        <h2 className="text-lg font-bold text-white">{title}</h2>
+        <button onClick={onClose} className="text-white/70 hover:text-white text-xl leading-none transition-colors">&times;</button>
+      </div>
+      <div className="p-6">{children}</div>
+    </div>
+  </div>
+);
+
+// ── Acción card ───────────────────────────────────────────────────────────────
+
+const ActionCard = ({ icon, title, desc, btnLabel, btnColor = 'violet', onClick }) => {
+  const colors = {
+    violet: 'from-violet-600 to-blue-600 hover:shadow-violet-300/40',
+    green:  'from-green-600  to-emerald-500 hover:shadow-green-300/40',
+    blue:   'from-blue-600   to-cyan-500 hover:shadow-blue-300/40',
+  };
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200 p-5 flex flex-col gap-3 hover:-translate-y-0.5">
+      <div className="flex items-center gap-3">
+        <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${colors[btnColor]} flex items-center justify-center text-white shadow-sm`}>
+          {icon}
+        </div>
+        <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
+      </div>
+      <p className="text-xs text-gray-500 leading-relaxed flex-1">{desc}</p>
+      <button
+        onClick={onClick}
+        className={`w-full py-2.5 bg-gradient-to-r ${colors[btnColor]} text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-95`}
+      >
+        <FaPlus className="text-xs" /> {btnLabel}
+      </button>
+    </div>
+  );
+};
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
 const IndexAdmin = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [emailData, setEmailData] = useState({
-    email: '',
-    name: '',
-    role: '',
-    department: ''
-  });
+  const [userData,      setUserData]      = useState(null);
+  const [isLoading,     setIsLoading]     = useState(true);
+  const [stats,         setStats]         = useState({ totalVehiculos: 0, totalReservas: 0, reservasHoy: 0 });
+  const [isLoadingStats,setIsLoadingStats] = useState(false);
+
   const [showPreciosModal, setShowPreciosModal] = useState(false);
-  const [isSavingPrecios, setIsSavingPrecios] = useState(false);
-  const [preciosData, setPreciosData] = useState({
-    'ZaraMede': '',
-    'ZaraCauca': '',
-    'CaucaMede': ''
-  });
+  const [showEstadoModal,  setShowEstadoModal]  = useState(false);
+  const [isSaving,  setIsSaving]  = useState(false);
+  const [precios,   setPrecios]   = useState({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' });
+  const [estadoSel, setEstadoSel] = useState('');
 
-  // Estados para el modal de estado del carro
-  const [showEstadoModal, setShowEstadoModal] = useState(false);
-  const [isSavingEstado, setIsSavingEstado] = useState(false);
-  const [estadoSeleccionado, setEstadoSeleccionado] = useState('');
-  const [estadosDisponibles] = useState([
-    { id: 1, nombre: '🚗 Esperando Pasajeros', color: '#10B981' },
-    { id: 2, nombre: '🛣️ En Viaje', color: '#F59E0B' },
-    { id: 3, nombre: '🔧 En Mantenimiento', color: '#EF4444' },
-    { id: 4, nombre: '❌ Fuera de Servicio', color: '#6B7280' }
-  ]);
+  const { toast, showToast, hideToast } = useToast();
+  const navigate = useNavigate();
 
-  // Estados para las estadísticas
-  const [stats, setStats] = useState({
-    totalVehiculos: 0,
-    usuariosRegistrados: 0,
-    reservasHoy: 0
-  });
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
-
+  // ── Auth + carga stats ────────────────────────────────────────────────────
   useEffect(() => {
-    const storedUserData = localStorage.getItem('userData');
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        
-        // Verificar si es administrador (tanto 'admin' como 'administrador')
-        if (user.rol === 'admin' || user.rol === 'administrador') {
-          setUserData(user);
-          
-          // Cargar estadísticas después de establecer userData
-          fetchStats();
-        } else {
-          navigate('/indexLogin');
-        }
-      } catch (error) {
-        navigate('/login');
-      }
-    } else {
-      navigate('/login');
-    }
+    const stored = localStorage.getItem('userData');
+    if (!stored) { navigate('/login'); return; }
+    try {
+      const user = JSON.parse(stored);
+      if (user.rol !== 'admin' && user.rol !== 'administrador') { navigate('/indexLogin'); return; }
+      setUserData(user);
+      fetchStats();
+    } catch { navigate('/login'); }
     setIsLoading(false);
   }, [navigate]);
 
-  // Función para cargar estadísticas del sistema
   const fetchStats = async () => {
     setIsLoadingStats(true);
     try {
-      const [vehiculosResponse, reservasResponse] = await Promise.all([
-        listarCarrosApi(),
-        listarReservasApi(),
-      ]);
-
-      // Procesar total de vehículos (listarCarrosApi usa fetch → devuelve JSON)
-      const vehiculosData = Array.isArray(vehiculosResponse.data)
-        ? vehiculosResponse.data
-        : [];
-      const totalVehiculos = vehiculosData.length;
-
-      // Procesar reservas de hoy (listarReservasApi usa fetch → devuelve JSON)
-      const reservasData = Array.isArray(reservasResponse)
-        ? reservasResponse
-        : (reservasResponse.data ?? []);
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      const reservasHoy = reservasData.filter((r) => {
-        if (!r.created_at) return false;
-        return new Date(r.created_at).toISOString().split('T')[0] === fechaHoy;
-      }).length;
-      const usuariosRegistrados = reservasData.length;
-
-      setStats({
-        totalVehiculos,
-        usuariosRegistrados,
-        reservasHoy
-      });
-    } catch (error) {
-      
-      // En caso de error, mostrar mensaje y mantener valores por defecto
-      if (error.response && error.response.status === 404) {
-      }
-      
-      // Mantener valores por defecto
-      setStats({
-        totalVehiculos: 0,
-        usuariosRegistrados: 0,
-        reservasHoy: 0
-      });
+      const [vRes, rRes] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
+      const vehiculos  = Array.isArray(vRes.data) ? vRes.data : [];
+      const reservas   = Array.isArray(rRes) ? rRes : (rRes.data ?? []);
+      const fechaHoy   = new Date().toISOString().split('T')[0];
+      const hoy        = reservas.filter(r => r.created_at && new Date(r.created_at).toISOString().startsWith(fechaHoy)).length;
+      setStats({ totalVehiculos: vehiculos.length, totalReservas: reservas.length, reservasHoy: hoy });
+    } catch {
+      setStats({ totalVehiculos: 0, totalReservas: 0, reservasHoy: 0 });
     } finally {
       setIsLoadingStats(false);
     }
   };
 
-  const _handleLogout = () => {
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    setUserData(null);
-    navigate('/index');
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-white text-xl">Cargando...</div>
-      </div>
-    );
-  }
-
-  if (!userData) {
-    return null;
-  }
-
-  const showToastNotification = (message, type = 'success') => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 4000);
-  };
-
+  // ── Guardar precios ────────────────────────────────────────────────────────
   const handleSavePrecios = async (e) => {
     e.preventDefault();
-    
-    if (!preciosData['ZaraMede'] || !preciosData['ZaraCauca'] || !preciosData['CaucaMede']) {
-      showToastNotification('Por favor, completa todos los campos de precios', 'error');
-      return;
+    if (!precios.ZaraMede || !precios.ZaraCauca || !precios.CaucaMede) {
+      showToast('Completa todos los campos de precio.', 'error'); return;
     }
-    
-    setIsSavingPrecios(true);
-    
-    const dataToSend = {
-      'ZaraMede': parseFloat(preciosData['ZaraMede']) || 0,
-      'ZaraCauca': parseFloat(preciosData['ZaraCauca']) || 0,
-      'CaucaMede': parseFloat(preciosData['CaucaMede']) || 0
-    };
-    
+    setIsSaving(true);
     try {
-      const response = await agregarPrecioApi(dataToSend);
-      
-      if (response.data && response.data.success) {
-        showToastNotification('¡Precios guardados exitosamente! 💰');
-        
-        setPreciosData({
-          'ZaraMede': '',
-          'ZaraCauca': '',
-          'CaucaMede': ''
-        });
-        
-        setShowPreciosModal(false);
-      } else {
-        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
-      }
-      
-    } catch (error) {
-      if (error.response) {
-        if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
-        } else if (error.response.status === 422) {
-          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-        } else {
-          showToastNotification(`Error: ${error.response.data.message || 'No se pudieron guardar los precios'}`, 'error');
-        }
-      } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
-      } else {
-        showToastNotification('Error inesperado al guardar los precios', 'error');
-      }
-    } finally {
-      setIsSavingPrecios(false);
-    }
+      const payload = {
+        ZaraMede:  parseFloat(precios.ZaraMede),
+        ZaraCauca: parseFloat(precios.ZaraCauca),
+        CaucaMede: parseFloat(precios.CaucaMede),
+      };
+      await agregarPrecioApi(payload);
+      showToast('Precios guardados correctamente.', 'success');
+      setPrecios({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' });
+      setShowPreciosModal(false);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al guardar precios.', 'error');
+    } finally { setIsSaving(false); }
   };
 
+  // ── Guardar estado ────────────────────────────────────────────────────────
   const handleSaveEstado = async (e) => {
     e.preventDefault();
-    
-    if (!estadoSeleccionado) {
-      showToastNotification('Por favor, selecciona un estado del viaje', 'error');
-      return;
-    }
-    
-    setIsSavingEstado(true);
-    
-    const estadoElegido = estadosDisponibles.find(estado => estado.id === parseInt(estadoSeleccionado));
-    
-    const dataToSend = {
-      Estados: estadoElegido.nombre
-    };
-    
+    if (!estadoSel) { showToast('Selecciona un estado.', 'error'); return; }
+    setIsSaving(true);
     try {
-      const response = await agregarEstadoApi(dataToSend);
-      
-      if (response.data && response.data.success) {
-        showToastNotification('¡Estado del viaje guardado exitosamente! 🚗');
-        
-        setEstadoSeleccionado('');
-        setShowEstadoModal(false);
-      } else {
-        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
-      }
-      
-    } catch (error) {
-      if (error.response) {
-        if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
-        } else if (error.response.status === 422) {
-          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-        } else {
-          showToastNotification(`Error: ${error.response.data.message || 'No se pudo guardar el estado'}`, 'error');
-        }
-      } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
-      } else {
-        showToastNotification('Error inesperado al guardar el estado', 'error');
-      }
-    } finally {
-      setIsSavingEstado(false);
-    }
+      const estado = ESTADOS.find(s => s.id === parseInt(estadoSel));
+      await agregarEstadoApi({ Estados: estado.label });
+      showToast('Estado guardado correctamente.', 'success');
+      setEstadoSel('');
+      setShowEstadoModal(false);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al guardar estado.', 'error');
+    } finally { setIsSaving(false); }
   };
 
-  const limpiarFormulario = () => {
-    setPreciosData({
-      'ZaraMede': '',
-      'ZaraCauca': '',
-      'CaucaMede': ''
-    });
-  };
-
-  const limpiarFormularioEstado = () => {
-    setEstadoSeleccionado('');
-  };
-
-  const abrirModalPrecios = () => {
-    setShowPreciosModal(true);
-    limpiarFormulario();
-  };
-
-  const abrirModalEstado = () => {
-    setShowEstadoModal(true);
-    limpiarFormularioEstado();
-  };
+  if (isLoading) return <LoadingScreen message="Cargando panel..." />;
+  if (!userData)  return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {showNotification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaCar className="h-8 w-8 text-green-500" />
-              </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {notificationMessage}
-                </p>
-              </div>
-              <div className="ml-auto pl-3">
-                <button
-                  onClick={() => setShowNotification(false)}
-                  className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
-                >
-                  <span className="sr-only">Cerrar</span>
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
+    <PageBg>
+      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
+      <InnerNavbar userData={userData} title="Panel Administrativo" backTo="/indexLogin" />
+
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+
+        {/* Header */}
+        <div className="animate-fade-in-up">
+          <h1 className="text-2xl md:text-3xl font-extrabold text-white">Panel Administrativo</h1>
+          <p className="text-blue-200 text-sm mt-1">Gestiona el sistema Mecaza desde aquí.</p>
         </div>
-      )}
 
-      <nav className="bg-white shadow-lg relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            <div className="flex items-center space-x-3">
-              <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
-              <span className="text-2xl font-bold text-blue-900">Mecaza Admin</span>
-            </div>
-
-            <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  placeholder="Buscar en el sistema..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-              </div>
-            </div>
-
-            <div className="hidden md:flex items-center space-x-6">
-              <a href="/" className="text-blue-900 hover:text-blue-700 font-medium transition-colors">
-                Inicio
-              </a>
-              <a href="/index2" className="text-blue-900 hover:text-blue-700 font-medium transition-colors">
-                Panel Admin
-              </a>
-              <UserMenu userData={userData} />
-            </div>
-
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-blue-900 hover:text-blue-700 p-2"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-
-          {isMenuOpen && (
-            <div className="md:hidden bg-white border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                <div className="relative mb-4">
-                  <input
-                    type="text"
-                    placeholder="Buscar en el sistema..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                
-                <a 
-                  href="/" 
-                  className="block px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  Inicio
-                </a>
-                <a 
-                  href="/index2" 
-                  className="block px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  Panel Admin
-                </a>
-                <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/index'); }}
-                  className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
-                >
-                  Cerrar Sesión
-                </button>
-              </div>
-            </div>
-          )}
+        {/* Stats */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 animate-fade-in-up delay-100">
+          <StatCard icon={<FaCar />}       label="Total vehículos"  value={stats.totalVehiculos} color="blue"   loading={isLoadingStats} />
+          <StatCard icon={<FaTicketAlt />} label="Total reservas"   value={stats.totalReservas}  color="violet" loading={isLoadingStats} />
+          <StatCard icon={<FaUsers />}     label="Reservas hoy"     value={stats.reservasHoy}    color="green"  loading={isLoadingStats} />
         </div>
-      </nav>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
-              Panel Administrativo
-            </h1>
-            <p className="text-lg text-gray-600 mb-6">
-              Gestiona vehículos y usuarios del sistema Mecaza
-            </p>
-            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 max-w-2xl mx-auto">
-              <div className="flex items-start">
-                <FaCog className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
-                <div>
-                  <h4 className="text-sm font-medium text-blue-800">Información de Estadísticas</h4>
-                  <p className="text-xs text-blue-700 mt-1">
-                    Las estadísticas se obtienen de las APIs disponibles. El número de usuarios es una estimación basada en los vehículos registrados.
-                  </p>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={fetchStats}
-              disabled={isLoadingStats}
-              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 font-semibold flex items-center mx-auto shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isLoadingStats ? (
-                <>
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                  Actualizando...
-                </>
-              ) : (
-                <>
-                  <FaSync className="mr-2" />
-                  Actualizar Estadísticas
-                </>
-              )}
-            </button>
-          </div>
-
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6 mb-8">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center mb-4">
-                <div className="bg-green-600 p-3 rounded-lg mr-4">
-                  <FaCar className="text-2xl text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-green-900">Agregar Estado del Viaje</h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Configura los estados de los viajes: esperando pasajeros, en viaje, cupos llenos y otros estados del sistema.
-              </p>
-              <button
-                onClick={abrirModalEstado}
-                className="w-full bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-              >
-                <FaPlus className="mr-2" />
-                Agregar Estado
-              </button>
-            </div>
-
-            <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-6 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center mb-4">
-                <div className="bg-blue-600 p-3 rounded-lg mr-4">
-                  <FaEnvelope className="text-2xl text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-blue-900">Agregar Precios</h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Gestiona precios de viajes, configura rutas y administra la información de los vehículos del sistema.
-              </p>
-              <button
-                onClick={abrirModalPrecios}
-                className="w-full bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-              >
-                <FaPlus className="mr-2" />
-                Agregar Precios
-              </button>
-            </div>
-
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-xl border-2 border-purple-200 hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center mb-4">
-                <div className="bg-purple-600 p-3 rounded-lg mr-4">
-                  <FaCog className="text-2xl text-white" />
-                </div>
-                <h3 className="text-xl font-bold text-purple-900">Ver Estadísticas</h3>
-              </div>
-              <p className="text-gray-600 mb-6 leading-relaxed">
-                Consulta estadísticas detalladas de vehículos, usuarios activos y viajes realizados.
-              </p>
-              <button
-                className="w-full bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg"
-              >
-                <FaUsers className="mr-2" />
-                Ver Estadísticas
-              </button>
-            </div>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="bg-gradient-to-br from-green-50 to-green-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center">
-                <FaCar className="text-2xl text-green-900 mr-3" />
-                <div>
-                  <h3 className="text-xl font-semibold text-green-900">Total Vehículos</h3>
-                  <p className="text-2xl font-bold text-green-700">{stats.totalVehiculos}</p>
-                  <p className="text-xs text-green-600 mt-1">Registrados en el sistema</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center">
-                <FaUsers className="text-2xl text-purple-900 mr-3" />
-                <div>
-                  <h3 className="text-xl font-semibold text-purple-900">Total Reservas</h3>
-                  <p className="text-2xl font-bold text-purple-700">{stats.usuariosRegistrados}</p>
-                  <p className="text-xs text-purple-600 mt-1">Total de reservas</p>
-                </div>
-              </div>
-            </div>
-            <div className="bg-gradient-to-br from-orange-50 to-orange-100 p-6 rounded-lg hover:shadow-lg transition-all duration-300 transform hover:scale-105">
-              <div className="flex items-center">
-                <FaCog className="text-2xl text-orange-900 mr-3" />
-                <div>
-                  <h3 className="text-xl font-semibold text-orange-900">Reservas Hoy</h3>
-                  <p className="text-2xl font-bold text-orange-700">{stats.reservasHoy}</p>
-                  <p className="text-xs text-orange-600 mt-1">Realizadas hoy</p>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* Refresh */}
+        <div className="flex justify-end animate-fade-in">
+          <button
+            onClick={fetchStats}
+            disabled={isLoadingStats}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 text-white text-sm font-medium rounded-xl border border-white/20 hover:bg-white/20 transition-all disabled:opacity-50"
+          >
+            <FaSync className={isLoadingStats ? 'animate-spin' : ''} />
+            {isLoadingStats ? 'Actualizando...' : 'Actualizar stats'}
+          </button>
         </div>
+
+        {/* Acciones */}
+        <SectionCard title="Acciones del sistema" icon={<FaCog className="text-sm" />} className="animate-fade-in-up delay-200">
+          <div className="grid sm:grid-cols-3 gap-4 mt-1">
+            <ActionCard
+              icon={<FaCar />}
+              title="Estado del viaje"
+              desc="Configura los estados disponibles para los viajes del sistema."
+              btnLabel="Agregar estado"
+              btnColor="green"
+              onClick={() => setShowEstadoModal(true)}
+            />
+            <ActionCard
+              icon={<FaTicketAlt />}
+              title="Precios de rutas"
+              desc="Gestiona los precios por ruta: Zaragoza, Caucasia y Medellín."
+              btnLabel="Agregar precios"
+              btnColor="blue"
+              onClick={() => setShowPreciosModal(true)}
+            />
+            <ActionCard
+              icon={<FaUsers />}
+              title="Ver usuarios"
+              desc="Consulta y administra la lista completa de usuarios registrados."
+              btnLabel="Ver usuarios"
+              btnColor="violet"
+              onClick={() => navigate('/lista-usuarios')}
+            />
+          </div>
+        </SectionCard>
       </div>
 
-      {/* Modal Seleccionar Estado del Viaje */}
+      {/* Modal Estado */}
       {showEstadoModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4">
-            <button
-              onClick={() => {
-                setShowEstadoModal(false);
-                limpiarFormularioEstado();
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-              aria-label="Cerrar"
-            >
-              &times;
-            </button>
-            
-            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">
-              Guardar Estado del Viaje
-            </h2>
-
-            <form onSubmit={handleSaveEstado} className="space-y-6">
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Estados Disponibles
-                </h3>
-                
-                {/* Selector de Estado */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-3">Selecciona el estado del viaje *</label>
-                  <select
-                    value={estadoSeleccionado}
-                    onChange={(e) => setEstadoSeleccionado(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  >
-                    <option value="">Selecciona un estado...</option>
-                    {estadosDisponibles.map((estado) => (
-                      <option key={estado.id} value={estado.id}>
-                        {estado.nombre}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* Información adicional */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <FaCar className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
-                    <div>
-                      <h4 className="text-sm font-medium text-blue-800">Estados de Viaje</h4>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Selecciona el estado actual del viaje. Esto ayudará a los pasajeros a conocer el estado de su viaje.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Botones */}
-                <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                  <button
-                    type="submit"
-                    disabled={isSavingEstado || !estadoSeleccionado}
-                    className="flex-1 bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
-                  >
-                    {isSavingEstado ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <FaCar className="mr-2" />
-                        Guardar Estado
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowEstadoModal(false);
-                      limpiarFormularioEstado();
-                    }}
-                    disabled={isSavingEstado}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
+        <Modal title="Agregar Estado de Viaje" onClose={() => { setShowEstadoModal(false); setEstadoSel(''); }}>
+          <form onSubmit={handleSaveEstado} className="space-y-4">
+            <p className="text-sm text-gray-500">Selecciona el estado que deseas configurar en el sistema.</p>
+            <div className="grid grid-cols-1 gap-2">
+              {ESTADOS.map(e => (
+                <label
+                  key={e.id}
+                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                    estadoSel == e.id ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-300'
+                  }`}
+                >
+                  <input type="radio" name="estado" value={e.id} checked={estadoSel == e.id} onChange={ev => setEstadoSel(ev.target.value)} className="sr-only" />
+                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${e.color}`}>{e.label}</span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={isSaving || !estadoSel} className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
+                {isSaving ? 'Guardando...' : 'Guardar estado'}
+              </button>
+              <button type="button" onClick={() => setShowEstadoModal(false)} className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
-      {/* Modal Agregar Precios */}
+      {/* Modal Precios */}
       {showPreciosModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-4xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-            <button
-              onClick={() => {
-                setShowPreciosModal(false);
-                limpiarFormulario();
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-              aria-label="Cerrar"
-            >
-              &times;
-            </button>
-            
-            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">
-              Agregar Precios de Viajes
-            </h2>
-
-            <form onSubmit={handleSavePrecios} className="space-y-5">
-              <div className="border-t pt-6">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Agregar Nuevos Precios
-                </h3>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Caucasia - Medellín (cauca-mede)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                    <input
-                      type="text"
-                      min="0"
-                      step="0.01"
-                      value={preciosData?.['CaucaMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'CaucaMede': e.target.value}))}
-                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Zaragoza - Medellín (zara-mede)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                    <input
-                      type="text"
-                      min="0"
-                      step="0.01"
-                      value={preciosData?.['ZaraMede'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraMede': e.target.value}))}
-                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Precio Zaragoza - Caucasia (zara-cauca)</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-2.5 text-gray-500">$</span>
-                    <input
-                      type="text"
-                      min="0"
-                      step="0.01"
-                      value={preciosData?.['ZaraCauca'] || ''}
-                      onChange={(e) => setPreciosData(prev => ({...prev, 'ZaraCauca': e.target.value}))}
-                      className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="0.00"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <div className="flex items-start">
-                    <FaCar className="text-blue-600 mt-1 mr-2 flex-shrink-0" />
-                    <div>
-                      <h4 className="text-sm font-medium text-blue-800">Información de Precios</h4>
-                      <p className="text-xs text-blue-700 mt-1">
-                        Los precios configurados aquí se aplicarán a todos los viajes en estas rutas. Asegúrate de establecer precios competitivos y rentables.
-                      </p>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                  <button
-                    type="submit"
-                    disabled={isSavingPrecios}
-                    className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center font-semibold"
-                  >
-                    {isSavingPrecios ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Guardando...
-                      </>
-                    ) : (
-                      <>
-                        <FaCar className="mr-2" />
-                        Guardar Precios
-                      </>
-                    )}
-                  </button>
-                  
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowPreciosModal(false);
-                      setPreciosData({
-                        'ZaraMede': '',
-                        'ZaraCauca': '',
-                        'CaucaMede': ''
-                      });
-                    }}
-                    disabled={isSavingPrecios}
-                    className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors disabled:opacity-50"
-                  >
-                    Cancelar
-                  </button>
+        <Modal title="Agregar Precios de Rutas" onClose={() => { setShowPreciosModal(false); setPrecios({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' }); }}>
+          <form onSubmit={handleSavePrecios} className="space-y-4">
+            <p className="text-sm text-gray-500">Configura los precios por ruta en pesos colombianos.</p>
+            {RUTAS.map(({ key, label }) => (
+              <div key={key}>
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
+                <div className="relative">
+                  <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-medium">$</span>
+                  <input
+                    type="number" min="0" step="0.01" required
+                    value={precios[key]}
+                    onChange={e => setPrecios(p => ({ ...p, [key]: e.target.value }))}
+                    placeholder="0.00"
+                    className="w-full pl-7 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
                 </div>
               </div>
-            </form>
-          </div>
-        </div>
+            ))}
+            <div className="flex gap-3 pt-2">
+              <button type="submit" disabled={isSaving} className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
+                {isSaving ? 'Guardando...' : 'Guardar precios'}
+              </button>
+              <button type="button" onClick={() => setShowPreciosModal(false)} className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
-      
-      <style>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slideIn 0.3s ease-out;
-        }
-      `}</style>
-    </div>
+    </PageBg>
   );
 };
 

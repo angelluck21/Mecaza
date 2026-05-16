@@ -1,426 +1,260 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaUser, FaEnvelope, FaPhone, FaEye, FaEdit, FaTrash, FaPlus, FaSearch } from 'react-icons/fa';
-import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../../components/ui/UserMenu';
-import axios from 'axios';
+import { FaUser, FaPhone, FaTrash, FaSearch, FaSync } from 'react-icons/fa';
+
+import PageBg            from '../../components/ui/PageBg';
+import InnerNavbar       from '../../components/layout/InnerNavbar';
+import LoadingScreen     from '../../components/ui/LoadingScreen';
+import ToastNotification from '../../components/ui/ToastNotification';
+import { useToast }      from '../../hooks/useToast';
+import axios             from 'axios';
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+const ROL_BADGE = {
+  conductor:     'bg-blue-100   text-blue-700   border-blue-200',
+  usuario:       'bg-green-100  text-green-700  border-green-200',
+  admin:         'bg-violet-100 text-violet-700 border-violet-200',
+  administrador: 'bg-violet-100 text-violet-700 border-violet-200',
+};
+const rolBadge = (r) => ROL_BADGE[r?.toLowerCase()] ?? 'bg-gray-100 text-gray-600 border-gray-200';
+
+// ── Component ─────────────────────────────────────────────────────────────────
 
 const ListaUsuarios = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
-  const [users, setUsers] = useState([]);
-  const [filteredUsers, setFilteredUsers] = useState([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [isLoadingUsers, setIsLoadingUsers] = useState(true);
+  const [userData,       setUserData]       = useState(null);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [users,          setUsers]          = useState([]);
+  const [filteredUsers,  setFilteredUsers]  = useState([]);
+  const [searchTerm,     setSearchTerm]     = useState('');
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [showConfirm,    setShowConfirm]    = useState(false);
+  const [userToDelete,   setUserToDelete]   = useState(null);
+  const [isDeleting,     setIsDeleting]     = useState(false);
+
+  const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
+  // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Verificar autenticación
-    const storedUserData = localStorage.getItem('userData');
+    const stored    = localStorage.getItem('userData');
     const authToken = localStorage.getItem('authToken');
-    
-    if (!authToken) {
-      navigate('/login');
-      return;
-    }
-    
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        setUserData(user);
-      } catch (error) {
-        navigate('/login');
-        return;
-      }
-    } else {
-      navigate('/login');
-      return;
-    }
+    if (!stored || !authToken) { navigate('/login'); return; }
+    try {
+      setUserData(JSON.parse(stored));
+    } catch { navigate('/login'); return; }
     setIsLoading(false);
   }, [navigate]);
 
-  useEffect(() => {
-    if (userData) {
-      fetchUsers();
-    }
-  }, [userData]);
+  useEffect(() => { if (userData) fetchUsers(); }, [userData]);
 
+  // ── Búsqueda ──────────────────────────────────────────────────────────────
   useEffect(() => {
-    // Filtrar usuarios basado en el término de búsqueda
-    const filtered = users.filter(user => 
-      user.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.email?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      user.id?.toString().includes(searchTerm) ||
-      user.rol?.toLowerCase().includes(searchTerm.toLowerCase())
-    );
-    setFilteredUsers(filtered);
+    const lower = searchTerm.toLowerCase();
+    setFilteredUsers(users.filter(u =>
+      u.name?.toLowerCase().includes(lower) ||
+      u.email?.toLowerCase().includes(lower) ||
+      u.id?.toString().includes(lower) ||
+      u.rol?.toLowerCase().includes(lower)
+    ));
   }, [searchTerm, users]);
 
+  // ── Fetch ────────────────────────────────────────────────────────────────
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/usuarios', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
+      const { data } = await axios.get('https://api-mecaza.geekcorplab.com/api/usuarios', {
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}`, Accept: 'application/json' },
       });
-
-      if (response.data.success) {
-        setUsers(response.data.users);
-        setFilteredUsers(response.data.users);
-        showToastNotification(`Se cargaron ${response.data.total} usuarios exitosamente`);
+      if (data.success) {
+        setUsers(data.users);
+        setFilteredUsers(data.users);
+        showToast(`${data.total} usuarios cargados.`, 'success');
       } else {
-        showToastNotification('Error al cargar usuarios', 'error');
+        showToast('Error al cargar usuarios.', 'error');
       }
-    } catch (error) {
-      
-      if (error.response) {
-        const statusCode = error.response.status;
-        if (statusCode === 400) {
-          showToastNotification('Error 400: Solicitud incorrecta al cargar usuarios. Verifica tu autenticación.', 'error');
-        } else if (statusCode === 401) {
-          showToastNotification('Error 401: No autorizado. Inicia sesión nuevamente.', 'error');
-          navigate('/login');
-        } else if (statusCode === 500) {
-          showToastNotification('Error del servidor al cargar usuarios. Intenta nuevamente.', 'error');
-        } else {
-          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error desconocido'}`, 'error');
-        }
+    } catch (err) {
+      const s = err.response?.status;
+      if (s === 401) { showToast('Sesión expirada.', 'error'); navigate('/login'); }
+      else showToast('Error al cargar usuarios.', 'error');
+    } finally { setIsLoadingUsers(false); }
+  };
+
+  // ── Eliminar ──────────────────────────────────────────────────────────────
+  const confirmDelete = async () => {
+    if (!userToDelete) return;
+    setIsDeleting(true);
+    try {
+      const { data } = await axios.delete(`https://api-mecaza.geekcorplab.com/api/usuarios/${userToDelete.id}`, {
+        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}`, Accept: 'application/json' },
+      });
+      if (data.success) {
+        showToast('Usuario eliminado correctamente.', 'success');
+        fetchUsers();
       } else {
-        showToastNotification('Error de conexión al cargar usuarios', 'error');
+        showToast(data.message || 'Error al eliminar.', 'error');
       }
-    } finally {
-      setIsLoadingUsers(false);
-    }
+    } catch { showToast('Error al eliminar el usuario.', 'error'); }
+    finally { setIsDeleting(false); setShowConfirm(false); setUserToDelete(null); }
   };
 
-  const showToastNotification = (message, type = 'success') => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 4000);
-  };
-
-  const handleViewUser = (userId) => {
-    navigate(`/usuario/${userId}`);
-  };
-
-  const handleEditUser = (userId) => {
-    navigate(`/editar-usuario/${userId}`);
-  };
-
-  const handleDeleteUser = async (userId) => {
-    if (window.confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
-      try {
-        const response = await axios.delete(`https://api-mecaza.geekcorplab.com/api/usuarios/${userId}`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          }
-        });
-
-        if (response.data.success) {
-          showToastNotification('Usuario eliminado exitosamente');
-          fetchUsers(); // Recargar la lista
-        } else {
-          showToastNotification(response.data.message || 'Error al eliminar usuario', 'error');
-        }
-      } catch (error) {
-        showToastNotification('Error al eliminar el usuario', 'error');
-      }
-    }
-  };
-
-  const getRolBadgeColor = (rol) => {
-    switch (rol?.toLowerCase()) {
-      case 'conductor':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'usuario':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'admin':
-        return 'bg-red-100 text-red-800 border-red-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
-  };
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-white text-xl">Cargando...</div>
-      </div>
-    );
-  }
-
-  if (!userData) {
-    return null;
-  }
+  if (isLoading) return <LoadingScreen message="Cargando usuarios..." />;
+  if (!userData)  return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {/* Notificación Toast */}
-      {showNotification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className="bg-white rounded-lg shadow-2xl border-l-4 border-green-500 p-4 max-w-sm">
-            <div className="flex items-center">
-              <div className="flex-shrink-0">
-                <FaUser className="h-8 w-8 text-green-500" />
+    <PageBg>
+      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
+      <InnerNavbar userData={userData} title="Lista de Usuarios" backTo="/indexAdmin" />
+
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-5">
+
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 animate-fade-in-up">
+          <div>
+            <h1 className="text-2xl font-extrabold text-white">Lista de Usuarios</h1>
+            <p className="text-blue-200 text-sm">
+              {filteredUsers.length} de {users.length} usuarios{searchTerm && ` — filtrado por "${searchTerm}"`}
+            </p>
+          </div>
+          <button
+            onClick={fetchUsers}
+            disabled={isLoadingUsers}
+            className="flex items-center gap-2 px-4 py-2 bg-white/10 border border-white/20 text-white text-sm font-medium rounded-xl hover:bg-white/20 transition-all disabled:opacity-50"
+          >
+            <FaSync className={isLoadingUsers ? 'animate-spin' : ''} />
+            {isLoadingUsers ? 'Actualizando...' : 'Actualizar'}
+          </button>
+        </div>
+
+        {/* Buscador */}
+        <div className="relative animate-fade-in-up delay-100">
+          <FaSearch className="absolute left-3.5 top-3 text-gray-400 text-sm" />
+          <input
+            type="text"
+            placeholder="Buscar por nombre, email, ID o rol..."
+            value={searchTerm}
+            onChange={e => setSearchTerm(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+          />
+        </div>
+
+        {/* Tabla */}
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in-up delay-200">
+          <div className="h-0.5 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
+
+          {isLoadingUsers ? (
+            <div className="flex items-center justify-center py-16 gap-3">
+              <div className="w-6 h-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-500 text-sm">Cargando usuarios...</span>
+            </div>
+          ) : filteredUsers.length === 0 ? (
+            <div className="text-center py-16">
+              <div className="text-5xl mb-3">👤</div>
+              <p className="text-gray-500 font-medium">
+                {searchTerm ? 'Sin resultados para tu búsqueda' : 'No hay usuarios registrados'}
+              </p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="min-w-full">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-100">
+                    {['ID', 'Usuario', 'Contacto', 'Rol', 'Registro', 'Acciones'].map(h => (
+                      <th key={h} className="px-5 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-50">
+                  {filteredUsers.map((u, idx) => (
+                    <tr
+                      key={u.id}
+                      className="hover:bg-violet-50/40 transition-colors"
+                      style={{ animationDelay: `${idx * 40}ms` }}
+                    >
+                      <td className="px-5 py-3.5 text-xs font-mono text-gray-400">#{u.id}</td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center shrink-0">
+                            <FaUser className="text-white text-xs" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-gray-800">{u.name || '—'}</p>
+                            <p className="text-xs text-gray-400">{u.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                          <FaPhone className="text-gray-300 text-xs" />
+                          {u.tel || '—'}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${rolBadge(u.rol)}`}>
+                          {u.rol || '—'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5 text-xs text-gray-400">
+                        {u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <button
+                          onClick={() => { setUserToDelete(u); setShowConfirm(true); }}
+                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Eliminar usuario"
+                        >
+                          <FaTrash className="text-xs" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Modal confirmar eliminación */}
+      {showConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-scale-in text-center overflow-hidden">
+            <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-5">
+              <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
+                <FaTrash className="text-white text-xl" />
               </div>
-              <div className="ml-3">
-                <p className="text-sm font-medium text-gray-900">
-                  {notificationMessage}
-                </p>
-              </div>
-              <div className="ml-auto pl-3">
+              <h3 className="text-lg font-bold text-white">Eliminar usuario</h3>
+              <p className="text-red-100 text-sm mt-1">{userToDelete?.name || userToDelete?.email}</p>
+            </div>
+            <div className="p-6">
+              <p className="text-sm text-gray-500 mb-5">
+                Esta acción es <span className="font-semibold text-red-600">irreversible</span>. ¿Confirmas?
+              </p>
+              <div className="flex gap-3">
                 <button
-                  onClick={() => setShowNotification(false)}
-                  className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none"
+                  onClick={() => { setShowConfirm(false); setUserToDelete(null); }}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
                 >
-                  <span className="sr-only">Cerrar</span>
-                  <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                  </svg>
+                  Cancelar
+                </button>
+                <button
+                  onClick={confirmDelete}
+                  disabled={isDeleting}
+                  className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-60"
+                >
+                  {isDeleting ? 'Eliminando...' : 'Eliminar'}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-
-      {/* Navbar */}
-      <nav className="bg-white shadow-lg relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
-            <div className="flex items-center space-x-3">
-              <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
-              <span className="text-2xl font-bold text-blue-900">Mecaza</span>
-            </div>
-
-            {/* Navegación - Desktop */}
-            <div className="hidden md:flex items-center space-x-6">
-              <button
-                onClick={() => navigate(-1)}
-                className="text-blue-900 hover:text-blue-700 font-medium transition-colors flex items-center"
-              >
-                ← Volver
-              </button>
-              <UserMenu userData={userData} />
-            </div>
-
-            {/* Botón menú móvil */}
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-blue-900 hover:text-blue-700 p-2"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Menú móvil */}
-          {isMenuOpen && (
-            <div className="md:hidden bg-white border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                <button
-                  onClick={() => navigate(-1)}
-                  className="w-full text-left px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  ← Volver
-                </button>
-                <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/index'); }}
-                  className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
-                >
-                  Cerrar Sesión
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      {/* Contenido principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
-          {/* Header */}
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8">
-            <div>
-              <h1 className="text-4xl font-extrabold text-blue-900 mb-2">
-                Lista de Usuarios
-              </h1>
-              <p className="text-lg text-gray-600">
-                Gestiona todos los usuarios registrados en el sistema
-              </p>
-            </div>
-            <div className="mt-4 md:mt-0">
-              <button
-                onClick={() => navigate('/registrar')}
-                className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition-colors font-semibold flex items-center"
-              >
-                <FaPlus className="mr-2" />
-                Agregar Usuario
-              </button>
-            </div>
-          </div>
-
-          {/* Barra de búsqueda */}
-          <div className="mb-6">
-            <div className="relative">
-              <FaSearch className="absolute left-3 top-3 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar por nombre, email, ID o rol..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
-
-          {/* Tabla de usuarios */}
-          <div className="overflow-x-auto">
-            {isLoadingUsers ? (
-              <div className="flex justify-center items-center py-12">
-                <div className="text-gray-500 text-lg">Cargando usuarios...</div>
-              </div>
-            ) : filteredUsers.length === 0 ? (
-              <div className="text-center py-12">
-                <FaUser className="mx-auto h-12 w-12 text-gray-400" />
-                <h3 className="mt-2 text-sm font-medium text-gray-900">No se encontraron usuarios</h3>
-                <p className="mt-1 text-sm text-gray-500">
-                  {searchTerm ? 'Intenta con otros términos de búsqueda.' : 'No hay usuarios registrados.'}
-                </p>
-              </div>
-            ) : (
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Usuario
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Contacto
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Rol
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Fecha Registro
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Acciones
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredUsers.map((user) => (
-                    <tr key={user.id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">
-                          #{user.id}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center">
-                          <div className="flex-shrink-0 h-10 w-10">
-                            <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                              <FaUser className="h-5 w-5 text-blue-600" />
-                            </div>
-                          </div>
-                          <div className="ml-4">
-                            <div className="text-sm font-medium text-gray-900">
-                              {user.name || 'Sin nombre'}
-                            </div>
-                            <div className="text-sm text-gray-500">
-                              {user.email}
-                            </div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="flex items-center text-sm text-gray-900">
-                          <FaPhone className="mr-2 text-gray-400" />
-                          {user.tel || 'Sin teléfono'}
-                        </div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full border ${getRolBadgeColor(user.rol)}`}>
-                          {user.rol || 'Sin rol'}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.created_at ? new Date(user.created_at).toLocaleDateString('es-ES') : 'N/A'}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                        <div className="flex space-x-2">
-                          <button
-                            onClick={() => handleViewUser(user.id)}
-                            className="text-blue-600 hover:text-blue-900 p-1 rounded"
-                            title="Ver detalles"
-                          >
-                            <FaEye className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleEditUser(user.id)}
-                            className="text-green-600 hover:text-green-900 p-1 rounded"
-                            title="Editar"
-                          >
-                            <FaEdit className="h-4 w-4" />
-                          </button>
-                          <button
-                            onClick={() => handleDeleteUser(user.id)}
-                            className="text-red-600 hover:text-red-900 p-1 rounded"
-                            title="Eliminar"
-                          >
-                            <FaTrash className="h-4 w-4" />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
-
-          {/* Información adicional */}
-          <div className="mt-6 text-sm text-gray-500 text-center">
-            Mostrando {filteredUsers.length} de {users.length} usuarios
-            {searchTerm && ` (filtrados por "${searchTerm}")`}
-          </div>
-        </div>
-      </div>
-      
-      {/* Estilos CSS para animaciones */}
-      <style>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slideIn 0.3s ease-out;
-        }
-      `}</style>
-    </div>
+    </PageBg>
   );
 };
 
-export default ListaUsuarios; 
+export default ListaUsuarios;
