@@ -17,6 +17,7 @@ export const ENDPOINTS = {
   CREAR_RESERVA: `${API_BASE_URL}/crearreserva`,
   ELIMINAR_RESERVA: (id) => `${API_BASE_URL}/eliminarreserva/${id}`,
   ACTUALIZAR_RESERVA: (id) => `${API_BASE_URL}/actualizarreserva/${id}`,
+  CONFIRMAR_RESERVA:  (id) => `${API_BASE_URL}/confirmarreserva/${id}`,
 
   // Estados
   LISTAR_ESTADOS: `${API_BASE_URL}/listarestados`,

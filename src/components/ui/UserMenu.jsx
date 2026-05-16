@@ -77,9 +77,14 @@ const UserMenu = ({ userData }) => {
             )}
 
             {isConductorOrAdmin && (
-              <MenuItem icon={<FaBell className="w-4 h-4" />} onClick={() => go('/conductor-notificaciones')}>
-                Notificaciones
-              </MenuItem>
+              <>
+                <MenuItem icon={<FaCar className="w-4 h-4" />} onClick={() => go('/conductor')}>
+                  Mi Panel
+                </MenuItem>
+                <MenuItem icon={<FaBell className="w-4 h-4" />} onClick={() => go('/conductor-notificaciones')}>
+                  Notificaciones
+                </MenuItem>
+              </>
             )}
 
             <MenuItem icon={<Cog6ToothIcon className="w-4 h-4" />} onClick={() => go('/ajustes-perfil')}>

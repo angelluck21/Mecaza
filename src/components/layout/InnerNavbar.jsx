@@ -21,6 +21,12 @@ const InnerNavbar = ({ userData, title, backTo, actions }) => {
     else navigate(-1);
   };
 
+  const rol = userData?.rol;
+  const logoHref =
+    rol === 'conductor'                            ? '/conductor'  :
+    (rol === 'admin' || rol === 'administrador')   ? '/indexAdmin' :
+    '/';
+
   return (
     <nav className="sticky top-0 z-50 bg-white/95 backdrop-blur-md shadow-md shadow-violet-100/30">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -38,7 +44,7 @@ const InnerNavbar = ({ userData, title, backTo, actions }) => {
 
             <div className="w-px h-5 bg-gray-200" />
 
-            <a href="/" className="flex items-center gap-2 group">
+            <a href={logoHref} className="flex items-center gap-2 group">
               <FaCar className="text-blue-900 text-xl group-hover:text-violet-700 transition-colors" />
               <span className="text-lg font-extrabold bg-gradient-to-r from-blue-900 to-violet-700 bg-clip-text text-transparent">
                 Mecaza

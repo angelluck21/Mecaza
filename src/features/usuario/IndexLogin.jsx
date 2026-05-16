@@ -47,7 +47,11 @@ const IndexLogin = () => {
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
-    try { setUserData(JSON.parse(stored)); } catch { navigate('/login'); return; }
+    try {
+      const user = JSON.parse(stored);
+      if (user.rol === 'conductor') { navigate('/conductor', { replace: true }); return; }
+      setUserData(user);
+    } catch { navigate('/login'); return; }
 
     (async () => {
       try {

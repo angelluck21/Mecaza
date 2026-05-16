@@ -48,6 +48,9 @@ export const eliminarReservaApi = (id) =>
 export const actualizarReservaApi = (id, data) =>
   axios.put(ENDPOINTS.ACTUALIZAR_RESERVA(id), data, authHeaders());
 
+export const confirmarReservaApi = (id, estado) =>
+  axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado }, authHeaders());
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 
 export const listarEstadosApi = () =>

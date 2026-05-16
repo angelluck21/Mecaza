@@ -1,2273 +1,626 @@
-import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog, FaMapMarkerAlt, FaClock, FaUserFriends, FaDollarSign, FaUser, FaBell, FaCheck, FaTimes, FaExternalLinkAlt, FaPhone } from 'react-icons/fa';
-import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../../components/ui/UserMenu';
-import axios from 'axios';
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  FaCar, FaPlus, FaTrash, FaListAlt,
+  FaMapMarkerAlt, FaClock, FaCalendarAlt, FaPhone,
+  FaUser, FaCheck, FaTimes, FaIdCard,
+} from 'react-icons/fa';
 
+import PageBg            from '../../components/ui/PageBg';
+import InnerNavbar       from '../../components/layout/InnerNavbar';
+import LoadingScreen     from '../../components/ui/LoadingScreen';
+import StatCard          from '../../components/ui/StatCard';
+import SectionCard       from '../../components/ui/SectionCard';
+import FormInput         from '../../components/ui/FormInput';
+import ToastNotification from '../../components/ui/ToastNotification';
+import { useToast }      from '../../hooks/useToast';
+
+import {
+  listarCarrosApi, listarReservasApi, listarEstadosApi,
+  crearCarroApi, eliminarCarroApi, actualizarEstadoCarroApi,
+  confirmarReservaApi,
+} from '../../services/api';
+import { compressImage } from '../../utils';
+
+// ── Modal base ────────────────────────────────────────────────────────────────
+
+const Modal = ({ title, accent = 'violet', onClose, children }) => {
+  const accents = {
+    violet: 'from-violet-700 to-blue-700',
+    green:  'from-green-600 to-emerald-600',
+    red:    'from-red-600 to-rose-600',
+    blue:   'from-blue-700 to-cyan-600',
+  };
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
+      onClick={(e) => e.target === e.currentTarget && onClose()}
+    >
+      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className={`bg-gradient-to-r ${accents[accent]} px-6 py-4 flex items-center justify-between shrink-0`}>
+          <h2 className="text-base font-bold text-white">{title}</h2>
+          <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none transition-colors">&times;</button>
+        </div>
+        <div className="overflow-y-auto flex-1 p-6">{children}</div>
+      </div>
+    </div>
+  );
+};
+
+// ── Action card ───────────────────────────────────────────────────────────────
+
+const ActionCard = ({ icon, title, desc, btnLabel, gradient, onClick }) => (
+  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-5 flex flex-col gap-3 hover:-translate-y-0.5">
+    <div className="flex items-center gap-3">
+      <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${gradient} flex items-center justify-center text-white shadow-sm`}>
+        {icon}
+      </div>
+      <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
+    </div>
+    <p className="text-xs text-gray-500 leading-relaxed flex-1">{desc}</p>
+    <button
+      onClick={onClick}
+      className={`w-full py-2.5 bg-gradient-to-r ${gradient} text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-95`}
+    >
+      <FaPlus className="text-xs" /> {btnLabel}
+    </button>
+  </div>
+);
+
+// ── Fila de info ──────────────────────────────────────────────────────────────
+
+const InfoRow = ({ icon, label, value }) => (
+  <div className="flex items-start gap-2 text-sm">
+    <span className="text-violet-400 mt-0.5 shrink-0">{icon}</span>
+    <div>
+      <p className="text-xs text-gray-400 font-medium">{label}</p>
+      <p className="text-gray-700">{value || '—'}</p>
+    </div>
+  </div>
+);
+
+// ── Component principal ───────────────────────────────────────────────────────
 
 const Conductor = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-    const [userData, setUserData] = useState(null);
+  const [userData,  setUserData]  = useState(null);
   const [isLoading, setIsLoading] = useState(true);
-  const navigate = useNavigate();
-  const [showAddCarModal, setShowAddCarModal] = useState(false);
-  const [showReservasModal, setShowReservasModal] = useState(false);
-  const [reservas, setReservas] = useState([]);
-  const [isLoadingReservas, setIsLoadingReservas] = useState(false);
-  const [showCarrosModal, setShowCarrosModal] = useState(false);
-  const [carros, setCarros] = useState([]);
-  const [isLoadingCarros, setIsLoadingCarros] = useState(false);
-  const [showUpdateEstadoModal, setShowUpdateEstadoModal] = useState(false);
+
+  // Modales
+  const [showAddCar,     setShowAddCar]     = useState(false);
+  const [showReservas,   setShowReservas]   = useState(false);
+  const [showCarros,     setShowCarros]     = useState(false);
+  const [showEstadoModal,setShowEstadoModal]= useState(false);
+  const [showDeleteModal,setShowDeleteModal]= useState(false);
+
+  // Datos
+  const [reservas,      setReservas]      = useState([]);
+  const [carros,        setCarros]        = useState([]);
+  const [estados,       setEstados]       = useState([]);
   const [selectedCarro, setSelectedCarro] = useState(null);
-  const [newEstado, setNewEstado] = useState('');
-  const [estados, setEstados] = useState([]);
-  const [isLoadingEstados, setIsLoadingEstados] = useState(false);
-  const [showDeleteConfirmModal, setShowDeleteConfirmModal] = useState(false);
   const [carroToDelete, setCarroToDelete] = useState(null);
-  const [isDeletingCarro, setIsDeletingCarro] = useState(false);
 
-  const [showNotification, setShowNotification] = useState(false);
-  const [notificationMessage, setNotificationMessage] = useState('');
+  // Loading states
+  const [loadingReservas, setLoadingReservas] = useState(false);
+  const [loadingCarros,   setLoadingCarros]   = useState(false);
+  const [isSaving,        setIsSaving]        = useState(false);
+  const [isDeleting,      setIsDeleting]      = useState(false);
+  const [procesando,      setProcesando]      = useState(null);
+
+  // Formulario agregar carro
   const [carData, setCarData] = useState({
-    Placa: '',
-    Conductor: '', 
-    Imagencarro: '',
-    Asientos: '',
-    Destino: '',
-    Horasalida: '',
-    Fecha: '',
-    Telefono: '',
-   
+    Placa: '', Conductor: '', Imagencarro: null,
+    Asientos: '', Destino: '', Horasalida: '',
+    Fecha: '', Telefono: '', Estado: '',
   });
-  
-  
-  useEffect(() => {
-  }, []);
-  
- 
-  useEffect(() => {
-  }, [carData]);
-  
+  const [newEstado, setNewEstado] = useState('');
 
-  
+  const { toast, showToast, hideToast } = useToast();
+  const navigate = useNavigate();
+
+  // ── Auth ────────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const storedUserData = localStorage.getItem('userData');
-    const authToken = localStorage.getItem('authToken');
-    
-    if (!authToken) {
-      navigate('/login');
-      return;
-    }
-    
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        
-        
-        if (user.rol === 'conductor' || user.rol === 'admin') {
-          setUserData(user);
-        } else {
-          showAuthError('No tienes permisos para acceder al panel de conductor');
-          navigate('/indexLogin');
-        }
-      } catch (error) {
-        navigate('/login');
+    const stored = localStorage.getItem('userData');
+    const token  = localStorage.getItem('authToken');
+    if (!token || !stored) { navigate('/login'); return; }
+    try {
+      const user = JSON.parse(stored);
+      if (user.rol !== 'conductor' && user.rol !== 'admin') {
+        showToast('Sin permisos para el panel de conductor.', 'error');
+        navigate('/indexLogin');
+        return;
       }
-    } else {
-      navigate('/login');
-    }
+      setUserData(user);
+    } catch { navigate('/login'); }
     setIsLoading(false);
   }, [navigate]);
 
-  
+  // Cargar estados al abrir modal agregar carro o cambiar estado
   useEffect(() => {
-    if (showUpdateEstadoModal) {
-      handleGetEstados();
+    if (showAddCar || showEstadoModal) fetchEstados();
+    if (showAddCar && userData) {
+      const nombre = userData.Nombre || userData.nombre || userData.name || '';
+      setCarData(p => ({ ...p, Conductor: nombre }));
     }
-  }, [showUpdateEstadoModal]);
+  }, [showAddCar, showEstadoModal, userData]);
 
-  
-  useEffect(() => {
-    if (showAddCarModal) {
-      handleGetEstados();
-      
-      
-      const conductorLogueado = userData?.Nombre || userData?.nombre || userData?.name || '';
-      if (conductorLogueado) {
-        setCarData(prev => ({
-          ...prev,
-          Conductor: conductorLogueado
-        }));
-      }
-    }
-  }, [showAddCarModal, userData]);
-
-  const _handleLogout = () => {
-    localStorage.removeItem('userData');
-    localStorage.removeItem('authToken');
-    setUserData(null);
-    navigate('/index');
+  // ── Cargar datos ─────────────────────────────────────────────────────────────
+  const fetchEstados = async () => {
+    try {
+      const { data } = await listarEstadosApi();
+      setEstados(Array.isArray(data.data) ? data.data : []);
+    } catch { /* silencioso */ }
   };
 
-  
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-white text-xl">Cargando...</div>
-      </div>
-    );
-  }
+  const fetchReservas = async () => {
+    setLoadingReservas(true);
+    setShowReservas(true);
+    try {
+      const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
+      const allCarros   = Array.isArray(carsResp.data)  ? carsResp.data  : [];
+      const allReservas = Array.isArray(reservasResp)   ? reservasResp   : (reservasResp.data ?? []);
 
-  // Si no hay usuario, no mostrar nada (ya se redirigió)
-  if (!userData) {
-    return null;
-  }
+      const nombreConductor = (userData?.Nombre || userData?.nombre || '').toLowerCase().trim();
+      const misCarros       = allCarros.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor);
+      const idsCarros       = misCarros.map(c => String(c.id_carros || c.id));
 
-  // Función para comprimir imagen
-  const compressImage = (file) => {
-    return new Promise((resolve) => {
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      
-      img.onload = () => {
-        // Calcular nuevas dimensiones (máximo 800px de ancho)
-        const maxWidth = 800;
-        const maxHeight = 600;
-        let { width, height } = img;
-        
-        if (width > maxWidth) {
-          height = (height * maxWidth) / width;
-          width = maxWidth;
-        }
-        
-        if (height > maxHeight) {
-          width = (width * maxHeight) / height;
-          height = maxHeight;
-        }
-        
-        canvas.width = width;
-        canvas.height = height;
-        
-        // Dibujar imagen redimensionada
-        ctx.drawImage(img, 0, 0, width, height);
-        
-        // Convertir a blob con calidad 0.7 (70%)
-        canvas.toBlob((blob) => {
-          const compressedFile = new File([blob], file.name, {
-            type: 'image/jpeg',
-            lastModified: Date.now(),
-          });
-          resolve(compressedFile);
-        }, 'image/jpeg', 0.7);
-      };
-      
-      img.src = URL.createObjectURL(file);
-    });
+      setReservas(
+        allReservas.filter(r => idsCarros.includes(String(r.id_carros || r.id_carro || r.carro_id))),
+      );
+    } catch { showToast('Error al cargar reservas.', 'error'); }
+    finally { setLoadingReservas(false); }
   };
 
-  const showToastNotification = (message, type = 'success') => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 5000); // Aumentado a 5 segundos para mejor legibilidad
+  const fetchCarros = async () => {
+    setLoadingCarros(true);
+    setShowCarros(true);
+    try {
+      const resp = await listarCarrosApi();
+      const all  = Array.isArray(resp.data) ? resp.data : [];
+      const nombreConductor = (userData?.Nombre || userData?.nombre || '').toLowerCase().trim();
+      setCarros(all.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor));
+    } catch { showToast('Error al cargar vehículos.', 'error'); }
+    finally { setLoadingCarros(false); }
   };
 
-  // Función para mostrar notificación de error de autorización
-  const showAuthError = (message) => {
-    setNotificationMessage(message);
-    setShowNotification(true);
-    setTimeout(() => {
-      setShowNotification(false);
-    }, 5000); // Más tiempo para mensajes de error
-  };
-
+  // ── Agregar carro ─────────────────────────────────────────────────────────────
   const handleAddCar = async (e) => {
     e.preventDefault();
-    
-    // Validación de campos requeridos
-    if (!carData.Conductor || carData.Conductor.trim() === '' ||
-        !carData.Placa || carData.Placa.trim() === '' || 
-        !carData.Asientos || carData.Asientos.trim() === '' || 
-        !carData.Destino || carData.Destino.trim() === '' || 
-        !carData.Horasalida || carData.Horasalida.trim() === '' || 
-        !carData.Fecha || carData.Fecha.trim() === '' || 
-        !carData.Telefono || carData.Telefono.trim() === '' ||
-        !carData.Estado || carData.Estado === '') {
-      showToastNotification('Por favor, completa todos los campos requeridos incluyendo el estado del carro', 'error');
-      return;
+    const { Conductor, Placa, Asientos, Destino, Horasalida, Fecha, Telefono, Estado, Imagencarro } = carData;
+
+    if (!Conductor || !Placa || !Asientos || !Destino || !Horasalida || !Fecha || !Telefono || !Estado) {
+      showToast('Completa todos los campos requeridos.', 'error'); return;
     }
-    
+
+    const userId = userData?.id || userData?.id_users || userData?.ID;
+    if (!userId) { showToast('No se pudo identificar tu cuenta. Inicia sesión de nuevo.', 'error'); return; }
+
+    const nombreLogueado = userData?.Nombre || userData?.nombre || userData?.name || '';
+    if (Conductor.trim().toLowerCase() !== nombreLogueado.toLowerCase()) {
+      showToast('El nombre del conductor debe coincidir con tu cuenta.', 'error'); return;
+    }
+
+    setIsSaving(true);
     try {
-      // Obtener el ID del usuario logueado
-      const userId = userData.id || userData.id_users || userData.ID || userData.user_id || userData.userId;
-      
-      if (!userId) {
-        showToastNotification('Error: No se pudo identificar tu cuenta de usuario. Por favor, inicia sesión nuevamente.', 'error');
-        return;
-      }
-      
-      // Verificar que el ID sea un número válido
-      if (isNaN(userId) || userId <= 0) {
-        showToastNotification('Error: ID de usuario inválido. Por favor, inicia sesión nuevamente.', 'error');
-        return;
-      }
-      
-      // Convertir a número si es string
-      const userIdNum = parseInt(userId);
-      if (isNaN(userIdNum) || userIdNum <= 0) {
-        showToastNotification('Error: ID de usuario inválido. Por favor, inicia sesión nuevamente.', 'error');
-        return;
-      }
-      
-      // Verificar que el conductor sea el usuario logueado
-      const conductorLogueado = userData.Nombre || userData.nombre || userData.name;
-      if (carData.Conductor.trim() !== conductorLogueado) {
-        showToastNotification('Error: El nombre del conductor debe coincidir con tu nombre de usuario', 'error');
-        return;
-      }
-      
-      
-      // Crear FormData para enviar datos con imagen
       const formData = new FormData();
-      formData.append('Conductor', carData.Conductor.trim());
-      formData.append('Telefono', carData.Telefono.trim());
-      formData.append('Placa', carData.Placa.trim());
-      formData.append('Asientos', carData.Asientos);
-      formData.append('Destino', carData.Destino.trim());
-      formData.append('Horasalida', carData.Horasalida.trim());
-      formData.append('Fecha', carData.Fecha.trim());
-      formData.append('Estado', carData.Estado);
-      formData.append('Userid', userIdNum);
-      
-      // Agregar imagen si existe (comprimida)
-      if (carData.Imagencarro) {
-        const compressedImage = await compressImage(carData.Imagencarro);
-        formData.append('Imagencarro', compressedImage);
+      formData.append('Conductor',  Conductor.trim());
+      formData.append('Telefono',   Telefono.trim());
+      formData.append('Placa',      Placa.trim());
+      formData.append('Asientos',   Asientos);
+      formData.append('Destino',    Destino.trim());
+      formData.append('Horasalida', Horasalida.trim());
+      formData.append('Fecha',      Fecha.trim());
+      formData.append('Estado',     Estado);
+      formData.append('Userid',     parseInt(userId));
+
+      if (Imagencarro) {
+        const compressed = await compressImage(Imagencarro);
+        formData.append('Imagencarro', compressed);
       }
-      
-      
-      // Verificar cada campo del FormData
-      for (let [key, value] of formData.entries()) {
-      }
-      
-      // Verificar que el Userid esté presente
-      const formDataUserId = formData.get('Userid');
-      
-      // Enviar datos al endpoint que conecta con AgregarcarrosController::Create
-      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarcarros', formData, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      
-      if (response.data && response.data.success) {
-        showToastNotification('¡Vehículo registrado exitosamente! 🚗');
-        
-        // Limpiar formulario
-        setCarData({
-          Placa: '',
-          Conductor: '',
-          Imagencarro: '',
-          Asientos: '',
-          Destino: '',
-          Horasalida: '',
-          Fecha: '',
-          Telefono: '',
-          Estado: '',
-        });
-        
-        // Cerrar modal automáticamente
-        setShowAddCarModal(false);
-      } else {
-        showToastNotification('Advertencia: El servidor no confirmó el registro', 'error');
-      }
-      
-    } catch (error) {
-      
-      if (error.response) {
-        if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
-        } else if (error.response.status === 422) {
-          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-        } else {
-          showToastNotification(`Error: ${error.response.data?.message || 'No se pudo guardar el vehículo'}`, 'error');
-        }
-      } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
-      } else {
-        showToastNotification('Error inesperado al guardar el vehículo', 'error');
-      }
-    }
+
+      await crearCarroApi(formData);
+      showToast('Vehículo registrado exitosamente.', 'success');
+      setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', Destino: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
+      setShowAddCar(false);
+    } catch (err) {
+      const msg = err.response?.data?.message || err.response?.data?.errors
+        ? Object.values(err.response.data.errors).flat()[0]
+        : 'Error al guardar el vehículo.';
+      showToast(msg, 'error');
+    } finally { setIsSaving(false); }
   };
 
-  const handleViewReservas = async () => {
-    setIsLoadingReservas(true);
-    setShowReservasModal(true);
-    
+  // ── Actualizar estado carro ───────────────────────────────────────────────────
+  const handleUpdateEstado = async (e) => {
+    e.preventDefault();
+    if (!newEstado || !selectedCarro) { showToast('Selecciona un estado.', 'error'); return; }
+    setIsSaving(true);
     try {
-      // Obtener todas las reservas
-      const reservasResponse = await axios.get('https://api-mecaza.geekcorplab.com/api/listarreserva', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      
-      // Obtener todos los carros
-      const carrosResponse = await axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      
-      // Procesar las respuestas
-      let reservasArray = [];
-      if (reservasResponse.data && Array.isArray(reservasResponse.data)) {
-        reservasArray = reservasResponse.data;
-      } else if (reservasResponse.data && Array.isArray(reservasResponse.data.data)) {
-        reservasArray = reservasResponse.data.data;
-      } else if (reservasResponse.data && reservasResponse.data.data) {
-        reservasArray = [reservasResponse.data.data];
-      }
-      
-      let carrosArray = [];
-      if (carrosResponse.data && Array.isArray(carrosResponse.data)) {
-        carrosArray = carrosResponse.data;
-      } else if (carrosResponse.data && Array.isArray(carrosResponse.data.data)) {
-        carrosArray = carrosResponse.data.data;
-      } else if (carrosResponse.data && carrosResponse.data.data) {
-        carrosArray = [carrosResponse.data.data];
-      }
-      
-      
-      // Obtener el nombre del conductor logueado
-      const conductorLogueado = userData.Nombre || userData.nombre || '';
-      
-      // Filtrar solo los carros del conductor logueado (comparación estricta)
-      const carrosDelConductor = carrosArray.filter(carro => {
-        const conductorCarro = carro.conductor || carro.Conductor || '';
-        
-        // Validar que ambos nombres existan
-        if (!conductorCarro || !conductorLogueado) {
-          return false;
-        }
-        
-        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
-        const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
-        
-        
-        return perteneceAlConductor;
-      });
-      
-      
-      // Obtener los IDs de los carros del conductor (convertir a string para comparación)
-      const idsCarrosConductor = carrosDelConductor.map(carro => 
-        String(carro.id_carros || carro.id || carro.ID)
-      );
-      
-      
-      // Filtrar solo las reservas de los carros del conductor (comparación más estricta)
-      const reservasDelConductor = reservasArray.filter(reserva => {
-        const carroId = String(reserva.id_carros || reserva.id_carro || reserva.carro_id || reserva.carroId);
-        
-        // Verificar que el carroId sea válido
-        if (!carroId || carroId === 'undefined' || carroId === 'null') {
-          return false;
-        }
-        
-        const perteneceAlConductor = idsCarrosConductor.includes(carroId);
-        
-        
-        return perteneceAlConductor;
-      });
-      
-      
-      // Enriquecer las reservas con información completa del carro y usuario
-      const reservasEnriquecidas = reservasDelConductor.map(reserva => {
-        const carroId = reserva.id_carros || reserva.id_carro || reserva.carro_id;
-        const carroEncontrado = carrosDelConductor.find(carro => 
-          (carro.id_carros || carro.id) == carroId
-        );
-        
-        
-        const carroInfo = {
-          id: carroEncontrado ? (carroEncontrado.id_carros || carroEncontrado.id) : 'N/A',
-          placa: carroEncontrado ? (carroEncontrado.placa || carroEncontrado.Placa) : 'N/A',
-          conductor: carroEncontrado ? (carroEncontrado.conductor || carroEncontrado.Conductor) : 'N/A'
-        };
-        
-        // Obtener información del usuario que hizo la reserva
-        const usuarioInfo = {
-          id: reserva.Usuario || reserva.usuario || reserva.user_id || 'N/A',
-          nombre: reserva.Nombre || reserva.nombre || reserva.comentario || reserva.Comentario || 'No especificado',
-          telefono: reserva.telefono || reserva.Telefono || reserva.phone || 'No especificado',
-          ubicacion: reserva.Ubicacion || reserva.ubicacion || 'No especificada'
-        };
-        
-        
-        return {
-          ...reserva,
-          carroInfo,
-          usuarioInfo
-        };
-      });
-      
-      
-      // Validación adicional: mostrar mensaje si no hay carros del conductor
-      if (carrosDelConductor.length === 0) {
-        showToastNotification('No tienes carros registrados en el sistema', 'warning');
-        setReservas([]);
-        return;
-      }
-      
-      // Validación: mostrar mensaje si no hay reservas para los carros del conductor
-      if (reservasDelConductor.length === 0) {
-        showToastNotification('No hay reservas para tus carros registrados', 'info');
-        setReservas([]);
-        return;
-      }
-      
-      setReservas(reservasEnriquecidas);
-      
-    } catch (error) {
-      
-      if (error.response) {
-        const statusCode = error.response.status;
-        if (statusCode === 400) {
-          showToastNotification('Error 400: Solicitud incorrecta al cargar reservas. Verifica tu autenticación.', 'error');
-        } else if (statusCode === 401) {
-          showToastNotification('Error 401: No autorizado. Inicia sesión nuevamente.', 'error');
-          navigate('/login');
-        } else if (statusCode === 500) {
-          showToastNotification('Error del servidor al cargar reservas. Intenta nuevamente.', 'error');
-        } else {
-          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error desconocido'}`, 'error');
-        }
-      } else {
-        showToastNotification('Error de conexión al cargar las reservas', 'error');
-      }
-      setReservas([]);
-    } finally {
-      setIsLoadingReservas(false);
-    }
+      const carroId = selectedCarro.id_carros || selectedCarro.id;
+      await actualizarEstadoCarroApi(carroId, parseInt(newEstado));
+      showToast('Estado actualizado correctamente.', 'success');
+      setShowEstadoModal(false);
+      setSelectedCarro(null);
+      setNewEstado('');
+      await fetchCarros();
+    } catch { showToast('Error al actualizar el estado.', 'error'); }
+    finally { setIsSaving(false); }
   };
 
-  const handleViewCarros = async () => {
-    setIsLoadingCarros(true);
-    setShowCarrosModal(true);
-    
-    try {
-      const response = await axios.get('https://api-mecaza.geekcorplab.com/api/listarcarro', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      
-      // Manejar diferentes estructuras de respuesta
-      let carrosArray = [];
-      if (response.data && Array.isArray(response.data)) {
-        carrosArray = response.data;
-      } else if (response.data && Array.isArray(response.data.data)) {
-        carrosArray = response.data.data;
-      } else if (response.data && response.data.data) {
-        carrosArray = [response.data.data];
-      } else {
-        carrosArray = [];
-      }
-      
-      
-      // Filtrar solo los carros del conductor logueado
-      let carrosDelConductor = carrosArray.filter(carro => {
-        const conductorCarro = carro.conductor || carro.Conductor || '';
-        const conductorLogueado = userData.Nombre || userData.nombre || '';
-        
-        
-        // Validar que ambos nombres existan
-        if (!conductorCarro || !conductorLogueado) {
-          return false;
-        }
-        
-        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
-        const match = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
-        return match;
-      });
-      
-      if (carrosDelConductor.length === 0) {
-        showToastNotification('No tienes carros registrados en el sistema', 'warning');
-        setCarros([]);
-        return;
-      }
-      
-      // Obtener estados para mostrar nombres en lugar de números
-      try {
-        const estadosResponse = await axios.get('http://127.0.0.1:8000/api/listarestados', {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          }
-        });
-        
-        
-        let estadosArray = [];
-        // Según el backend, los datos vienen en response.data.data
-        if (estadosResponse.data && estadosResponse.data.data) {
-          estadosArray = Array.isArray(estadosResponse.data.data) 
-            ? estadosResponse.data.data 
-            : [estadosResponse.data.data];
-        } else if (estadosResponse.data && Array.isArray(estadosResponse.data)) {
-          estadosArray = estadosResponse.data;
-        } else {
-          estadosArray = [];
-        }
-        
-        
-        // Crear un mapa de estados para acceso rápido
-        const estadosMap = {};
-        estadosArray.forEach(estado => {
-          
-          const id = estado.id_estados || estado.id;
-          const nombre = estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados || `Estado ${id}`;
-          estadosMap[id] = nombre;
-        });
-      
-        
-        // Agregar el nombre del estado a cada carro
-        carrosDelConductor = carrosDelConductor.map(carro => {
-          
-          const estadoId = carro.id_estados || carro.Estado;
-          
-          // Usar getEstadoNombre directamente para asegurar que funcione
-          const estadoNombre = getEstadoNombre(estadoId);
-          
-          return {
-            ...carro,
-            estadoNombre: estadoNombre
-          };
-        });
-      
-      } catch (estadosError) {
-        // Si no se pueden obtener los estados, usar nombres por defecto
-        carrosDelConductor = carrosDelConductor.map(carro => ({
-          ...carro,
-          estadoNombre: getEstadoNombre(carro.id_estados || carro.Estado)
-        }));
-      }
-    
-      setCarros(carrosDelConductor);
-      showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
-    } catch (error) {
-      
-      if (error.response) {
-        const statusCode = error.response.status;
-        if (statusCode === 400) {
-          showToastNotification('Error 400: Solicitud incorrecta al cargar carros. Verifica tu autenticación.', 'error');
-        } else if (statusCode === 401) {
-          showToastNotification('Error 401: No autorizado. Inicia sesión nuevamente.', 'error');
-          navigate('/login');
-        } else if (statusCode === 500) {
-          showToastNotification('Error del servidor al cargar carros. Intenta nuevamente.', 'error');
-        } else {
-          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error desconocido'}`, 'error');
-        }
-      } else {
-        showToastNotification('Error de conexión al cargar los carros', 'error');
-      }
-      setCarros([]);
-    } finally {
-      setIsLoadingCarros(false);
-    }
-  };
-
-  // Función para cargar los carros del conductor logueado
-  const handleViewMyCars = async () => {
-    setIsLoadingMyCars(true);
-    setShowMyCarsModal(true);
-    
-    try {
-      const response = await axios.get('http://127.0.0.1:8000/api/listarcarro', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      
-      // Manejar diferentes estructuras de respuesta
-      let carrosArray = [];
-      if (response.data && Array.isArray(response.data.data)) {
-        carrosArray = response.data.data;
-      } else if (Array.isArray(response.data)) {
-        carrosArray = response.data;
-      } else if (response.data && response.data.data) {
-        carrosArray = [response.data.data];
-      } else {
-        carrosArray = [];
-      }
-      
-      
-      // Filtrar solo los carros del conductor logueado
-      const conductorLogueado = userData.Nombre || userData.nombre || '';
-      const carrosDelConductor = carrosArray.filter(carro => {
-        const conductorCarro = carro.conductor || carro.Conductor || '';
-        
-        // Validar que ambos nombres existan
-        if (!conductorCarro || !conductorLogueado) {
-          return false;
-        }
-        
-        // Comparar nombres de conductor de manera exacta (ignorar mayúsculas/minúsculas y espacios)
-        const perteneceAlConductor = conductorCarro.toLowerCase().trim() === conductorLogueado.toLowerCase().trim();
-        
-        return perteneceAlConductor;
-      });
-      
-      
-      if (carrosDelConductor.length === 0) {
-        showToastNotification('No tienes carros registrados en el sistema', 'warning');
-        setMyCars([]);
-        return;
-      }
-      
-      // Obtener estados para mostrar nombres en lugar de números
-      try {
-        const estadosResponse = await axios.get('http://127.0.0.1:8000/api/listarestados', {
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-          }
-        });
-        
-        let estadosArray = [];
-        if (estadosResponse.data && estadosResponse.data.data) {
-          estadosArray = Array.isArray(estadosResponse.data.data) 
-            ? estadosResponse.data.data 
-            : [estadosResponse.data.data];
-        } else if (estadosResponse.data && Array.isArray(estadosResponse.data)) {
-          estadosArray = estadosResponse.data;
-        }
-        
-        // Crear un mapa de estados para acceso rápido
-        const estadosMap = {};
-        estadosArray.forEach(estado => {
-          const id = estado.id_estados || estado.id;
-          const nombre = estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || `Estado ${id}`;
-          estadosMap[id] = nombre;
-        });
-        
-        // Agregar el nombre del estado a cada carro
-        const carrosConEstados = carrosDelConductor.map(carro => {
-          const estadoId = carro.id_estados || carro.Estado;
-          const estadoNombre = estadosMap[estadoId] || getEstadoNombre(estadoId);
-          
-          return {
-            ...carro,
-            estadoNombre: estadoNombre
-          };
-        });
-        
-        setMyCars(carrosConEstados);
-        showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
-      } catch (estadosError) {
-        // Si no se pueden obtener los estados, usar nombres por defecto
-        const carrosConEstados = carrosDelConductor.map(carro => ({
-          ...carro,
-          estadoNombre: getEstadoNombre(carro.id_estados || carro.Estado)
-        }));
-        setMyCars(carrosConEstados);
-        showToastNotification(`Se encontraron ${carrosDelConductor.length} carro(s) registrado(s)`, 'success');
-      }
-      
-    } catch (error) {
-      
-      if (error.response) {
-        const statusCode = error.response.status;
-        if (statusCode === 400) {
-          showToastNotification('Error 400: Solicitud incorrecta al cargar carros. Verifica tu autenticación.', 'error');
-        } else if (statusCode === 401) {
-          showToastNotification('Error 401: No autorizado. Inicia sesión nuevamente.', 'error');
-          navigate('/login');
-        } else if (statusCode === 500) {
-          showToastNotification('Error del servidor al cargar carros. Intenta nuevamente.', 'error');
-        } else {
-          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error desconocido'}`, 'error');
-        }
-      } else {
-        showToastNotification('Error de conexión al cargar los carros', 'error');
-      }
-      setMyCars([]);
-    } finally {
-      setIsLoadingMyCars(false);
-    }
-  };
-
-     // Función auxiliar para obtener nombre del estado por ID - CORREGIDA
-   const getEstadoNombre = (estadoId) => {
-     // Debug: ver qué ID está llegando
-     
-     // Convertir a número si es string
-     const id = parseInt(estadoId);
-     
-     // Mapeo de estados con nombres más descriptivos
-     const estados = {
-       1: '🚗 Esperando Pasajeros',
-       2: '🛣️ En Viaje', 
-       3: '🔧 En Mantenimiento',
-       4: '❌ Fuera de Servicio'
-     };
-     
-     // Si el ID es válido y está en nuestro mapeo, devolver el nombre descriptivo
-     if (id && estados[id]) {
-       return estados[id];
-     }
-     
-     // Si no es un ID válido, devolver un mensaje descriptivo
-     return `🔍 Estado ${estadoId || 'Desconocido'}`;
-     };
-
-  // Función helper para construir la URL de la imagen del carro
-  const getCarImageUrl = (imagePath) => {
-    if (!imagePath) return null;
-    
-    // Si ya es una URL completa, devolverla
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    
-    // Si empieza con /storage, construir URL completa
-    if (imagePath.startsWith('/storage/')) {
-      return `http://127.0.0.1:8000${imagePath}`;
-    }
-    
-    // Si es solo el nombre del archivo, construir URL
-    if (!imagePath.includes('/')) {
-      return `http://127.0.0.1:8000/storage/carros/${imagePath}`;
-    }
-    
-    // Construir URL completa
-    return `http://127.0.0.1:8000/storage/${imagePath}`;
-  };
-
-     const handleUpdateEstado = async () => {
-     if (!selectedCarro) {
-       showToastNotification('Por favor selecciona un carro', 'error');
-       return;
-     }
-
-     try {
-       // Preparar datos para enviar según la API Laravel
-       const updateData = {};
-
-       // Agregar estado si se ha seleccionado uno nuevo
-       if (newEstado) {
-         updateData.Estado = newEstado;
-       }
-
-       // Agregar fecha y hora si se han modificado
-       if (selectedCarro.nuevaFecha && selectedCarro.nuevaFecha !== selectedCarro.fecha && selectedCarro.nuevaFecha !== selectedCarro.Fecha) {
-         updateData.Fecha = selectedCarro.nuevaFecha;
-       }
-       
-       if (selectedCarro.nuevaHora && selectedCarro.nuevaHora !== selectedCarro.horasalida && selectedCarro.nuevaHora !== selectedCarro.Horasalida) {
-         updateData.Horasalida = selectedCarro.nuevaHora;
-       }
-
-       // Verificar que haya algo que actualizar
-       if (Object.keys(updateData).length === 0) {
-         showToastNotification('No hay cambios para actualizar', 'warning');
-         return;
-       }
-
-
-       const response = await axios.put(`http://127.0.0.1:8000/api/actualizarestadocarro/${selectedCarro.id_carros || selectedCarro.id}`, updateData, {
-         headers: {
-           'Content-Type': 'application/json',
-           'Accept': 'application/json',
-         }
-       });
-       
-       
-       let mensaje = 'Carro actualizado correctamente';
-       if (updateData.Estado && (updateData.Fecha || updateData.Horasalida)) {
-         mensaje = 'Carro actualizado correctamente (estado, fecha y/o hora)';
-       } else if (updateData.Estado) {
-         mensaje = 'Estado del carro actualizado correctamente';
-       } else if (updateData.Fecha || updateData.Horasalida) {
-         mensaje = 'Fecha y/o hora del carro actualizada correctamente';
-       }
-       
-       showToastNotification(mensaje, 'success');
-       
-       // Actualizar la lista de carros
-       handleViewCarros();
-       
-       // Cerrar modales
-       setShowUpdateEstadoModal(false);
-       setSelectedCarro(null);
-       setNewEstado('');
-     } catch (error) {
-       showToastNotification('Error al actualizar el carro', 'error');
-     }
-   };
-
-     // Function to assign state directly from the "Usar" button
-   const handleAssignEstado = async (estadoId) => {
-     if (!selectedCarro) {
-       showToastNotification('Por favor selecciona un carro', 'error');
-       return;
-     }
-     
-     // Solo seleccionar el estado, NO hacer llamada a la API
-     setNewEstado(estadoId);
-     
-     // Actualizar el estado local del carro seleccionado para mostrar el cambio
-     setSelectedCarro(prev => ({
-       ...prev,
-       Estado: estadoId,
-       id_estados: estadoId
-     }));
-     
-     showToastNotification(`Estado seleccionado: ${estados.find(e => e.id === estadoId)?.nombre || 'Desconocido'}`, 'info');
-   };
-
-  
-
-  const handleGetEstados = async () => {
-    setIsLoadingEstados(true);
-    
-    try {
-      const response = await axios.get('http://127.0.0.1:8000/api/listarestados', {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-      
-      // Según el backend, los datos vienen en response.data.data
-      let estadosArray = [];
-      if (response.data && response.data.data) {
-        // Si data es un array, usarlo directamente
-        if (Array.isArray(response.data.data)) {
-          estadosArray = response.data.data;
-        } 
-        // Si data es un objeto, convertirlo a array
-        else if (typeof response.data.data === 'object') {
-          estadosArray = [response.data.data];
-        }
-        // Si data es un string o número, crear un array con ese valor
-        else {
-          estadosArray = [response.data.data];
-        }
-      } else if (response.data && Array.isArray(response.data)) {
-        estadosArray = response.data;
-        } else {
-        estadosArray = [];
-      }
-      
-      
-      if (estadosArray.length > 0) {
-        estadosArray.forEach((estado, index) => {
-        });
-      } else {
-      }
-      
-      setEstados(estadosArray);
-    } catch (error) {
-      if (error.response) {
-      }
-      showToastNotification('Error al cargar los estados', 'error');
-      setEstados([]);
-    } finally {
-      setIsLoadingEstados(false);
-    }
-  };
-
-  // Función para eliminar carro
+  // ── Eliminar carro ────────────────────────────────────────────────────────────
   const handleDeleteCarro = async () => {
-    if (!carroToDelete) {
-      showToastNotification('Error: No se seleccionó ningún carro para eliminar', 'error');
-      return;
-    }
-
-    setIsDeletingCarro(true);
-    
+    if (!carroToDelete) return;
+    setIsDeleting(true);
     try {
-      const carroId = carroToDelete.id_carros || carroToDelete.id || carroToDelete.ID;
-      
-      const response = await axios.delete(`http://127.0.0.1:8000/api/eliminarcarro/${carroId}`, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-
-      
-      // Mostrar notificación de éxito con detalles del carro eliminado
-      const carroInfo = `🚗 Vehículo ${carroToDelete.placa || carroToDelete.Placa || 'N/A'} eliminado exitosamente`;
-      showToastNotification(carroInfo, 'success');
-      
-      // Actualizar la lista de carros
-      handleViewCarros();
-      
-      // Cerrar modales
-      setShowDeleteConfirmModal(false);
+      const id = carroToDelete.id_carros || carroToDelete.id;
+      await eliminarCarroApi(id);
+      showToast('Vehículo eliminado.', 'success');
+      setShowDeleteModal(false);
       setCarroToDelete(null);
-    } catch (error) {
-      
-      if (error.response) {
-        const statusCode = error.response.status;
-        if (statusCode === 404) {
-          showToastNotification('Error: El carro no fue encontrado', 'error');
-        } else if (statusCode === 403) {
-          showToastNotification('Error: No tienes permisos para eliminar este carro', 'error');
-        } else if (statusCode === 500) {
-          showToastNotification('Error del servidor al eliminar el carro', 'error');
-        } else {
-          showToastNotification(`Error ${statusCode}: ${error.response.data?.message || 'Error al eliminar el carro'}`, 'error');
-        }
-      } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
-      } else {
-        showToastNotification('Error inesperado al eliminar el carro', 'error');
-      }
-    } finally {
-      setIsDeletingCarro(false);
-    }
+      await fetchCarros();
+    } catch { showToast('Error al eliminar el vehículo.', 'error'); }
+    finally { setIsDeleting(false); }
   };
 
-  // Función para confirmar eliminación de carro
-  const confirmDeleteCarro = (carro) => {
-    setCarroToDelete(carro);
-    setShowDeleteConfirmModal(true);
-  };
-
-  // Función para verificar si un texto es un link
-  const isLink = (text) => {
-    if (!text) return false;
-    return text.startsWith('http://') || text.startsWith('https://') || text.startsWith('www.');
-  };
-
-  // Función para truncar un link largo
-  const truncateLink = (link, maxLength = 50) => {
-    if (!link) return '';
-    if (link.length <= maxLength) return link;
-    return link.substring(0, maxLength) + '...';
-  };
-
-  // Función para abrir link en nueva pestaña
-  const openLink = (link) => {
-    if (isLink(link)) {
-      let url = link;
-      if (link.startsWith('www.')) {
-        url = 'https://' + link;
-      }
-      window.open(url, '_blank');
-    }
-  };
-
-  // Función para confirmar reserva
-  const handleConfirmarReserva = async (reserva) => {
+  // ── Confirmar / rechazar reserva ──────────────────────────────────────────────
+  const cambiarEstadoReserva = async (reserva, estado) => {
+    const id = reserva.id_reservarviajes || reserva.id_reservarviaje || reserva.id || reserva.ID;
+    setProcesando(id);
     try {
-      
-      const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
-      
-      if (!reservationId || reservationId === 'undefined') {
-        showToastNotification('❌ Error: ID de reserva no válido. Verifica los datos de la reserva.', 'error');
-        return;
-      }
-      
-      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
-        estado: 'confirmada'
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-
-      
-      // Mostrar notificación de éxito con detalles
-      const reservaInfo = `Reserva #${reservationId} confirmada exitosamente`;
-      showToastNotification(reservaInfo, 'success');
-      
-      // Recargar la lista de reservas
-      await handleViewReservas();
-    } catch (error) {
-      
-      let errorMessage = '❌ Error al confirmar la reserva';
-      
-      if (error.response) {
-        if (error.response.data && error.response.data.message) {
-          errorMessage = `❌ ${error.response.data.message}`;
-        } else if (error.response.status === 404) {
-          errorMessage = '❌ Reserva no encontrada en el sistema';
-        } else if (error.response.status === 400) {
-          errorMessage = '❌ Datos de reserva inválidos';
-        }
-      } else if (error.request) {
-        errorMessage = '❌ Error de conexión. Verifica que el servidor esté ejecutándose.';
-      }
-      
-      showToastNotification(errorMessage, 'error');
-    }
+      await confirmarReservaApi(id, estado);
+      showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Reserva rechazada.', estado === 'Confirmada' ? 'success' : 'error');
+      await fetchReservas();
+    } catch { showToast('Error al actualizar la reserva.', 'error'); }
+    finally { setProcesando(null); }
   };
 
-  // Función para rechazar reserva
-  const handleRechazarReserva = async (reserva) => {
-    if (!window.confirm('¿Estás seguro de que quieres rechazar esta reserva?')) {
-      return;
-    }
+  if (isLoading) return <LoadingScreen message="Cargando panel..." />;
+  if (!userData)  return null;
 
-    try {
-      
-      const reservationId = reserva.id || reserva.id_reservarviaje || reserva.ID;
-      
-      if (!reservationId || reservationId === 'undefined') {
-        showToastNotification('❌ Error: ID de reserva no válido. Verifica los datos de la reserva.', 'error');
-        return;
-      }
-      
-      const response = await axios.put(`http://127.0.0.1:8000/api/confirmarreserva/${reservationId}`, {
-        estado: 'rechazada'
-      }, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
+  const nombre = userData.Nombre || userData.nombre || userData.name || 'Conductor';
 
-      
-      // Mostrar notificación de éxito con detalles
-      const reservaInfo = `Reserva #${reservationId} rechazada exitosamente`;
-      showToastNotification(reservaInfo, 'success');
-      
-      // Recargar la lista de reservas
-      await handleViewReservas();
-    } catch (error) {
-      
-      let errorMessage = '❌ Error al rechazar la reserva';
-      
-      if (error.response) {
-        if (error.response.data && error.response.data.message) {
-          errorMessage = `❌ ${error.response.data.message}`;
-        } else if (error.response.status === 404) {
-          errorMessage = '❌ Reserva no encontrada en el sistema';
-        } else if (error.response.status === 400) {
-          errorMessage = '❌ Datos de reserva inválidos';
-        }
-      } else if (error.request) {
-        errorMessage = '❌ Error de conexión. Verifica que el servidor esté ejecutándose.';
-      }
-      
-      showToastNotification(errorMessage, 'error');
-    }
-  };
-
-
-
+  // ── Render ────────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative">
-      {/* Notificación Toast Mejorada */}
-      {showNotification && (
-        <div className="fixed top-4 right-4 z-50 animate-slide-in">
-          <div className={`rounded-xl shadow-2xl p-6 max-w-md transform transition-all duration-300 hover:scale-105 ${
-            notificationMessage.includes('eliminado') 
-              ? 'bg-gradient-to-r from-red-50 to-red-100 border-l-4 border-red-500' 
-              : 'bg-gradient-to-r from-green-50 to-green-100 border-l-4 border-green-500'
-          }`}>
-            <div className="flex items-start">
-              <div className="flex-shrink-0">
-                <div className={`p-3 rounded-full ${
-                  notificationMessage.includes('eliminado') 
-                    ? 'bg-red-200' 
-                    : 'bg-green-200'
-                }`}>
-                  {notificationMessage.includes('eliminado') ? (
-                    <FaTimes className="h-6 w-6 text-red-600" />
-                  ) : (
-                  <FaCheck className="h-6 w-6 text-green-600" />
-                  )}
-                </div>
-              </div>
-              <div className="ml-4 flex-1">
-                <div className="flex items-center justify-between">
-                  <h4 className={`text-sm font-bold mb-1 ${
-                    notificationMessage.includes('eliminado') 
-                      ? 'text-red-800' 
-                      : 'text-green-800'
-                  }`}>
-                    {notificationMessage.includes('eliminado') ? '🚗 Vehículo Eliminado' : '✅ Operación Exitosa'}
-                  </h4>
-                  <button
-                    onClick={() => setShowNotification(false)}
-                    className="inline-flex text-gray-400 hover:text-gray-600 focus:outline-none transition-colors"
-                  >
-                    <span className="sr-only">Cerrar</span>
-                    <svg className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
-                    </svg>
-                  </button>
-                </div>
-                <p className={`text-sm leading-relaxed font-medium ${
-                  notificationMessage.includes('eliminado') 
-                    ? 'text-red-700' 
-                    : 'text-green-700'
-                }`}>
-                  {notificationMessage}
-                </p>
-                <div className={`mt-3 flex items-center text-xs ${
-                  notificationMessage.includes('eliminado') 
-                    ? 'text-red-600' 
-                    : 'text-green-600'
-                }`}>
-                  <FaCar className="mr-2" />
-                  <span className="font-semibold">Sistema Mecaza</span>
-                  {notificationMessage.includes('eliminado') && (
-                    <span className="ml-2 bg-red-200 text-red-800 px-2 py-1 rounded-full text-xs font-bold">
-                      ELIMINADO
-                    </span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
+    <PageBg>
+      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
+
+      <InnerNavbar
+        userData={userData}
+        title="Panel de Conductor"
+        backTo="/"
+      />
+
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
+
+        {/* Bienvenida */}
+        <div className="animate-fade-in-up">
+          <h1 className="text-3xl font-extrabold text-white">Hola, {nombre} 👋</h1>
+          <p className="text-blue-200 mt-1 text-sm">Gestiona tus vehículos y reservas desde aquí.</p>
         </div>
-      )}
-      
-      {/* Navbar */}
-      <nav className="bg-white shadow-lg relative z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
-            <div className="flex items-center space-x-3">
-              <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
-              <span className="text-2xl font-bold text-blue-900">Agregar Vehículo</span>
-            </div>
 
-            {/* Barra de búsqueda - Desktop */}
-            <div className="hidden md:flex items-center flex-1 max-w-lg mx-8">
-              <div className="relative w-full">
-                <input
-                  type="text"
-                  placeholder="Buscar en el sistema..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 transition-all"
-                />
-                <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-              </div>
-            </div>
-
-            {/* Navegación - Desktop */}
-            <div className="hidden md:flex items-center space-x-6" style={{ zIndex: 99999, position: 'relative' }}>
-            
-              <a href="/index2" className="text-blue-900 hover:text-blue-700 font-medium transition-colors">
-                Panel Conductor
-              </a>
-              <UserMenu userData={userData} />
-            </div>
-
-            {/* Botón menú móvil */}
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-blue-900 hover:text-blue-700 p-2"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
-            </div>
-          </div>
-
-          {/* Menú móvil */}
-          {isMenuOpen && (
-            <div className="md:hidden bg-white border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                {/* Barra de búsqueda móvil */}
-                <div className="relative mb-4">
-                  <input
-                    type="text"
-                    placeholder="Buscar en el sistema..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  />
-                  <MagnifyingGlassIcon className="absolute left-3 top-2.5 h-5 w-5 text-gray-400" />
-                </div>
-                
-               
-                <a 
-                  href="/index2" 
-                  className="block px-3 py-2 text-blue-900 hover:text-blue-700 font-medium"
-                >
-                  Panel Conductor
-                </a>
-                <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/login'); }}
-                  className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
-                >
-                  Cerrar Sesión
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      </nav>
-
-      {/* Contenido principal */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
-          <div className="text-center mb-8">
-            <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
-              Agregar Vehículo
-            </h1>
-            <p className="text-lg text-gray-600">
-              Registra tu vehículo en el sistema Mecaza
-            </p>
-          </div>
-
-                     {/* Botones para el conductor */}
-           <div className="flex justify-center space-x-6 flex-wrap">
-             {/* Botón para agregar vehículo */}
-             <div className="bg-gradient-to-br from-blue-50 to-blue-100 p-8 rounded-xl border-2 border-blue-200 hover:border-blue-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 max-w-md mb-6">
-               <div className="flex items-center mb-6">
-                 <div className="bg-blue-600 p-4 rounded-lg mr-4">
-                   <FaCar className="text-3xl text-white" />
-                 </div>
-                 <h3 className="text-2xl font-bold text-blue-900">Registrar Vehículo</h3>
-               </div>
-               <p className="text-gray-600 mb-8 leading-relaxed text-center">
-                 Completa la información de tu vehículo: placa, conductor, puestos, destino, horarios y estado del viaje.
-               </p>
-               <button
-                 onClick={() => setShowAddCarModal(true)}
-                 className="w-full bg-blue-600 text-white px-8 py-4 rounded-lg hover:bg-blue-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg text-lg"
-               >
-                 <FaPlus className="mr-3 text-xl" />
-                 Agregar Vehículo
-               </button>
-             </div>
-
-             {/* Botón para ver reservas */}
-             <div className="bg-gradient-to-br from-green-50 to-green-100 p-8 rounded-xl border-2 border-green-200 hover:border-green-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 max-w-md mb-6">
-               <div className="flex items-center mb-6">
-                 <div className="bg-green-600 p-4 rounded-lg mr-4">
-                   <FaUsers className="text-3xl text-white" />
-                 </div>
-                 <h3 className="text-2xl font-bold text-green-900">Gestionar Reservas</h3>
-               </div>
-               <p className="text-gray-600 mb-8 leading-relaxed text-center">
-                 Consulta y gestiona todas las reservas. Confirma o rechaza solicitudes pendientes de los usuarios.
-               </p>
-               <button
-                 onClick={handleViewReservas}
-                 className="w-full bg-green-600 text-white px-8 py-4 rounded-lg hover:bg-green-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg text-lg"
-               >
-                 <FaUsers className="mr-3 text-xl" />
-                 Gestionar Reservas
-               </button>
-             </div>
-
-
-
-             {/* Botón para gestionar carros */}
-             <div className="bg-gradient-to-br from-purple-50 to-purple-100 p-8 rounded-xl border-2 border-purple-200 hover:border-purple-400 hover:shadow-lg transition-all duration-300 transform hover:scale-105 max-w-md mb-6">
-               <div className="flex items-center mb-6">
-                 <div className="bg-purple-600 p-4 rounded-lg mr-4">
-                   <FaCog className="text-3xl text-white" />
-                 </div>
-                 <h3 className="text-2xl font-bold text-purple-900">Gestionar Carros</h3>
-               </div>
-               <p className="text-gray-600 mb-8 leading-relaxed text-center">
-                 Ver y actualizar el estado de los carros. Cambia el estado de los vehículos según el viaje.
-               </p>
-               <button
-                 onClick={handleViewCarros}
-                 className="w-full bg-purple-600 text-white px-8 py-4 rounded-lg hover:bg-purple-700 transition-all duration-300 font-semibold flex items-center justify-center shadow-md hover:shadow-lg text-lg"
-               >
-                 <FaCog className="mr-3 text-xl" />
-                 Gestionar Carros
-               </button>
-             </div>
-
-
-           </div>
+        {/* Acciones */}
+        <div className="grid sm:grid-cols-3 gap-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+          <ActionCard
+            icon={<FaPlus />}
+            title="Agregar Vehículo"
+            desc="Registra un nuevo vehículo con imagen, ruta y horario."
+            btnLabel="Agregar"
+            gradient="from-violet-600 to-blue-600"
+            onClick={() => setShowAddCar(true)}
+          />
+          <ActionCard
+            icon={<FaListAlt />}
+            title="Ver Reservas"
+            desc="Consulta las reservas activas de tus vehículos."
+            btnLabel="Ver reservas"
+            gradient="from-blue-600 to-cyan-500"
+            onClick={fetchReservas}
+          />
+          <ActionCard
+            icon={<FaCar />}
+            title="Mis Vehículos"
+            desc="Administra, actualiza el estado o elimina tus carros."
+            btnLabel="Ver vehículos"
+            gradient="from-green-600 to-emerald-500"
+            onClick={fetchCarros}
+          />
         </div>
       </div>
 
-      {/* Modal Agregar Carro */}
-      {showAddCarModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-            {/* Botón de cerrar arriba a la derecha */}
-            <button
-              onClick={() => setShowAddCarModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-              aria-label="Cerrar"
-            >
-              &times;
-            </button>
-            <h2 className="text-3xl font-bold text-blue-900 mb-8 text-center">Agregar Vehículo</h2>
-            
-            {/* Botón para cargar estados - ELIMINADO */}
-            
-            <form onSubmit={handleAddCar} className="space-y-5">
-              {/* Placa */}
-
-
+      {/* ── Modal: Agregar Vehículo ── */}
+      {showAddCar && (
+        <Modal title="Registrar Vehículo" accent="violet" onClose={() => setShowAddCar(false)}>
+          <form onSubmit={handleAddCar} className="space-y-4">
+            <div className="grid grid-cols-2 gap-3">
+              <FormInput
+                label="Conductor"
+                icon={<FaUser />}
+                value={carData.Conductor}
+                onChange={e => setCarData(p => ({ ...p, Conductor: e.target.value }))}
+                placeholder="Tu nombre"
+                required
+              />
+              <FormInput
+                label="Teléfono"
+                icon={<FaPhone />}
+                value={carData.Telefono}
+                onChange={e => setCarData(p => ({ ...p, Telefono: e.target.value }))}
+                placeholder="300 000 0000"
+                required
+              />
+              <FormInput
+                label="Placa"
+                icon={<FaIdCard />}
+                value={carData.Placa}
+                onChange={e => setCarData(p => ({ ...p, Placa: e.target.value }))}
+                placeholder="ABC-123"
+                required
+              />
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Placa</label>
-                <input
-                  type="text"
-                  value={carData.Placa}
-                  onChange={(e) => setCarData({...carData, Placa: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              <div>
-  <label className="block text-sm font-medium text-gray-700 mb-1">Imagen del Carro</label>
-      <input
-      type="file"
-      name="Imagencarro"
-      accept="image/*"
-      onChange={(e) => {
-        const file = e.target.files[0];
-        if (file && file.size > 2 * 1024 * 1024) { // 2MB
-          showToastNotification('La imagen debe ser menor a 2MB. Se comprimirá automáticamente.', 'warning');
-        }
-        setCarData({ ...carData, Imagencarro: file });
-      }}
-      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-    />
-</div>
-              {/* Conductor */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Conductor 
-                  <span className="text-xs text-green-600 ml-2">
-                    (Se llena automáticamente)
-                  </span>
-                </label>
-                <input
-                  type="text"
-                  value={carData.Conductor}
-                  onChange={(e) => setCarData({...carData, Conductor: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 bg-gray-50"
-                  required
-                  readOnly
-                  placeholder="Se llena automáticamente con tu nombre"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Este campo se llena automáticamente con tu nombre de usuario
-                </p>
-              </div>
-              {/* Puestos */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Cantidad de Puestos</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="4"
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Asientos</label>
+                <select
                   value={carData.Asientos}
-                  onChange={(e) => setCarData({...carData, Asientos: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Ej: 4"
+                  onChange={e => setCarData(p => ({ ...p, Asientos: e.target.value }))}
                   required
-                />
-              </div>
-              
-              {/* Destino */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Destino</label>
-                <select
-                  value={carData.Destino}
-                  onChange={(e) => setCarData({...carData, Destino: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
+                  className="w-full py-2.5 px-4 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
                 >
-                  <option value="">Seleccionar destino</option>
-                  <option value="Medellin">Medellín</option>
-                  <option value="Caucasia">Caucasia</option>
-                  <option value="Zaragoza">Zaragoza</option>
+                  <option value="">Seleccionar</option>
+                  {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
                 </select>
               </div>
+              <FormInput
+                label="Destino"
+                icon={<FaMapMarkerAlt />}
+                value={carData.Destino}
+                onChange={e => setCarData(p => ({ ...p, Destino: e.target.value }))}
+                placeholder="Medellín"
+                required
+                className="col-span-2"
+              />
+              <FormInput
+                label="Hora de salida"
+                icon={<FaClock />}
+                type="time"
+                value={carData.Horasalida}
+                onChange={e => setCarData(p => ({ ...p, Horasalida: e.target.value }))}
+                required
+              />
+              <FormInput
+                label="Fecha"
+                icon={<FaCalendarAlt />}
+                type="date"
+                value={carData.Fecha}
+                onChange={e => setCarData(p => ({ ...p, Fecha: e.target.value }))}
+                required
+              />
+            </div>
 
-   
-
-            
-              
-              {/* Hora de Salida */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Fecha del Viaje</label>
-                  <input
-                    type="date"
-                    value={carData.Fecha}
-                    onChange={(e) => setCarData({...carData, Fecha: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Selecciona la fecha del viaje
-                  </p>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Hora de Salida</label>
-                  <input
-                    type="time"
-                    value={carData.Horasalida}
-                    onChange={(e) => setCarData({...carData, Horasalida: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    required
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Selecciona la hora de salida
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Teléfono</label>
-                <input
-                  type="text"
-                  value={carData.Telefono}
-                  onChange={(e) => setCarData({...carData, Telefono: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
-              </div>
-              {/* Estado del Carro */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Estado del Carro 
-                  {carData.Estado && (
-                    <span className="ml-2 text-xs text-green-600">
-                      (Seleccionado: {estados.find(e => (e.id_estados || e.id) == carData.Estado)?.estados || `Estado ${carData.Estado}`})
-                    </span>
-                  )}
-                </label>
-                <select
-                  value={carData.Estado || ''}
-                  onChange={(e) => setCarData({...carData, Estado: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                >
-                  <option value="">Seleccionar estado</option>
-                  {estados.map((estado, index) => (
-                    <option key={index} value={estado.id_estados || estado.id}>
-                      {estado.estados || estado.nombre || estado.Nombre || `Estado ${estado.id_estados || estado.id}`}
-                    </option>
-                  ))}
-                </select>
-                {estados.length === 0 && (
-                  <p className="text-sm text-gray-500 mt-1">
-                    Cargando estados... Si no aparecen, haz clic en "Cargar Estados"
-                  </p>
-                )}
-                {estados.length > 0 && (
-                  <p className="text-sm text-blue-600 mt-1">
-                    ✓ {estados.length} estado(s) disponible(s) para seleccionar
-                  </p>
-                )}
-              </div>
-
-              {/* Día - Eliminado ya que ahora usamos el campo de fecha */}
-              
-              {/* Botones */}
-              <div className="flex flex-col sm:flex-row gap-3 mt-6">
-                <button
-                  type="submit"
-                  className="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
-                >
-                  Agregar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setShowAddCarModal(false)}
-                  className="flex-1 bg-gray-300 text-gray-700 py-2 px-4 rounded-md hover:bg-gray-400 transition-colors"
-                >
-                  Cancelar
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-             )}
-
-       {/* Modal Ver Carros */}
-       {showCarrosModal && (
-         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-           <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-4xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-             {/* Botón de cerrar arriba a la derecha */}
-             <button
-               onClick={() => setShowCarrosModal(false)}
-               className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-               aria-label="Cerrar"
-             >
-               &times;
-             </button>
-             
-             <h2 className="text-3xl font-bold text-purple-900 mb-8 text-center">Gestionar Carros</h2>
-             
-             {isLoadingCarros ? (
-               <div className="flex items-center justify-center py-8">
-                 <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
-                 <span className="ml-3 text-gray-600">Cargando carros...</span>
-               </div>
-             ) : carros.length === 0 ? (
-               <div className="text-center py-8">
-                 <FaCar className="text-6xl text-gray-300 mx-auto mb-4" />
-                 <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay carros</h3>
-                 <p className="text-gray-500">Aún no se han registrado carros en el sistema.</p>
-               </div>
-             ) : (
-               <div className="space-y-4">
-                 <div className="bg-purple-50 rounded-lg p-4 mb-6">
-                   <h3 className="text-lg font-semibold text-purple-900 mb-2">
-                     Total de Carros: {carros.length}
-                   </h3>
-                   <p className="text-purple-700 text-sm">
-                     Aquí puedes ver y actualizar el estado de todos los carros
-                   </p>
-                 </div>
-                 
-                 <div className="grid gap-4">
-                   {carros.map((carro, index) => (
-                     <div key={index} className="bg-white border border-gray-200 rounded-lg p-6 shadow-sm hover:shadow-md transition-shadow">
-                       {/* Imagen del carro */}
-                       <div className="mb-4 flex justify-center">
-                         {carro.imagencarro ? (
-                           <div className="relative">
-                             <img 
-                               src={getCarImageUrl(carro.imagencarro)}
-                               alt={`Imagen del carro ${carro.placa || carro.Placa}`}
-                               className="w-full max-w-xs h-32 object-cover rounded-lg shadow-md"
-                               onError={(e) => {
-                                 e.target.style.display = 'none';
-                                 e.target.nextSibling.style.display = 'block';
-                               }}
-                             />
-                             <div className="absolute top-2 right-2 bg-green-500 text-white text-xs px-2 py-1 rounded-full">
-                               ✓ Imagen
-                             </div>
-                           </div>
-                         ) : null}
-                         
-                         {/* Fallback si no hay imagen o si falla */}
-                         <div className={`w-full max-w-xs h-32 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-md flex items-center justify-center ${carro.imagencarro ? 'hidden' : 'block'}`}>
-                           <FaCar className="text-4xl text-blue-600" />
-                           <span className="ml-2 text-blue-800 font-medium text-sm">Sin imagen</span>
-                         </div>
-                         
-
-                       </div>
-                       
-                       <div className="grid md:grid-cols-2 gap-4">
-                         {/* Información principal */}
-                         <div className="space-y-3">
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">ID Carro:</span>
-                             <span className="text-purple-600 font-bold">#{carro.id_carros || carro.id || index + 1}</span>
-                           </div>
-                           
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Placa:</span>
-                             <span className="text-gray-900 font-mono">{carro.placa || carro.Placa || 'N/A'}</span>
-                           </div>
-                           
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Conductor:</span>
-                             <span className="text-gray-900">{carro.conductor || carro.Conductor || 'N/A'}</span>
-                           </div>
-                           
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Destino:</span>
-                             <span className="bg-blue-100 text-blue-800 px-2 py-1 rounded-full text-sm font-semibold">
-                               {carro.destino || carro.Destino || 'N/A'}
-                             </span>
-                           </div>
-                         </div>
-                         
-                         {/* Información adicional */}
-                         <div className="space-y-3">
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Asientos:</span>
-                             <span className="text-gray-900">{carro.asientos || carro.Asientos || 'N/A'}</span>
-                           </div>
-                           
-                                                       <div className="flex items-center justify-between">
-                              <span className="font-semibold text-gray-700">Estado Actual:</span>
-                              <div className="flex flex-col items-end">
-                                <span className={`px-3 py-2 rounded-full text-sm font-bold shadow-sm ${
-                                  (carro.id_estados || carro.Estado) == 1 
-                                    ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300' 
-                                    : (carro.id_estados || carro.Estado) == 2
-                                    ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300'
-                                    : (carro.id_estados || carro.Estado) == 3
-                                    ? 'bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 border border-orange-300'
-                                    : (carro.id_estados || carro.Estado) == 4
-                                    ? 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
-                                    : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300'
-                                }`}>
-                                  {getEstadoNombre(carro.id_estados || carro.Estado)}
-                                </span>
-                                <span className="text-xs text-gray-500 mt-2 font-mono">
-                                  ID: {carro.id_estados || carro.Estado || 'N/A'}
-                                </span>
-                              </div>
-                            </div>
-                           
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Fecha:</span>
-                             <span className="text-gray-900 text-sm">
-                               {carro.fecha || carro.Fecha || 'N/A'}
-                             </span>
-                           </div>
-                           
-                           <div className="flex items-center justify-between">
-                             <span className="font-semibold text-gray-700">Hora:</span>
-                             <span className="text-gray-900 text-sm">
-                               {carro.horasalida || carro.Horasalida || 'N/A'}
-                             </span>
-                           </div>
-                         </div>
-                       </div>
-                       
-                       {/* Botones de acción */}
-                       <div className="border-t border-gray-200 mt-4 pt-4">
-                         <div className="grid grid-cols-2 gap-3">
-                                                       <button
-                              onClick={() => {
-                                setSelectedCarro(carro);
-                                setShowUpdateEstadoModal(true);
-                              }}
-                              className="bg-purple-600 text-white py-2 px-4 rounded-lg hover:bg-purple-700 transition-colors font-semibold flex items-center justify-center"
-                            >
-                              <FaCog className="mr-2" />
-                              Editar Carro
-                            </button>
-                           <button
-                             onClick={() => confirmDeleteCarro(carro)}
-                             className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition-colors font-semibold flex items-center justify-center"
-                           >
-                             <FaTimes className="mr-2" />
-                             Eliminar
-                           </button>
-                         </div>
-                       </div>
-                     </div>
-                   ))}
-                 </div>
-               </div>
-             )}
-             
-             {/* Botón de cerrar */}
-             <div className="mt-8 text-center">
-               <button
-                 onClick={() => setShowCarrosModal(false)}
-                 className="bg-gray-300 text-gray-700 py-2 px-6 rounded-lg hover:bg-gray-400 transition-colors font-semibold"
-               >
-                 Cerrar
-               </button>
-             </div>
-           </div>
-         </div>
-       )}
-
-               {/* Modal Actualizar Estado */}
-        {showUpdateEstadoModal && selectedCarro && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-            <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-6xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-              {/* Botón de cerrar arriba a la derecha */}
-              <button
-                onClick={() => {
-                  setShowUpdateEstadoModal(false);
-                  setSelectedCarro(null);
-                  setNewEstado('');
-                }}
-                className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-                aria-label="Cerrar"
+            {/* Estado */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Estado</label>
+              <select
+                value={carData.Estado}
+                onChange={e => setCarData(p => ({ ...p, Estado: e.target.value }))}
+                required
+                className="w-full py-2.5 px-4 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
               >
-                &times;
+                <option value="">Seleccionar estado</option>
+                {estados.map(est => (
+                  <option key={est.id_estados || est.id} value={est.id_estados || est.id}>
+                    {est.estados || est.Estados || est.nombre || `Estado ${est.id_estados || est.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Imagen */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Imagen del vehículo</label>
+              <input
+                type="file"
+                accept="image/*"
+                onChange={e => setCarData(p => ({ ...p, Imagencarro: e.target.files[0] || null }))}
+                required
+                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowAddCar(false)}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all"
+              >
+                Cancelar
               </button>
-              
-                             <h2 className="text-3xl font-bold text-purple-900 mb-8 text-center">Actualizar Carro</h2>
-              
-              <div className="grid md:grid-cols-2 gap-8">
-                {/* Columna izquierda: Formulario de actualización */}
-                <div className="space-y-6">
-                                     {/* Información del carro */}
-                   <div className="bg-purple-50 rounded-lg p-4">
-                     <h3 className="font-semibold text-purple-900 mb-2">Carro Seleccionado:</h3>
-                     <div className="space-y-2 text-sm">
-                       <div><span className="font-semibold">Placa:</span> {selectedCarro.placa || selectedCarro.Placa}</div>
-                       <div><span className="font-semibold">Conductor:</span> {selectedCarro.conductor || selectedCarro.Conductor}</div>
-                       <div><span className="font-semibold">Destino:</span> {selectedCarro.destino || selectedCarro.Destino}</div>
-                       <div className="flex items-center justify-between">
-                         <span className="font-semibold">Estado Actual:</span>
-                         <div className="flex flex-col items-end">
-                           <span className={`px-3 py-2 rounded-full text-sm font-bold shadow-sm ${
-                             (selectedCarro.id_estados || selectedCarro.Estado) == 1 
-                               ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300' 
-                               : (selectedCarro.id_estados || selectedCarro.Estado) == 2
-                               ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300'
-                               : (selectedCarro.id_estados || selectedCarro.Estado) == 3
-                               ? 'bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 border border-orange-300'
-                               : (selectedCarro.id_estados || selectedCarro.Estado) == 4
-                               ? 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
-                               : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300'
-                           }`}>
-                             {(() => {
-                               const estadoId = selectedCarro.id_estados || selectedCarro.Estado;
-                               const nombreEstado = getEstadoNombre(estadoId);
-                               return nombreEstado;
-                             })()}
-                           </span>
-                           <span className="text-xs text-gray-500 mt-2 font-mono">
-                             ID: {selectedCarro.id_estados || selectedCarro.Estado || 'N/A'}
-                           </span>
-                         </div>
-                       </div>
-                     </div>
-                   </div>
-                  
-                                     {/* Estado seleccionado */}
-                   {newEstado && (
-                     <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-                       <h4 className="font-semibold text-green-900 mb-2">Estado Seleccionado:</h4>
-                       <div className="flex items-center justify-between">
-                         <div className="flex items-center space-x-3">
-                           <span className="bg-green-100 text-green-800 px-2 py-1 rounded-full text-xs font-semibold">
-                             ID: {newEstado}
-                           </span>
-                                                      <span className="text-green-900 font-medium">
-                              {estados.find(e => (e.id_estados || e.id) == newEstado)?.estados || 
-                               estados.find(e => (e.id_estados || e.id) == newEstado)?.nombre || 
-                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Nombre || 
-                               estados.find(e => (e.id_estados || e.id) == newEstado)?.estado || 
-                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Estado || 
-                               estados.find(e => (e.id_estados || e.id) == newEstado)?.Estados || 
-                               `Estado ${newEstado}`}
-                            </span>
-                         </div>
-                         <button
-                           onClick={() => setNewEstado('')}
-                           className="text-red-600 hover:text-red-800 text-sm font-medium"
-                         >
-                           Cambiar
-                         </button>
-                       </div>
-                     </div>
-                   )}
-
-                   {/* Campos de fecha y hora */}
-                   <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                     <h4 className="font-semibold text-blue-900 mb-3">Modificar Fecha y Hora del Viaje</h4>
-                     <div className="grid grid-cols-2 gap-4">
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Fecha:</label>
-                         <input
-                           type="date"
-                           value={selectedCarro?.nuevaFecha || selectedCarro?.fecha || selectedCarro?.Fecha || ''}
-                           onChange={(e) => setSelectedCarro(prev => ({...prev, nuevaFecha: e.target.value}))}
-                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                         />
-                       </div>
-                       <div>
-                         <label className="block text-sm font-medium text-gray-700 mb-2">Nueva Hora:</label>
-                         <input
-                           type="time"
-                           value={selectedCarro?.nuevaHora || selectedCarro?.horasalida || selectedCarro?.Horasalida || ''}
-                           onChange={(e) => setSelectedCarro(prev => ({...prev, nuevaHora: e.target.value}))}
-                           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                         />
-                       </div>
-                     </div>
-                     <p className="text-xs text-blue-600 mt-2">
-                       Deja vacío si no quieres cambiar la fecha o hora
-                     </p>
-                   </div>
-                  
-                  {/* Información sobre el funcionamiento */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                    <h4 className="font-semibold text-blue-900 mb-2">ℹ️ Cómo funciona:</h4>
-                    <ul className="text-sm text-blue-800 space-y-1">
-                      <li>• <strong>Botón "Usar":</strong> Solo selecciona el estado (NO actualiza nada)</li>
-                      <li>• <strong>Botón "Actualizar Carro":</strong> Aplica todos los cambios (estado, fecha y hora)</li>
-                      <li>• Primero selecciona el estado, luego modifica fecha/hora si quieres, y finalmente actualiza</li>
-                    </ul>
-                  </div>
-
-                  {/* Botones */}
-                  <div className="flex space-x-4">
-                                         <button
-                       onClick={handleUpdateEstado}
-                       disabled={!selectedCarro}
-                       className="flex-1 bg-purple-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-purple-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                     >
-                       Actualizar Carro
-                     </button>
-                    <button
-                      onClick={() => {
-                        setShowUpdateEstadoModal(false);
-                        setSelectedCarro(null);
-                        setNewEstado('');
-                      }}
-                      className="flex-1 bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors"
-                    >
-                      Cancelar
-                    </button>
-                  </div>
-                </div>
-                
-                {/* Columna derecha: Lista de estados disponibles */}
-                <div className="space-y-4">
-                  <div className="bg-blue-50 rounded-lg p-4">
-                    <h3 className="font-semibold text-blue-900 mb-2">Estados Disponibles:</h3>
-                    <p className="text-blue-700 text-sm mb-4">
-                      Estados disponibles para asignar al carro
-                    </p>
-                  </div>
-                  
-                  {/* Lista de estados */}
-                  {estados.length > 0 && (
-                    <div className="bg-white border border-gray-200 rounded-lg p-4">
-                      <h4 className="font-semibold text-gray-900 mb-3">Estados Registrados:</h4>
-                      <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {estados.map((estado, index) => (
-                          <div key={index} className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-50 to-gray-100 rounded-lg border border-gray-200 hover:shadow-md transition-all duration-200">
-                            <div className="flex items-center space-x-3">
-                              <span className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 px-3 py-1 rounded-full text-xs font-bold border border-purple-300">
-                                ID: {estado.id_estados || estado.id || index + 1}
-                              </span>
-                              <span className="text-gray-900 font-semibold text-lg">
-                               {estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados || `Estado ${estado.id_estados || estado.id || index + 1}`}
-                             </span>
-                            </div>
-                            <button
-                              onClick={() => handleAssignEstado(estado.id_estados || estado.id || index + 1)}
-                              className="bg-gradient-to-r from-purple-600 to-purple-700 text-white px-4 py-2 rounded-lg hover:from-purple-700 hover:to-purple-800 transition-all duration-200 text-sm font-bold shadow-md hover:shadow-lg transform hover:scale-105"
-                            >
-                              🎯 Usar
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                  
-                  {isLoadingEstados && (
-                    <div className="flex items-center justify-center py-4">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                      <span className="ml-3 text-gray-600">Cargando estados...</span>
-                    </div>
-                  )}
-                  
-                  {!isLoadingEstados && estados.length === 0 && (
-                    <div className="text-center py-8 bg-gray-50 rounded-lg">
-                      <div className="text-gray-400 text-4xl mb-2">📋</div>
-                      <h4 className="text-gray-600 font-medium">No hay estados cargados</h4>
-                      <p className="text-gray-500 text-sm">Los estados se cargan automáticamente</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-       {/* Modal Ver Reservas */}
-      {showReservasModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-6xl w-full mx-4 overflow-y-auto max-h-[90vh]">
-            {/* Botón de cerrar arriba a la derecha */}
-            <button
-              onClick={() => setShowReservasModal(false)}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold"
-              aria-label="Cerrar"
-            >
-              &times;
-            </button>
-            
-            <h2 className="text-3xl font-bold text-green-900 mb-8 text-center">Gestión de Reservas</h2>
-            
-            <div className="bg-green-50 rounded-lg p-4 mb-6">
-              <h3 className="text-lg font-semibold text-green-900 mb-2">
-                Total de Reservas: {reservas.length}
-              </h3>
-              <p className="text-green-700 text-sm">
-                Confirma o rechaza las reservas pendientes de los usuarios
-              </p>
-            </div>
-            
-            {isLoadingReservas ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-                <span className="ml-3 text-gray-600">Cargando reservas...</span>
-              </div>
-            ) : reservas.length === 0 ? (
-              <div className="text-center py-8">
-                <FaUsers className="text-6xl text-gray-300 mx-auto mb-4" />
-                <h3 className="text-xl font-semibold text-gray-600 mb-2">No hay reservas</h3>
-                <p className="text-gray-500">Aún no se han realizado reservas en el sistema.</p>
-              </div>
-            ) : (
-              <div className="space-y-6">
-                {/* Lista de reservas */}
-                <div className="grid gap-6">
-                  {reservas.map((reserva, index) => (
-                    <div key={index} className="bg-white border border-gray-200 rounded-xl p-6 shadow-sm hover:shadow-lg transition-all duration-300">
-                      {/* Header de la reserva */}
-                      <div className="flex items-center justify-between mb-4 pb-4 border-b border-gray-100">
-                        <div className="flex items-center space-x-3">
-                          <div className="bg-green-100 text-green-800 px-3 py-1 rounded-full text-sm font-semibold">
-                            Reserva #{reserva.id_reservarviaje || reserva.id || index + 1}
-                          </div>
-                          <div className="bg-blue-100 text-blue-800 px-3 py-1 rounded-full text-sm font-semibold">
-                            Asiento {reserva.asiento || reserva.Asiento || 'N/A'}
-                          </div>
-                          <div className={`px-3 py-1 rounded-full text-sm font-semibold ${
-                            !reserva.estado || reserva.estado.toLowerCase() === 'pendiente'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-green-100 text-green-800'
-                          }`}>
-                            {!reserva.estado || reserva.estado.toLowerCase() === 'pendiente'
-                              ? 'Pendiente'
-                              : 'Confirmado por el usuario'
-                            }
-                          </div>
-                        </div>
-                        <div className="text-sm text-gray-500">
-                          {reserva.created_at ? new Date(reserva.created_at).toLocaleString('es-ES') : 'Fecha no disponible'}
-                        </div>
-                      </div>
-                      
-                      {/* Información principal */}
-                      <div className="grid md:grid-cols-3 gap-6">
-                        {/* Información del usuario */}
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-gray-900 flex items-center">
-                            <FaUser className="mr-2 text-blue-600" />
-                            Información del Usuario
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Nombre:</span>
-                              <span className="font-medium text-gray-900">{reserva.usuarioInfo?.nombre || reserva.comentario || reserva.Comentario || 'No especificado'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Teléfono:</span>
-                              <span className="font-medium text-gray-900 flex items-center">
-                                <FaPhone className="mr-1 text-blue-500" />
-                                {reserva.usuarioInfo?.telefono || reserva.usuarioInfo?.Telefono || reserva.usuarioInfo?.phone || 'No especificado'}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Información del viaje */}
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-gray-900 flex items-center">
-                            <FaMapMarkerAlt className="mr-2 text-green-600" />
-                            Detalles del Viaje
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Asiento:</span>
-                              <span className="font-medium text-gray-900">{reserva.asiento || reserva.Asiento || 'N/A'}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Placa:</span>
-                              <span className="font-medium text-gray-900">
-                                {(() => {
-                                  const placa = reserva.carroInfo?.placa || 'N/A';
-                                  return placa;
-                                })()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                        
-                        {/* Estado de la reserva */}
-                        <div className="space-y-3">
-                          <h4 className="font-semibold text-gray-900 flex items-center">
-                            <FaCog className="mr-2 text-green-600" />
-                            Estado de la Reserva
-                          </h4>
-                          <div className="space-y-2">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Estado:</span>
-                              <span className="bg-yellow-100 text-yellow-800 px-2 py-1 rounded text-sm font-medium">
-                                Pendiente
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Información adicional */}
-                      {(reserva.ubicacion || reserva.Ubicacion) && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <h5 className="font-medium text-gray-900 mb-2">Ubicación Detallada:</h5>
-                          <div className="bg-gray-50 p-3 rounded-lg">
-                            <p className="text-gray-700 break-all">
-                              {reserva.ubicacion || reserva.Ubicacion}
-                            </p>
-                            {isLink(reserva.ubicacion || reserva.Ubicacion) && (
-                              <button
-                                onClick={() => openLink(reserva.ubicacion || reserva.Ubicacion)}
-                                className="mt-2 text-blue-600 hover:text-blue-800 text-sm font-medium flex items-center"
-                              >
-                                <FaExternalLinkAlt className="mr-1" />
-                                Abrir ubicación
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Botones de acción para reservas pendientes */}
-                      {(!reserva.estado || reserva.estado.toLowerCase() === 'pendiente') && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <div className="flex space-x-3 justify-center">
-                            <button
-                              onClick={() => handleConfirmarReserva(reserva)}
-                              className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition-colors flex items-center"
-                            >
-                              <FaCheck className="mr-2" />
-                              Confirmar
-                            </button>
-                            <button
-                              onClick={() => handleRechazarReserva(reserva)}
-                              className="bg-red-600 text-white px-6 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center"
-                            >
-                              <FaTimes className="mr-2" />
-                              Rechazar
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                      
-                      {/* Estado de reservas confirmadas */}
-                      {reserva.estado && reserva.estado.toLowerCase() !== 'pendiente' && (
-                        <div className="mt-4 pt-4 border-t border-gray-100">
-                          <div className="text-center p-3 rounded-lg bg-green-50 text-green-800">
-                            <span className="font-semibold">
-                              ✅ Confirmado por el usuario
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-            
-            {/* Botón de cerrar */}
-            <div className="mt-8 text-center">
               <button
-                onClick={() => setShowReservasModal(false)}
-                className="bg-gray-300 text-gray-700 py-3 px-8 rounded-lg hover:bg-gray-400 transition-colors font-semibold"
+                type="submit"
+                disabled={isSaving}
+                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
               >
-                Cerrar
+                {isSaving ? 'Guardando...' : 'Registrar Vehículo'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal: Reservas ── */}
+      {showReservas && (
+        <Modal title="Reservas de mis vehículos" accent="blue" onClose={() => setShowReservas(false)}>
+          {loadingReservas ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="w-8 h-8 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Cargando...</p>
+            </div>
+          ) : reservas.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="text-5xl mb-3">📋</div>
+              <p className="text-gray-500 text-sm">No hay reservas para tus vehículos.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {reservas.map((r, idx) => {
+                const id = r.id_reservarviajes || r.id_reservarviaje || r.id || r.ID;
+                const enProceso = procesando === id;
+                const estado = r.estado?.toLowerCase();
+                const statusCls = estado === 'confirmada'
+                  ? 'bg-green-50 text-green-700 border-green-200'
+                  : estado === 'rechazada' || estado === 'cancelada'
+                    ? 'bg-red-50 text-red-700 border-red-200'
+                    : 'bg-yellow-50 text-yellow-700 border-yellow-200';
+
+                return (
+                  <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-gray-800 text-sm">Reserva #{id}</p>
+                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
+                        {r.estado || 'Pendiente'}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <InfoRow icon={<FaMapMarkerAlt />} label="Ubicación"  value={r.ubicacion} />
+                      <InfoRow icon={<FaCar />}          label="Asiento"    value={r.asiento} />
+                      <InfoRow icon={<FaUser />}         label="Pasajero"   value={r.nombre} />
+                      <InfoRow icon={<FaPhone />}        label="Teléfono"   value={r.tel} />
+                    </div>
+                    {(!estado || estado === 'pendiente') && (
+                      <div className="flex gap-2 pt-2 border-t border-gray-100">
+                        <button
+                          onClick={() => cambiarEstadoReserva(r, 'Confirmada')}
+                          disabled={enProceso}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
+                          Confirmar
+                        </button>
+                        <button
+                          onClick={() => cambiarEstadoReserva(r, 'rechazada')}
+                          disabled={enProceso}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
+                          Rechazar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Modal: Mis Carros ── */}
+      {showCarros && (
+        <Modal title="Mis Vehículos" accent="green" onClose={() => setShowCarros(false)}>
+          {loadingCarros ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="w-8 h-8 border-4 border-green-200 border-t-green-500 rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Cargando...</p>
+            </div>
+          ) : carros.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="text-5xl mb-3">🚗</div>
+              <p className="text-gray-500 text-sm">No tienes vehículos registrados.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {carros.map((carro, idx) => {
+                const id = carro.id_carros || carro.id;
+                return (
+                  <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-bold text-gray-800 text-sm">{carro.placa || 'Sin placa'}</p>
+                      <span className="text-xs bg-blue-50 text-blue-700 border border-blue-200 px-2.5 py-1 rounded-full font-semibold">
+                        {carro.asientos} asientos
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <InfoRow icon={<FaMapMarkerAlt />} label="Destino"    value={carro.destino} />
+                      <InfoRow icon={<FaClock />}        label="Hora"       value={carro.horasalida} />
+                      <InfoRow icon={<FaCalendarAlt />}  label="Fecha"      value={carro.fecha} />
+                      <InfoRow icon={<FaPhone />}        label="Teléfono"   value={carro.telefono} />
+                    </div>
+                    <div className="flex gap-2 pt-2 border-t border-gray-100">
+                      <button
+                        onClick={() => { setSelectedCarro(carro); setNewEstado(''); setShowEstadoModal(true); }}
+                        className="flex-1 py-2 bg-blue-500 text-white text-xs font-bold rounded-xl hover:bg-blue-600 transition-all active:scale-95"
+                      >
+                        Cambiar Estado
+                      </button>
+                      <button
+                        onClick={() => { setCarroToDelete(carro); setShowDeleteModal(true); }}
+                        className="flex items-center justify-center w-9 h-9 bg-red-50 text-red-500 rounded-xl hover:bg-red-100 transition-all"
+                      >
+                        <FaTrash className="text-xs" />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Modal: Cambiar Estado ── */}
+      {showEstadoModal && selectedCarro && (
+        <Modal title={`Estado — ${selectedCarro.placa}`} accent="blue" onClose={() => { setShowEstadoModal(false); setSelectedCarro(null); }}>
+          <form onSubmit={handleUpdateEstado} className="space-y-4">
+            <div>
+              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Nuevo estado</label>
+              <select
+                value={newEstado}
+                onChange={e => setNewEstado(e.target.value)}
+                required
+                className="w-full py-2.5 px-4 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+              >
+                <option value="">Seleccionar estado</option>
+                {estados.map(est => (
+                  <option key={est.id_estados || est.id} value={est.id_estados || est.id}>
+                    {est.estados || est.Estados || est.nombre || `Estado ${est.id_estados || est.id}`}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex gap-3">
+              <button type="button" onClick={() => { setShowEstadoModal(false); setSelectedCarro(null); }}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button type="submit" disabled={isSaving}
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-cyan-500 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
+                {isSaving ? 'Guardando...' : 'Actualizar'}
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
+
+      {/* ── Modal: Confirmar eliminación ── */}
+      {showDeleteModal && carroToDelete && (
+        <Modal title="Eliminar Vehículo" accent="red" onClose={() => { setShowDeleteModal(false); setCarroToDelete(null); }}>
+          <div className="text-center space-y-4">
+            <div className="text-5xl">🗑️</div>
+            <p className="text-gray-700 text-sm">
+              ¿Seguro que quieres eliminar el vehículo <strong>{carroToDelete.placa}</strong>? Esta acción no se puede deshacer.
+            </p>
+            <div className="flex gap-3">
+              <button onClick={() => { setShowDeleteModal(false); setCarroToDelete(null); }}
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50">
+                Cancelar
+              </button>
+              <button onClick={handleDeleteCarro} disabled={isDeleting}
+                className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
+                {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
-
-      {/* Modal de confirmación para eliminar carro */}
-      {showDeleteConfirmModal && carroToDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="relative bg-white rounded-2xl shadow-2xl p-8 max-w-lg w-full mx-4">
-            {/* Botón de cerrar arriba a la derecha */}
-            <button
-              onClick={() => {
-                setShowDeleteConfirmModal(false);
-                setCarroToDelete(null);
-              }}
-              className="absolute top-4 right-4 text-gray-400 hover:text-red-500 text-2xl font-bold transition-colors"
-              aria-label="Cerrar"
-            >
-              &times;
-            </button>
-            
-            <div className="text-center">
-              {/* Header con gradiente rojo */}
-              <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-t-xl -m-8 mb-8 p-8 text-white">
-                <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
-                  <FaTimes className="text-5xl text-white drop-shadow-lg" />
-                </div>
-                <h3 className="text-3xl font-bold mb-2">Confirmar Eliminación</h3>
-                <p className="text-red-100 text-lg">Esta acción no se puede deshacer</p>
-              </div>
-              
-                            {/* Información del carro */}
-              <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 mb-8 border border-gray-200">
-                <h4 className="font-bold text-gray-900 mb-6 text-xl flex items-center justify-center">
-                  <FaCar className="mr-3 text-blue-600" />
-                  Detalles del Vehículo
-                </h4>
-                
-                {/* Información principal en orden lógico */}
-                <div className="space-y-4">
-                  {/* Placa - Información más importante */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-700 text-lg">🚗 Placa del Vehículo</span>
-                      <span className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 py-2 rounded-full font-mono font-bold text-xl shadow-md">
-                        {carroToDelete.placa || carroToDelete.Placa || 'N/A'}
-                      </span>
-                    </div>
-              </div>
-              
-                  {/* Información del conductor */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-700 text-lg">👤 Conductor Responsable</span>
-                      <span className="bg-gradient-to-r from-purple-100 to-purple-200 text-purple-800 px-4 py-2 rounded-full font-semibold text-lg border border-purple-300">
-                        {carroToDelete.conductor || carroToDelete.Conductor || 'N/A'}
-                      </span>
-                </div>
-              </div>
-              
-                  {/* Destino del viaje */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-700 text-lg">📍 Destino del Viaje</span>
-                      <span className="bg-gradient-to-r from-green-100 to-green-200 text-green-800 px-4 py-2 rounded-full font-semibold text-lg border border-green-300">
-                        {carroToDelete.destino || carroToDelete.Destino || 'N/A'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  {/* Fecha y hora */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="grid grid-cols-2 gap-4">
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-gray-700">📅 Fecha:</span>
-                        <span className="text-gray-900 font-semibold bg-gray-100 px-3 py-1 rounded-lg">
-                          {carroToDelete.fecha || carroToDelete.Fecha || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="font-bold text-gray-700">🕐 Hora:</span>
-                        <span className="text-gray-900 font-semibold bg-gray-100 px-3 py-1 rounded-lg">
-                          {carroToDelete.horasalida || carroToDelete.Horasalida || 'N/A'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Estado actual */}
-                  <div className="bg-white rounded-lg p-4 border border-gray-200 shadow-sm">
-                    <div className="flex justify-between items-center">
-                      <span className="font-bold text-gray-700 text-lg">🔧 Estado Actual</span>
-                      <span className={`px-4 py-2 rounded-full font-bold text-lg shadow-md ${
-                        (carroToDelete.id_estados || carroToDelete.Estado) == 1 
-                          ? 'bg-gradient-to-r from-green-100 to-green-200 text-green-800 border border-green-300' 
-                          : (carroToDelete.id_estados || carroToDelete.Estado) == 2
-                          ? 'bg-gradient-to-r from-yellow-100 to-yellow-200 text-yellow-800 border border-yellow-300'
-                          : (carroToDelete.id_estados || carroToDelete.Estado) == 3
-                          ? 'bg-gradient-to-r from-orange-100 to-orange-200 text-orange-800 border border-orange-300'
-                          : (carroToDelete.id_estados || carroToDelete.Estado) == 4
-                          ? 'bg-gradient-to-r from-red-100 to-red-200 text-red-800 border border-red-300'
-                          : 'bg-gradient-to-r from-gray-100 to-gray-200 text-gray-800 border border-gray-300'
-                      }`}>
-                        {(() => {
-                          const estadoId = carroToDelete.id_estados || carroToDelete.Estado;
-                          const nombreEstado = getEstadoNombre(estadoId);
-                          return nombreEstado;
-                        })()}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Mensaje de advertencia */}
-              <div className="bg-gradient-to-r from-orange-50 to-red-50 border-l-4 border-red-500 rounded-lg p-4 mb-8 text-left">
-                <div className="flex items-start">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 bg-red-100 rounded-full flex items-center justify-center">
-                      <span className="text-red-600 text-lg">⚠️</span>
-                    </div>
-                  </div>
-                  <div className="ml-3">
-                    <h5 className="text-red-800 font-bold text-lg mb-1">¡Atención!</h5>
-                    <p className="text-red-700">
-                      Al eliminar este vehículo, también se eliminarán <strong>todas las reservas asociadas</strong> y 
-                      se perderá toda la información relacionada de forma permanente.
-                    </p>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Botones de acción */}
-              <div className="flex space-x-4">
-                <button
-                  onClick={() => {
-                    setShowDeleteConfirmModal(false);
-                    setCarroToDelete(null);
-                  }}
-                  disabled={isDeletingCarro}
-                  className="flex-1 bg-gradient-to-r from-gray-400 to-gray-500 text-white py-4 px-8 rounded-xl hover:from-gray-500 hover:to-gray-600 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-                >
-                  ❌ Cancelar
-                </button>
-                <button
-                  onClick={handleDeleteCarro}
-                  disabled={isDeletingCarro}
-                  className="flex-1 bg-gradient-to-r from-red-500 to-red-600 text-white py-4 px-8 rounded-xl hover:from-red-600 hover:to-red-700 transition-all duration-300 font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none flex items-center justify-center"
-                >
-                  {isDeletingCarro ? (
-                    <>
-                      <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white mr-3"></div>
-                      Eliminando...
-                    </>
-                  ) : (
-                    <>
-                      🗑️ Eliminar Definitivamente
-                    </>
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Estilos CSS para animaciones */}
-      <style>{`
-        @keyframes slideIn {
-          from {
-            transform: translateX(100%);
-            opacity: 0;
-          }
-          to {
-            transform: translateX(0);
-            opacity: 1;
-          }
-        }
-        .animate-slide-in {
-          animation: slideIn 0.3s ease-out;
-        }
-      `}</style>
-    </div>
+    </PageBg>
   );
 };
 
