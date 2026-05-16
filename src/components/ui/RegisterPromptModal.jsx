@@ -57,13 +57,13 @@ const RegisterPromptModal = ({ onClose }) => {
               onClick={() => { onClose(); navigate('/registrar'); }}
               className="w-full bg-gradient-to-r from-blue-700 to-violet-600 text-white py-3 px-4 rounded-xl font-bold hover:from-blue-800 hover:to-violet-700 transition-all duration-200 shadow-md hover:shadow-violet-300/50 hover:shadow-lg hover:scale-[1.02] active:scale-95"
             >
-              🚀 Crear Cuenta Gratis
+              Crear cuenta gratis
             </button>
             <button
               onClick={() => { onClose(); navigate('/login'); }}
               className="w-full bg-gray-100 text-gray-700 py-3 px-4 rounded-xl font-semibold hover:bg-gray-200 transition-all duration-200 active:scale-95"
             >
-              🔑 Ya tengo cuenta
+              Ya tengo cuenta
             </button>
             <button
               onClick={onClose}

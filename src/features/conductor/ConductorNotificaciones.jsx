@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaBell, FaCheck, FaTimes, FaMapMarkerAlt,
-  FaCar, FaCalendarAlt, FaExternalLinkAlt,
+  FaCar, FaCalendarAlt, FaExternalLinkAlt, FaUser,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -122,7 +122,11 @@ const ConductorNotificaciones = () => {
           </div>
         ) : reservasPendientes.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center animate-scale-in">
-            <div className="text-6xl mb-4">🔔</div>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-yellow-50 flex items-center justify-center">
+                <FaBell className="text-yellow-300 text-3xl" />
+              </div>
+            </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">Sin notificaciones</h3>
             <p className="text-gray-500 text-sm">No hay reservas pendientes por confirmar.</p>
           </div>
@@ -158,7 +162,7 @@ const ConductorNotificaciones = () => {
                         </div>
                       </div>
                       <span className="px-3 py-1 rounded-full text-xs font-semibold border bg-yellow-50 text-yellow-700 border-yellow-200">
-                        ⏳ Pendiente
+                        Pendiente
                       </span>
                     </div>
 
@@ -195,7 +199,7 @@ const ConductorNotificaciones = () => {
                       {/* Nombre pasajero */}
                       {reserva.nombre && (
                         <div className="flex items-start gap-2 text-sm">
-                          <span className="text-green-400 mt-0.5">👤</span>
+                          <FaUser className="text-green-400 mt-0.5 shrink-0" />
                           <div>
                             <p className="text-xs text-gray-400 font-medium mb-0.5">Pasajero</p>
                             <p className="text-gray-700">{reserva.nombre}</p>

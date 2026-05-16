@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaCar } from 'react-icons/fa';
 
 import Navbar              from '../components/layout/Navbar';
 import Footer              from '../components/layout/Footer';
@@ -114,7 +115,7 @@ const Home = () => {
           </h2>
           <p className="text-blue-200 text-base">
             {userData
-              ? `Bienvenido de vuelta, ${userData?.Nombre || userData?.nombre || 'viajero'} 👋`
+              ? `Bienvenido de vuelta, ${userData?.Nombre || userData?.nombre || 'viajero'}`
               : 'Regístrate para reservar tu asiento y viajar seguro'}
           </p>
           <div className="mx-auto mt-4 w-16 h-1 rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
@@ -129,7 +130,11 @@ const Home = () => {
 
         ) : !filteredCars.length ? (
           <div className="text-center py-24 animate-fade-in">
-            <div className="text-6xl mb-4">🚗</div>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
+                <FaCar className="text-white/60 text-3xl" />
+              </div>
+            </div>
             <p className="text-white text-xl font-semibold mb-2">
               {searchTerm ? 'Sin resultados' : 'No hay viajes disponibles'}
             </p>

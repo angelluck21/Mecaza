@@ -17,10 +17,10 @@ import { getCarImageUrl } from '../../utils';
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS = {
-  confirmada: { label: '✅ Confirmada', cls: 'bg-green-100 text-green-700 border-green-200' },
-  pendiente:  { label: '⏳ Pendiente',  cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  rechazada:  { label: '❌ Rechazada',  cls: 'bg-red-100 text-red-700 border-red-200' },
-  cancelada:  { label: '❌ Cancelada',  cls: 'bg-red-100 text-red-700 border-red-200' },
+  confirmada: { label: 'Confirmada', cls: 'bg-green-100 text-green-700 border-green-200' },
+  pendiente:  { label: 'Pendiente',  cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  rechazada:  { label: 'Rechazada',  cls: 'bg-red-100 text-red-700 border-red-200' },
+  cancelada:  { label: 'Cancelada',  cls: 'bg-red-100 text-red-700 border-red-200' },
 };
 const getStatus = (s) => STATUS[s?.toLowerCase()] ?? STATUS.pendiente;
 
@@ -121,7 +121,11 @@ const MisReservas = () => {
         {/* Sin reservas */}
         {reservations.length === 0 ? (
           <div className="bg-white rounded-2xl shadow-xl p-12 text-center animate-scale-in">
-            <div className="text-6xl mb-4">🎫</div>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center">
+                <FaTicketAlt className="text-violet-400 text-3xl" />
+              </div>
+            </div>
             <h3 className="text-xl font-bold text-gray-800 mb-2">No tienes reservas aún</h3>
             <p className="text-gray-500 text-sm mb-6">Explora los viajes disponibles y reserva tu asiento.</p>
             <button

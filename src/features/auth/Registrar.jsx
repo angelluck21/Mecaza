@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LockClosedIcon, EnvelopeIcon, PhoneIcon, UserIcon } from '@heroicons/react/24/solid';
-import { FaCar } from 'react-icons/fa';
+import { LockClosedIcon, EnvelopeIcon, PhoneIcon, UserIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
+import { FaCar, FaUser, FaCarAlt, FaCog } from 'react-icons/fa';
 
 import { registrarApi }  from '../../services/api';
 import { extractUserId } from '../../utils';
@@ -21,9 +21,9 @@ const ROL_MESSAGES = {
 };
 
 const ROLES_OPTIONS = [
-  { value: 'usuario',       label: '👤 Usuario', desc: 'Reserva y viaja' },
-  { value: 'conductor',     label: '🚗 Conductor', desc: 'Ofrece viajes' },
-  { value: 'administrador', label: '⚙️ Administrador', desc: 'Gestiona la plataforma' },
+  { value: 'usuario',       icon: <FaUser />,    label: 'Usuario',       desc: 'Reserva y viaja' },
+  { value: 'conductor',     icon: <FaCarAlt />,  label: 'Conductor',     desc: 'Ofrece viajes' },
+  { value: 'administrador', icon: <FaCog />,     label: 'Administrador', desc: 'Gestiona la plataforma' },
 ];
 
 const parseRegisterError = (error) => {
@@ -157,7 +157,7 @@ const Registrar = () => {
               <div>
                 <label className={labelClass}>Tipo de cuenta</label>
                 <div className="grid grid-cols-3 gap-2">
-                  {ROLES_OPTIONS.map(({ value, label, desc }) => (
+                  {ROLES_OPTIONS.map(({ value, icon, label, desc }) => (
                     <button
                       key={value}
                       type="button"
@@ -168,6 +168,7 @@ const Registrar = () => {
                           : 'border-gray-200 text-gray-500 hover:border-violet-300 hover:bg-violet-50/50'
                       }`}
                     >
+                      <div className={`flex justify-center mb-1 text-base ${selectedRol === value ? 'text-violet-500' : 'text-gray-400'}`}>{icon}</div>
                       <div className="font-semibold">{label}</div>
                       <div className="text-gray-400 mt-0.5">{desc}</div>
                     </button>
@@ -191,9 +192,9 @@ const Registrar = () => {
                   <button
                     type="button"
                     onClick={() => setShowPass((p) => !p)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors text-xs"
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors"
                   >
-                    {showPass ? '🙈' : '👁️'}
+                    {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

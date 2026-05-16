@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { FaCar } from 'react-icons/fa';
 
 import Navbar       from '../../components/layout/Navbar';
 import Footer       from '../../components/layout/Footer';
@@ -97,14 +98,18 @@ const IndexLogin = () => {
             Viajes disponibles
           </h2>
           <p className="text-blue-200">
-            Bienvenido, <span className="font-semibold text-white">{userData?.Nombre || userData?.nombre || 'viajero'}</span> 👋
+            Bienvenido, <span className="font-semibold text-white">{userData?.Nombre || userData?.nombre || 'viajero'}</span>
           </p>
           <div className="mx-auto mt-4 w-16 h-1 rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
         </div>
 
         {!filteredCars.length ? (
           <div className="text-center py-24 animate-fade-in">
-            <div className="text-6xl mb-4">🚗</div>
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
+                <FaCar className="text-white/60 text-3xl" />
+              </div>
+            </div>
             <p className="text-white text-xl font-semibold mb-2">
               {searchTerm ? 'Sin resultados' : 'No hay viajes disponibles'}
             </p>

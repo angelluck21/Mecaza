@@ -15,10 +15,10 @@ import { listarCarrosApi, listarReservasApi, agregarPrecioApi, agregarEstadoApi 
 // ── Constantes ────────────────────────────────────────────────────────────────
 
 const ESTADOS = [
-  { id: 1, label: '🚗 Esperando Pasajeros', color: 'bg-green-100 text-green-700 border-green-200' },
-  { id: 2, label: '🛣️ En Viaje',            color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  { id: 3, label: '🔧 En Mantenimiento',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
-  { id: 4, label: '❌ Fuera de Servicio',   color: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 1, label: 'Esperando pasajeros', color: 'bg-green-100 text-green-700 border-green-200' },
+  { id: 2, label: 'En viaje',            color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  { id: 3, label: 'En mantenimiento',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
+  { id: 4, label: 'Fuera de servicio',   color: 'bg-red-100 text-red-700 border-red-200' },
 ];
 
 const RUTAS = [

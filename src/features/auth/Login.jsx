@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LockClosedIcon, EnvelopeIcon } from '@heroicons/react/24/solid';
+import { LockClosedIcon, EnvelopeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 import { FaCar } from 'react-icons/fa';
 
 import { loginApi }      from '../../services/api';
@@ -120,9 +120,9 @@ const Login = () => {
                   <button
                     type="button"
                     onClick={() => setShowPass((p) => !p)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors text-xs"
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors"
                   >
-                    {showPass ? '🙈' : '👁️'}
+                    {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                   </button>
                 </div>
               </div>

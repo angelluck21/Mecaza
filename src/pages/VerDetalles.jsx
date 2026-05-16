@@ -55,7 +55,7 @@ const VerDetalles = () => {
     
     // Si no hay estado, retornar desconocido
     if (estadoId === null || estadoId === undefined || estadoId === '') {
-      return '🔍 Estado Desconocido';
+      return 'Estado desconocido';
     }
     
     // Primero intentar buscar en la lista de estados del backend
@@ -68,13 +68,13 @@ const VerDetalles = () => {
       
       // Validar que cada ID corresponda al nombre correcto
       if (estadoNumero === 1 && !nombreEstado.toLowerCase().includes('esperando')) {
-        return '🚗 Esperando Pasajeros';
+        return 'Esperando pasajeros';
       } else if (estadoNumero === 2 && !nombreEstado.toLowerCase().includes('viaje')) {
-        return '🛣️ En Viaje';
+        return 'En viaje';
       } else if (estadoNumero === 3 && !nombreEstado.toLowerCase().includes('mantenimiento')) {
-        return '🔧 En Mantenimiento';
+        return 'En mantenimiento';
       } else if (estadoNumero === 4 && !nombreEstado.toLowerCase().includes('fuera') && !nombreEstado.toLowerCase().includes('servicio')) {
-        return '❌ Fuera de Servicio';
+        return 'Fuera de servicio';
       }
       
       return nombreEstado;
@@ -90,22 +90,22 @@ const VerDetalles = () => {
     
     // Si no es un número válido, retornar el valor original
     if (isNaN(id)) {
-      return `🔍 Estado: ${estadoId}`;
+      return `Estado: ${estadoId}`;
     }
-    
+
     const estadosDefault = {
-      1: '🚗 Esperando Pasajeros',
-      2: '🛣️ En Viaje', 
-      3: '🔧 En Mantenimiento',
-      4: '❌ Fuera de Servicio'
+      1: 'Esperando pasajeros',
+      2: 'En viaje',
+      3: 'En mantenimiento',
+      4: 'Fuera de servicio'
     };
-    
-    
+
+
     if (estadosDefault[id]) {
       return estadosDefault[id];
     }
-    
-    return `🔍 Estado ${id} (No reconocido)`;
+
+    return `Estado ${id}`;
   };
 
   useEffect(() => {

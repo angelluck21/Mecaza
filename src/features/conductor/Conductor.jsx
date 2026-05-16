@@ -294,7 +294,7 @@ const Conductor = () => {
 
         {/* Bienvenida */}
         <div className="animate-fade-in-up">
-          <h1 className="text-3xl font-extrabold text-white">Hola, {nombre} 👋</h1>
+          <h1 className="text-3xl font-extrabold text-white">Hola, {nombre}</h1>
           <p className="text-blue-200 mt-1 text-sm">Gestiona tus vehículos y reservas desde aquí.</p>
         </div>
 
@@ -455,7 +455,11 @@ const Conductor = () => {
             </div>
           ) : reservas.length === 0 ? (
             <div className="text-center py-10">
-              <div className="text-5xl mb-3">📋</div>
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center">
+                  <FaListAlt className="text-blue-300 text-xl" />
+                </div>
+              </div>
               <p className="text-gray-500 text-sm">No hay reservas para tus vehículos.</p>
             </div>
           ) : (
@@ -522,7 +526,11 @@ const Conductor = () => {
             </div>
           ) : carros.length === 0 ? (
             <div className="text-center py-10">
-              <div className="text-5xl mb-3">🚗</div>
+              <div className="flex justify-center mb-3">
+                <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center">
+                  <FaCar className="text-green-300 text-xl" />
+                </div>
+              </div>
               <p className="text-gray-500 text-sm">No tienes vehículos registrados.</p>
             </div>
           ) : (
@@ -603,7 +611,11 @@ const Conductor = () => {
       {showDeleteModal && carroToDelete && (
         <Modal title="Eliminar Vehículo" accent="red" onClose={() => { setShowDeleteModal(false); setCarroToDelete(null); }}>
           <div className="text-center space-y-4">
-            <div className="text-5xl">🗑️</div>
+            <div className="flex justify-center">
+              <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center">
+                <FaTrash className="text-red-400 text-xl" />
+              </div>
+            </div>
             <p className="text-gray-700 text-sm">
               ¿Seguro que quieres eliminar el vehículo <strong>{carroToDelete.placa}</strong>? Esta acción no se puede deshacer.
             </p>

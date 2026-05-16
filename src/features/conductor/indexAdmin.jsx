@@ -113,7 +113,7 @@ const IndexAdmin = () => {
       });
       
       if (response.data && response.data.success) {
-        showToastNotification('¡Precios guardados exitosamente! 💰');
+        showToastNotification('¡Precios guardados exitosamente!');
         
         setPreciosData({
           'ZaraMede': '',
@@ -171,7 +171,7 @@ const IndexAdmin = () => {
       });
       
       if (response.data && response.data.success) {
-        showToastNotification('¡Estado del viaje guardado exitosamente! 🚗');
+        showToastNotification('¡Estado del viaje guardado exitosamente!');
         
         setEstadoSeleccionado('');
         setShowEstadoModal(false);

@@ -149,7 +149,11 @@ const ListaUsuarios = () => {
             </div>
           ) : filteredUsers.length === 0 ? (
             <div className="text-center py-16">
-              <div className="text-5xl mb-3">👤</div>
+              <div className="flex justify-center mb-3">
+                <div className="w-14 h-14 rounded-2xl bg-gray-100 flex items-center justify-center">
+                  <FaUser className="text-gray-300 text-2xl" />
+                </div>
+              </div>
               <p className="text-gray-500 font-medium">
                 {searchTerm ? 'Sin resultados para tu búsqueda' : 'No hay usuarios registrados'}
               </p>

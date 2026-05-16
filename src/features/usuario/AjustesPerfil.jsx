@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaUser, FaCamera, FaSave } from 'react-icons/fa';
-import { EnvelopeIcon, PhoneIcon, LockClosedIcon } from '@heroicons/react/24/outline';
+import { EnvelopeIcon, PhoneIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
 
 import PageBg        from '../../components/ui/PageBg';
 import InnerNavbar   from '../../components/layout/InnerNavbar';
@@ -214,8 +214,8 @@ const AjustesPerfil = () => {
                 onChange={set('contrasena')}
                 placeholder="Deja vacío para no cambiar"
                 right={
-                  <button type="button" onClick={() => setShowPass(p => !p)} className="text-gray-400 hover:text-violet-500 transition-colors text-sm">
-                    {showPass ? '🙈' : '👁️'}
+                  <button type="button" onClick={() => setShowPass(p => !p)} className="text-gray-400 hover:text-violet-500 transition-colors">
+                    {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
                   </button>
                 }
               />
