@@ -10,7 +10,9 @@ import FormInput     from '../../components/ui/FormInput';
 import SectionCard   from '../../components/ui/SectionCard';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }            from '../../hooks/useToast';
-import { actualizarUsuarioApi } from '../../services/api';
+import { actualizarUsuarioApi, actualizarUsuarioConFotoApi } from '../../services/api';
+import { getUserPhotoUrl, compressImage } from '../../utils';
+import UserAvatar from '../../components/ui/UserAvatar';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -53,7 +55,8 @@ const AjustesPerfil = () => {
         contrasena: '',
         confirmar:  '',
       });
-      if (user.fotoPerfil) setImagePreview(user.fotoPerfil);
+      const fotoActual = resolveField(user, ['fotoperfil', 'fotoPerfil', 'Fotoperfil']);
+      if (fotoActual) setImagePreview(getUserPhotoUrl(fotoActual) || fotoActual);
     } catch {
       navigate('/login');
     } finally {
@@ -84,25 +87,45 @@ const AjustesPerfil = () => {
     const userId = resolveField(userData, ['id', 'id_users', 'ID', 'user_id', 'userId']);
 
     try {
-      const payload = {
-        Nombre:   form.nombre,
-        Correo:   form.email,
-        Rol:      userData.rol ?? 'usuario',
-        Telefono: form.telefono || resolveField(userData, ['Telefono', 'telefono', 'tel', 'phone']) || '',
-      };
-      if (form.contrasena) payload.Contrasena = form.contrasena;
+      let fotoGuardada = resolveField(userData, ['fotoperfil', 'fotoPerfil', 'Fotoperfil']) || null;
 
-      await actualizarUsuarioApi(userId, payload);
+      // Si hay foto nueva, subirla primero
+      if (profileImage) {
+        const compressed = await compressImage(profileImage);
+        const formData = new FormData();
+        formData.append('fotoperfil', compressed);
+        formData.append('_method', 'PUT');
+        formData.append('Nombre',   form.nombre);
+        formData.append('Correo',   form.email);
+        formData.append('Rol',      userData.rol ?? 'usuario');
+        formData.append('Telefono', form.telefono || '');
+        if (form.contrasena) formData.append('Contrasena', form.contrasena);
 
+        const resp = await actualizarUsuarioConFotoApi(userId, formData);
+        fotoGuardada = resp.data?.fotoperfil || resp.data?.data?.fotoperfil || fotoGuardada;
+      } else {
+        const payload = {
+          Nombre:   form.nombre,
+          Correo:   form.email,
+          Rol:      userData.rol ?? 'usuario',
+          Telefono: form.telefono || resolveField(userData, ['Telefono', 'telefono', 'tel', 'phone']) || '',
+        };
+        if (form.contrasena) payload.Contrasena = form.contrasena;
+        await actualizarUsuarioApi(userId, payload);
+      }
+
+      const fotoUrl = fotoGuardada ? (getUserPhotoUrl(fotoGuardada) || fotoGuardada) : imagePreview;
       const updated = {
         ...userData,
-        Nombre:    form.nombre,
-        Correo:    form.email,
-        Telefono:  form.telefono,
-        fotoPerfil: imagePreview,
+        Nombre:     form.nombre,
+        Correo:     form.email,
+        Telefono:   form.telefono,
+        fotoperfil: fotoGuardada,
+        fotoPerfil: fotoUrl,
       };
       localStorage.setItem('userData', JSON.stringify(updated));
       setUserData(updated);
+      setImagePreview(fotoUrl || null);
       setForm(f => ({ ...f, contrasena: '', confirmar: '' }));
       setProfileImage(null);
       showToast('Perfil actualizado correctamente.', 'success');
@@ -136,10 +159,10 @@ const AjustesPerfil = () => {
           <SectionCard title="Foto de perfil" icon={<FaCamera className="text-sm" />}>
             <div className="flex items-center gap-5">
               <div className="relative shrink-0">
-                <div className="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center overflow-hidden shadow">
+                <div className="w-20 h-20 rounded-2xl overflow-hidden shadow">
                   {imagePreview
                     ? <img src={imagePreview} alt="Foto" className="w-full h-full object-cover" />
-                    : <FaUser className="text-3xl text-violet-400" />
+                    : <UserAvatar userData={userData} size="xl" className="rounded-2xl w-full h-full" />
                   }
                 </div>
                 <label className="absolute -bottom-1 -right-1 w-7 h-7 bg-gradient-to-r from-blue-600 to-violet-600 rounded-full flex items-center justify-center cursor-pointer shadow-md hover:scale-110 transition-transform">

@@ -18,7 +18,9 @@ const REDIRECT_BY_ROLE = {
  *   onError(message)           – callback si algo falla
  *   label                      – texto del botón (default: "Continuar con Google")
  */
-const GoogleAuthButton = ({ onSuccess, onError, label = 'Continuar con Google' }) => {
+const HAS_GOOGLE = !!import.meta.env.VITE_GOOGLE_CLIENT_ID;
+
+const GoogleAuthInner = ({ onSuccess, onError, label }) => {
   const [loading, setLoading] = useState(false);
 
   const login = useGoogleLogin({
@@ -103,6 +105,9 @@ const GoogleAuthButton = ({ onSuccess, onError, label = 'Continuar con Google' }
     </button>
   );
 };
+
+const GoogleAuthButton = (props) =>
+  HAS_GOOGLE ? <GoogleAuthInner {...props} /> : null;
 
 export { REDIRECT_BY_ROLE };
 export default GoogleAuthButton;

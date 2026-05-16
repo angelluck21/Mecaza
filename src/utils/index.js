@@ -2,16 +2,16 @@ import { ESTADOS_CARRO } from '../constants';
 
 const API_STORAGE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api').replace('/api', '');
 
-/**
- * Construye la URL completa de la imagen de un carro.
- */
-export const getCarImageUrl = (imagePath) => {
+const buildStorageUrl = (imagePath, folder) => {
   if (!imagePath || imagePath.trim() === '') return null;
   if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) return imagePath;
   if (imagePath.startsWith('/storage/')) return `${API_STORAGE_URL}${imagePath}`;
-  if (!imagePath.includes('/')) return `${API_STORAGE_URL}/storage/carros/${imagePath}`;
+  if (!imagePath.includes('/')) return `${API_STORAGE_URL}/storage/${folder}/${imagePath}`;
   return `${API_STORAGE_URL}/storage/${imagePath}`;
 };
+
+export const getCarImageUrl  = (p) => buildStorageUrl(p, 'carros');
+export const getUserPhotoUrl = (p) => buildStorageUrl(p, 'usuarios');
 
 /**
  * Devuelve el label y color de un estado de carro dado su ID.

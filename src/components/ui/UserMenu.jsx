@@ -1,8 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaUserCircle, FaSignOutAlt, FaCar, FaBell, FaTicketAlt } from 'react-icons/fa';
+import { FaSignOutAlt, FaCar, FaBell, FaTicketAlt } from 'react-icons/fa';
 import { UserCircleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '../../constants';
+import UserAvatar from './UserAvatar';
 
 const UserMenu = ({ userData }) => {
   const [open, setOpen] = useState(false);
@@ -37,13 +38,13 @@ const UserMenu = ({ userData }) => {
       {/* Trigger */}
       <button
         onClick={() => setOpen((p) => !p)}
-        className={`flex items-center gap-2 px-3 py-1.5 rounded-full border-2 transition-all duration-200 ${
+        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full border-2 transition-all duration-200 ${
           open
             ? 'border-violet-400 bg-violet-50 text-violet-800'
             : 'border-gray-200 bg-gray-50 text-blue-900 hover:border-violet-300 hover:bg-violet-50'
         }`}
       >
-        <FaUserCircle className={`text-xl transition-colors ${open ? 'text-violet-600' : 'text-blue-700'}`} />
+        <UserAvatar userData={userData} size="sm" />
         <span className="font-semibold text-sm max-w-[120px] truncate">{nombre}</span>
         <svg
           className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
@@ -59,11 +60,15 @@ const UserMenu = ({ userData }) => {
 
           {/* Info usuario */}
           <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-violet-50 border-b border-gray-100">
-            <p className="text-xs text-gray-500 font-medium">Conectado como</p>
-            <p className="text-sm font-bold text-blue-900 truncate">{nombre}</p>
-            <span className="inline-block mt-0.5 text-xs bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full capitalize">
-              {userData?.rol || 'usuario'}
-            </span>
+            <div className="flex items-center gap-3 mb-1">
+              <UserAvatar userData={userData} size="md" />
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-blue-900 truncate">{nombre}</p>
+                <span className="inline-block text-xs bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full capitalize">
+                  {userData?.rol || 'usuario'}
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Opciones */}

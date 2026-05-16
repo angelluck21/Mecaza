@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, EnvelopeIcon, PhoneIcon, UserIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
-import { FaCar, FaUser, FaCarAlt, FaCog } from 'react-icons/fa';
+import { FaCar, FaUser } from 'react-icons/fa';
 
 import { registrarApi }  from '../../services/api';
 import { extractUserId } from '../../utils';
@@ -9,23 +9,7 @@ import { useToast }      from '../../hooks/useToast';
 import ToastNotification from '../../components/ui/ToastNotification';
 import GoogleAuthButton  from '../../components/ui/GoogleAuthButton';
 
-const REDIRECT_BY_ROLE = {
-  usuario:       '/login',
-  conductor:     '/conductor',
-  administrador: '/indexAdmin',
-};
-
-const ROL_MESSAGES = {
-  usuario:       '¡Cuenta creada! Serás redirigido al login.',
-  conductor:     '¡Conductor registrado! Serás redirigido al panel.',
-  administrador: '¡Admin registrado! Serás redirigido al panel.',
-};
-
-const ROLES_OPTIONS = [
-  { value: 'usuario',       icon: <FaUser />,    label: 'Usuario',       desc: 'Reserva y viaja' },
-  { value: 'conductor',     icon: <FaCarAlt />,  label: 'Conductor',     desc: 'Ofrece viajes' },
-  { value: 'administrador', icon: <FaCog />,     label: 'Administrador', desc: 'Gestiona la plataforma' },
-];
+const ROL = 'usuario';
 
 const parseRegisterError = (error) => {
   const errData = error.response?.data;
@@ -52,25 +36,22 @@ const parseRegisterError = (error) => {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const Registrar = () => {
-  const [isLoading,   setIsLoading]   = useState(false);
-  const [selectedRol, setSelectedRol] = useState('');
-  const [showPass,    setShowPass]    = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPass,  setShowPass]  = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
   const handleRegister = async (e) => {
     e.preventDefault();
-    if (!selectedRol) { showToast('Por favor, selecciona un rol.', 'error'); return; }
-
     setIsLoading(true);
     const payload = {
       Nombre:     e.target.Nombre.value,
       Correo:     e.target.Correo.value,
       Contrasena: e.target.Contrasena.value,
       Telefono:   e.target.Telefono.value,
-      Rol:        selectedRol,
-      rol:        selectedRol,
-      role:       selectedRol,
+      Rol:        ROL,
+      rol:        ROL,
+      role:       ROL,
     };
 
     try {
@@ -78,14 +59,13 @@ const Registrar = () => {
       const userId   = extractUserId(data);
       const userData = {
         id_users: userId, id: userId, ID: userId, user_id: userId, userId,
-        rol: selectedRol, Correo: payload.Correo, Nombre: payload.Nombre, ...data,
+        rol: ROL, Correo: payload.Correo, Nombre: payload.Nombre, ...data,
       };
 
       localStorage.setItem('userData', JSON.stringify(userData));
-      showToast(ROL_MESSAGES[selectedRol], 'success');
+      showToast('¡Cuenta creada! Serás redirigido al login.', 'success');
       e.target.reset();
-      setSelectedRol('');
-      setTimeout(() => navigate(REDIRECT_BY_ROLE[selectedRol] ?? '/login'), 2000);
+      setTimeout(() => navigate('/login'), 2000);
     } catch (error) {
       showToast(parseRegisterError(error), 'error');
     } finally {
@@ -151,29 +131,6 @@ const Registrar = () => {
                 <div className="relative">
                   <PhoneIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
                   <input name="Telefono" type="text" placeholder="+57 300 000 0000" required className={inputClass} />
-                </div>
-              </div>
-
-              {/* Rol */}
-              <div>
-                <label className={labelClass}>Tipo de cuenta</label>
-                <div className="grid grid-cols-3 gap-2">
-                  {ROLES_OPTIONS.map(({ value, icon, label, desc }) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setSelectedRol(value)}
-                      className={`p-2.5 rounded-xl border-2 text-center transition-all duration-200 text-xs ${
-                        selectedRol === value
-                          ? 'border-violet-500 bg-violet-50 text-violet-700'
-                          : 'border-gray-200 text-gray-500 hover:border-violet-300 hover:bg-violet-50/50'
-                      }`}
-                    >
-                      <div className={`flex justify-center mb-1 text-base ${selectedRol === value ? 'text-violet-500' : 'text-gray-400'}`}>{icon}</div>
-                      <div className="font-semibold">{label}</div>
-                      <div className="text-gray-400 mt-0.5">{desc}</div>
-                    </button>
-                  ))}
                 </div>
               </div>
 

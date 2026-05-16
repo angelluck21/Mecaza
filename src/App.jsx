@@ -20,8 +20,9 @@ import IndexAdmin    from './features/admin/indexAdmin';
 import ListaUsuarios from './features/admin/ListaUsuarios';
 
 // Pages
-import Home       from './pages/Home';
-import VerDetalles from './pages/VerDetalles';
+import Home          from './pages/Home';
+import VerDetalles   from './pages/VerDetalles';
+import RegConductor  from './pages/RegConductor';
 
 function App() {
   return (
@@ -32,6 +33,7 @@ function App() {
         <Route path="/index"  element={<Home />} />
         <Route path="/login"  element={<Login />} />
         <Route path="/registrar" element={<Registrar />} />
+        <Route path="/registrar-conductor" element={<RegConductor />} />
 
         {/* Usuario autenticado */}
         <Route path="/indexLogin"  element={<IndexLogin />} />

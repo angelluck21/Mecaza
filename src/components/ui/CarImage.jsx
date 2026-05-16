@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { FaCar } from 'react-icons/fa';
 
 const CarImage = ({
@@ -10,10 +10,15 @@ const CarImage = ({
 }) => {
   const [imageError,  setImageError]  = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
+  const imgRef = useRef(null);
 
   useEffect(() => {
     setImageError(false);
     setImageLoaded(false);
+    // Si la imagen ya estaba en cache, onLoad pudo haber disparado antes del efecto
+    if (imgRef.current?.complete && imgRef.current.naturalWidth > 0) {
+      setImageLoaded(true);
+    }
   }, [imageUrl]);
 
   const hasValidUrl = Boolean(imageUrl?.trim());
@@ -28,6 +33,7 @@ const CarImage = ({
 
   return (
     <img
+      ref={imgRef}
       src={imageUrl}
       alt={`Carro de ${conductorName}`}
       className={className}

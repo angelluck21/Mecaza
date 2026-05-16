@@ -11,7 +11,9 @@
       "Bash(curl *)",
       "Bash(git config *)",
       "Bash(Get-ChildItem \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\Mecaza\\\\src\" -Recurse -Filter \"utils*\")",
-      "Bash(Select-Object FullName)"
+      "Bash(Select-Object FullName)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\MecazaBack\" -Directory)",
+      "Bash(Select-Object Name)"
     ]
   }
 }

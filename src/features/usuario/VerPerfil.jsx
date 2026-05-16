@@ -13,6 +13,8 @@ import InfoRow       from '../../components/ui/InfoRow';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
 import { verUsuarioApi, eliminarUsuarioApi } from '../../services/api';
+import { getUserPhotoUrl } from '../../utils';
+import UserAvatar from '../../components/ui/UserAvatar';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -143,11 +145,14 @@ const VerPerfil = () => {
         <div className="bg-white rounded-2xl shadow-xl shadow-violet-900/20 overflow-hidden mb-6 animate-fade-in-up">
           <div className="h-24 bg-gradient-to-r from-blue-800 to-violet-700 relative">
             <div className="absolute -bottom-10 left-8">
-              <div className="w-20 h-20 rounded-2xl bg-white shadow-lg flex items-center justify-center border-4 border-white">
-                {userData.fotoPerfil
-                  ? <img src={userData.fotoPerfil} alt="Foto" className="w-full h-full object-cover rounded-xl" />
-                  : <FaUser className="text-3xl text-violet-500" />
-                }
+              <div className="w-20 h-20 rounded-2xl bg-white shadow-lg overflow-hidden border-4 border-white">
+                {(() => {
+                  const fotoRaw = userData.fotoperfil || userData.fotoPerfil || null;
+                  const fotoUrl = fotoRaw ? (getUserPhotoUrl(fotoRaw) || fotoRaw) : null;
+                  return fotoUrl
+                    ? <img src={fotoUrl} alt="Foto" className="w-full h-full object-cover" />
+                    : <UserAvatar userData={userData} size="xl" className="rounded-none w-full h-full" />;
+                })()}
               </div>
             </div>
           </div>

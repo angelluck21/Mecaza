@@ -47,7 +47,7 @@ const MisReservas = () => {
   const fetchData = async (user) => {
     try {
       const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
-      const carsData     = Array.isArray(carsResp.data) ? carsResp.data : [];
+      const carsData     = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
       const reservasArray = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
       setCars(carsData);
       const userId = user?.id || user?.ID || user?.id_users;

@@ -35,4 +35,9 @@ export const ENDPOINTS = {
 
   // Estados (agregar)
   AGREGAR_ESTADO: `${API_BASE_URL}/agregarestados`,
+
+  // Invitaciones conductor
+  INVITAR_CONDUCTOR:    `${API_BASE_URL}/invitar-conductor`,
+  VALIDAR_INVITACION:   (token) => `${API_BASE_URL}/validar-invitacion/${token}`,
+  REGISTRAR_CONDUCTOR:  (token) => `${API_BASE_URL}/registrar-conductor/${token}`,
 };

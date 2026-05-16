@@ -70,8 +70,27 @@ export const verUsuarioApi = (id) =>
 export const actualizarUsuarioApi = (id, data) =>
   axios.put(ENDPOINTS.ACTUALIZAR_USUARIO(id), data, authHeaders());
 
+export const actualizarUsuarioConFotoApi = (id, formData) =>
+  axios.post(ENDPOINTS.ACTUALIZAR_USUARIO(id), formData, {
+    headers: {
+      Authorization: `Bearer ${localStorage.getItem('authToken')}`,
+      Accept: 'application/json',
+    },
+  });
+
 export const eliminarUsuarioApi = (id) =>
   axios.delete(ENDPOINTS.ELIMINAR_USUARIO(id), authHeaders());
+
+// ── Invitaciones conductor ───────────────────────────────────────────────────
+
+export const invitarConductorApi = (email) =>
+  axios.post(ENDPOINTS.INVITAR_CONDUCTOR, { email }, authHeaders());
+
+export const validarInvitacionApi = (token) =>
+  axios.get(ENDPOINTS.VALIDAR_INVITACION(token));
+
+export const registrarConductorApi = (token, data) =>
+  axios.post(ENDPOINTS.REGISTRAR_CONDUCTOR(token), data);
 
 // ── Precios ──────────────────────────────────────────────────────────────────
 
