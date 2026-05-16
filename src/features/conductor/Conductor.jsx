@@ -9,8 +9,6 @@ import {
 import PageBg            from '../../components/ui/PageBg';
 import InnerNavbar       from '../../components/layout/InnerNavbar';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
-import StatCard          from '../../components/ui/StatCard';
-import SectionCard       from '../../components/ui/SectionCard';
 import FormInput         from '../../components/ui/FormInput';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
@@ -223,10 +221,11 @@ const Conductor = () => {
       setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', Destino: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
       setShowAddCar(false);
     } catch (err) {
-      const msg = err.response?.data?.message || err.response?.data?.errors
-        ? Object.values(err.response.data.errors).flat()[0]
-        : 'Error al guardar el vehículo.';
-      showToast(msg, 'error');
+      const errors = err.response?.data?.errors;
+      const msg = errors
+        ? Object.values(errors).flat()[0]
+        : (err.response?.data?.message || 'Error al guardar el vehículo.');
+      showToast(String(msg), 'error');
     } finally { setIsSaving(false); }
   };
 
@@ -356,18 +355,17 @@ const Conductor = () => {
                 placeholder="ABC-123"
                 required
               />
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Asientos</label>
-                <select
-                  value={carData.Asientos}
-                  onChange={e => setCarData(p => ({ ...p, Asientos: e.target.value }))}
-                  required
-                  className="w-full py-2.5 px-4 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
-                >
-                  <option value="">Seleccionar</option>
-                  {[1,2,3,4].map(n => <option key={n} value={n}>{n}</option>)}
-                </select>
-              </div>
+              <FormInput
+                label="Asientos"
+                icon={<FaCar className="text-xs" />}
+                type="number"
+                min="1"
+                max="20"
+                value={carData.Asientos}
+                onChange={e => setCarData(p => ({ ...p, Asientos: e.target.value }))}
+                placeholder="Ej. 4"
+                required
+              />
               <FormInput
                 label="Destino"
                 icon={<FaMapMarkerAlt />}

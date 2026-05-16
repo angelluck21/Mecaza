@@ -25,8 +25,10 @@ const UserMenu = ({ userData }) => {
     go('/login');
   };
 
-  const isConductorOrAdmin =
-    userData?.rol === ROLES.CONDUCTOR || userData?.rol === ROLES.ADMIN;
+  const rol        = userData?.rol;
+  const isConductor = rol === ROLES.CONDUCTOR;
+  const isAdmin     = rol === ROLES.ADMIN || rol === 'administrador';
+  const isUsuario   = !isConductor && !isAdmin;
 
   const nombre = userData?.Nombre || userData?.nombre || 'Usuario';
 
@@ -70,13 +72,13 @@ const UserMenu = ({ userData }) => {
               Ver perfil
             </MenuItem>
 
-            {!isConductorOrAdmin && (
+            {isUsuario && (
               <MenuItem icon={<FaTicketAlt className="w-4 h-4" />} onClick={() => go('/mis-reservas')}>
                 Mis Reservas
               </MenuItem>
             )}
 
-            {isConductorOrAdmin && (
+            {isConductor && (
               <>
                 <MenuItem icon={<FaCar className="w-4 h-4" />} onClick={() => go('/conductor')}>
                   Mi Panel
@@ -85,6 +87,12 @@ const UserMenu = ({ userData }) => {
                   Notificaciones
                 </MenuItem>
               </>
+            )}
+
+            {isAdmin && (
+              <MenuItem icon={<FaCar className="w-4 h-4" />} onClick={() => go('/indexAdmin')}>
+                Mi Panel
+              </MenuItem>
             )}
 
             <MenuItem icon={<Cog6ToothIcon className="w-4 h-4" />} onClick={() => go('/ajustes-perfil')}>

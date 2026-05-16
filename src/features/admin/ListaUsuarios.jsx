@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaPhone, FaTrash, FaSearch, FaSync } from 'react-icons/fa';
+import { FaUser, FaPhone, FaTrash, FaSearch, FaSync, FaEye } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
 import InnerNavbar       from '../../components/layout/InnerNavbar';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
-import axios             from 'axios';
+import { listarUsuariosApi, eliminarUsuarioApi } from '../../services/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -41,7 +41,9 @@ const ListaUsuarios = () => {
     const authToken = localStorage.getItem('authToken');
     if (!stored || !authToken) { navigate('/login'); return; }
     try {
-      setUserData(JSON.parse(stored));
+      const user = JSON.parse(stored);
+      if (user.rol !== 'admin' && user.rol !== 'administrador') { navigate('/indexAdmin'); return; }
+      setUserData(user);
     } catch { navigate('/login'); return; }
     setIsLoading(false);
   }, [navigate]);
@@ -52,27 +54,22 @@ const ListaUsuarios = () => {
   useEffect(() => {
     const lower = searchTerm.toLowerCase();
     setFilteredUsers(users.filter(u =>
-      u.name?.toLowerCase().includes(lower) ||
+      u.name?.toLowerCase().includes(lower)  ||
       u.email?.toLowerCase().includes(lower) ||
-      u.id?.toString().includes(lower) ||
-      u.rol?.toLowerCase().includes(lower)
+      u.tel?.toLowerCase().includes(lower)   ||
+      u.rol?.toLowerCase().includes(lower)   ||
+      String(u.id_users || u.id || '').includes(lower)
     ));
   }, [searchTerm, users]);
 
-  // ── Fetch ────────────────────────────────────────────────────────────────
+  // ── Fetch ─────────────────────────────────────────────────────────────────
   const fetchUsers = async () => {
     setIsLoadingUsers(true);
     try {
-      const { data } = await axios.get('https://api-mecaza.geekcorplab.com/api/usuarios', {
-        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}`, Accept: 'application/json' },
-      });
-      if (data.success) {
-        setUsers(data.users);
-        setFilteredUsers(data.users);
-        showToast(`${data.total} usuarios cargados.`, 'success');
-      } else {
-        showToast('Error al cargar usuarios.', 'error');
-      }
+      const { data } = await listarUsuariosApi();
+      const list = Array.isArray(data.data) ? data.data : [];
+      setUsers(list);
+      setFilteredUsers(list);
     } catch (err) {
       const s = err.response?.status;
       if (s === 401) { showToast('Sesión expirada.', 'error'); navigate('/login'); }
@@ -85,17 +82,13 @@ const ListaUsuarios = () => {
     if (!userToDelete) return;
     setIsDeleting(true);
     try {
-      const { data } = await axios.delete(`https://api-mecaza.geekcorplab.com/api/usuarios/${userToDelete.id}`, {
-        headers: { Authorization: `Bearer ${localStorage.getItem('authToken')}`, Accept: 'application/json' },
-      });
-      if (data.success) {
-        showToast('Usuario eliminado correctamente.', 'success');
-        fetchUsers();
-      } else {
-        showToast(data.message || 'Error al eliminar.', 'error');
-      }
-    } catch { showToast('Error al eliminar el usuario.', 'error'); }
-    finally { setIsDeleting(false); setShowConfirm(false); setUserToDelete(null); }
+      const id = userToDelete.id_users || userToDelete.id;
+      await eliminarUsuarioApi(id);
+      showToast('Usuario eliminado correctamente.', 'success');
+      await fetchUsers();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al eliminar el usuario.', 'error');
+    } finally { setIsDeleting(false); setShowConfirm(false); setUserToDelete(null); }
   };
 
   if (isLoading) return <LoadingScreen message="Cargando usuarios..." />;
@@ -113,7 +106,8 @@ const ListaUsuarios = () => {
           <div>
             <h1 className="text-2xl font-extrabold text-white">Lista de Usuarios</h1>
             <p className="text-blue-200 text-sm">
-              {filteredUsers.length} de {users.length} usuarios{searchTerm && ` — filtrado por "${searchTerm}"`}
+              {filteredUsers.length} de {users.length} usuarios
+              {searchTerm && ` — filtrado por "${searchTerm}"`}
             </p>
           </div>
           <button
@@ -127,11 +121,11 @@ const ListaUsuarios = () => {
         </div>
 
         {/* Buscador */}
-        <div className="relative animate-fade-in-up delay-100">
+        <div className="relative animate-fade-in-up">
           <FaSearch className="absolute left-3.5 top-3 text-gray-400 text-sm" />
           <input
             type="text"
-            placeholder="Buscar por nombre, email, ID o rol..."
+            placeholder="Buscar por nombre, email, teléfono, ID o rol..."
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
             className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
@@ -139,7 +133,7 @@ const ListaUsuarios = () => {
         </div>
 
         {/* Tabla */}
-        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in-up delay-200">
+        <div className="bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden animate-fade-in-up">
           <div className="h-0.5 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
 
           {isLoadingUsers ? (
@@ -163,55 +157,63 @@ const ListaUsuarios = () => {
               <table className="min-w-full">
                 <thead>
                   <tr className="bg-gray-50 border-b border-gray-100">
-                    {['ID', 'Usuario', 'Contacto', 'Rol', 'Registro', 'Acciones'].map(h => (
+                    {['ID', 'Usuario', 'Teléfono', 'Rol', 'Registro', 'Acciones'].map(h => (
                       <th key={h} className="px-5 py-3 text-left text-xs font-bold text-gray-400 uppercase tracking-wider">{h}</th>
                     ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {filteredUsers.map((u, idx) => (
-                    <tr
-                      key={u.id}
-                      className="hover:bg-violet-50/40 transition-colors"
-                      style={{ animationDelay: `${idx * 40}ms` }}
-                    >
-                      <td className="px-5 py-3.5 text-xs font-mono text-gray-400">#{u.id}</td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center shrink-0">
-                            <FaUser className="text-white text-xs" />
+                  {filteredUsers.map((u, idx) => {
+                    const userId = u.id_users || u.id;
+                    return (
+                      <tr key={userId ?? idx} className="hover:bg-violet-50/40 transition-colors">
+                        <td className="px-5 py-3.5 text-xs font-mono text-gray-400">#{userId}</td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-3">
+                            <div className="w-8 h-8 rounded-full bg-gradient-to-r from-blue-500 to-violet-500 flex items-center justify-center shrink-0">
+                              <FaUser className="text-white text-xs" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-gray-800">{u.name || '—'}</p>
+                              <p className="text-xs text-gray-400">{u.email}</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-gray-800">{u.name || '—'}</p>
-                            <p className="text-xs text-gray-400">{u.email}</p>
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-1.5 text-xs text-gray-600">
+                            <FaPhone className="text-gray-300 text-xs" />
+                            {u.tel || '—'}
                           </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <div className="flex items-center gap-1.5 text-xs text-gray-600">
-                          <FaPhone className="text-gray-300 text-xs" />
-                          {u.tel || '—'}
-                        </div>
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${rolBadge(u.rol)}`}>
-                          {u.rol || '—'}
-                        </span>
-                      </td>
-                      <td className="px-5 py-3.5 text-xs text-gray-400">
-                        {u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}
-                      </td>
-                      <td className="px-5 py-3.5">
-                        <button
-                          onClick={() => { setUserToDelete(u); setShowConfirm(true); }}
-                          className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                          title="Eliminar usuario"
-                        >
-                          <FaTrash className="text-xs" />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border capitalize ${rolBadge(u.rol)}`}>
+                            {u.rol || '—'}
+                          </span>
+                        </td>
+                        <td className="px-5 py-3.5 text-xs text-gray-400">
+                          {u.created_at ? new Date(u.created_at).toLocaleDateString('es-ES') : '—'}
+                        </td>
+                        <td className="px-5 py-3.5">
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => navigate(`/ver-perfil/${userId}`)}
+                              title="Ver perfil"
+                              className="p-2 text-violet-400 hover:text-violet-600 hover:bg-violet-50 rounded-lg transition-all"
+                            >
+                              <FaEye className="text-xs" />
+                            </button>
+                            <button
+                              onClick={() => { setUserToDelete(u); setShowConfirm(true); }}
+                              title="Eliminar usuario"
+                              className="p-2 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                            >
+                              <FaTrash className="text-xs" />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -222,10 +224,10 @@ const ListaUsuarios = () => {
       {/* Modal confirmar eliminación */}
       {showConfirm && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
         >
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-scale-in text-center overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl text-center overflow-hidden">
             <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-5">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <FaTrash className="text-white text-xl" />
@@ -241,7 +243,7 @@ const ListaUsuarios = () => {
                 <button
                   onClick={() => { setShowConfirm(false); setUserToDelete(null); }}
                   disabled={isDeleting}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all disabled:opacity-50"
                 >
                   Cancelar
                 </button>

@@ -36,7 +36,8 @@ function App() {
         {/* Usuario autenticado */}
         <Route path="/indexLogin"  element={<IndexLogin />} />
         <Route path="/mis-reservas" element={<MisReservas />} />
-        <Route path="/ver-perfil"   element={<VerPerfil />} />
+        <Route path="/ver-perfil"           element={<VerPerfil />} />
+        <Route path="/ver-perfil/:userId"   element={<VerPerfil />} />
         <Route path="/ajustes-perfil" element={<AjustesPerfil />} />
         <Route path="/usuario/:userId"        element={<VerPerfil />} />
         <Route path="/editar-usuario/:userId" element={<AjustesPerfil />} />

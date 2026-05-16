@@ -1,1035 +1,485 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { FaCar, FaUser, FaMapMarkerAlt, FaClock, FaCalendar, FaPhone, FaEnvelope, FaArrowLeft, FaCheck, FaTimes } from 'react-icons/fa';
-import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
-import UserMenu from '../components/ui/UserMenu';
-import CarImage from '../components/ui/CarImage';
+import {
+  FaUser, FaMapMarkerAlt, FaClock, FaCalendar,
+  FaPhone, FaCheck, FaTimes,
+} from 'react-icons/fa';
+
+import PageBg            from '../components/ui/PageBg';
+import InnerNavbar       from '../components/layout/InnerNavbar';
+import SectionCard       from '../components/ui/SectionCard';
+import LoadingScreen     from '../components/ui/LoadingScreen';
+import FormInput         from '../components/ui/FormInput';
+import CarImage          from '../components/ui/CarImage';
+import ToastNotification from '../components/ui/ToastNotification';
+import { useToast }      from '../hooks/useToast';
+import { crearReservaApi } from '../services/api';
+import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
+
+const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api';
 
 const VerDetalles = () => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [userData, setUserData] = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
-
-  const [carDetails, setCarDetails] = useState(null);
-  const [selectedSeat, setSelectedSeat] = useState(null);
-  const [pickupLocation, setPickupLocation] = useState('');
-  const [nombre, setNombre] = useState('');
-  const [telefono, setTelefono] = useState(''); // Nuevo estado para el teléfono
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isReserving, setIsReserving] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
-  const [precios, setPrecios] = useState(null);
-  const [reservasExistentes, setReservasExistentes] = useState([]);
+  const [userData,         setUserData]         = useState(null);
+  const [isLoading,        setIsLoading]        = useState(true);
+  const [carDetails,       setCarDetails]       = useState(null);
+  const [selectedSeat,     setSelectedSeat]     = useState(null);
+  const [seatInput,        setSeatInput]        = useState('');
+  const [pickupLocation,   setPickupLocation]   = useState('');
+  const [nombre,           setNombre]           = useState('');
+  const [telefono,         setTelefono]         = useState('');
+  const [precios,          setPrecios]          = useState(null);
   const [asientosOcupados, setAsientosOcupados] = useState([]);
-  const [estados, setEstados] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isReserving,      setIsReserving]      = useState(false);
+  const [showSuccess,      setShowSuccess]      = useState(false);
+  const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
   const { carId } = useParams();
 
-  // Función helper para construir la URL de la imagen del carro
-  const getCarImageUrl = (imagePath) => {
-    if (!imagePath || imagePath.trim() === '') {
-      return null;
-    }
-    
-    // Si ya es una URL completa, devolverla
-    if (imagePath.startsWith('http://') || imagePath.startsWith('https://')) {
-      return imagePath;
-    }
-    
-    // Si empieza con /storage, construir URL completa
-    if (imagePath.startsWith('/storage/')) {
-      return `https://api-mecaza.geekcorplab.com${imagePath}`;
-    }
-    
-    // Si es solo el nombre del archivo, construir URL
-    if (!imagePath.includes('/')) {
-      return `https://api-mecaza.geekcorplab.com/storage/carros/${imagePath}`;
-    }
-    
-    // Construir URL completa
-    return `https://api-mecaza.geekcorplab.com/storage/${imagePath}`;
-  };
-
-  // Función helper para obtener el nombre del estado optimizada
-  const getEstadoNombre = (estadoId) => {
-    
-    // Si no hay estado, retornar desconocido
-    if (estadoId === null || estadoId === undefined || estadoId === '') {
-      return 'Estado desconocido';
-    }
-    
-    // Primero intentar buscar en la lista de estados del backend
-    const estado = estados.find(e => (e.id_estados || e.id) == estadoId);
-    if (estado) {
-      const nombreEstado = estado.estados || estado.nombre || estado.Nombre || estado.estado || estado.Estado || estado.Estados;
-      
-      // Verificar si el nombre del backend es correcto para el ID
-      const estadoNumero = parseInt(estadoId);
-      
-      // Validar que cada ID corresponda al nombre correcto
-      if (estadoNumero === 1 && !nombreEstado.toLowerCase().includes('esperando')) {
-        return 'Esperando pasajeros';
-      } else if (estadoNumero === 2 && !nombreEstado.toLowerCase().includes('viaje')) {
-        return 'En viaje';
-      } else if (estadoNumero === 3 && !nombreEstado.toLowerCase().includes('mantenimiento')) {
-        return 'En mantenimiento';
-      } else if (estadoNumero === 4 && !nombreEstado.toLowerCase().includes('fuera') && !nombreEstado.toLowerCase().includes('servicio')) {
-        return 'Fuera de servicio';
-      }
-      
-      return nombreEstado;
-    }
-    
-    // Si no se encuentra en el backend, usar nombres por defecto
-    let id;
-    if (typeof estadoId === 'string') {
-      id = parseInt(estadoId.trim());
-    } else {
-      id = estadoId;
-    }
-    
-    // Si no es un número válido, retornar el valor original
-    if (isNaN(id)) {
-      return `Estado: ${estadoId}`;
-    }
-
-    const estadosDefault = {
-      1: 'Esperando pasajeros',
-      2: 'En viaje',
-      3: 'En mantenimiento',
-      4: 'Fuera de servicio'
-    };
-
-
-    if (estadosDefault[id]) {
-      return estadosDefault[id];
-    }
-
-    return `Estado ${id}`;
-  };
-
   useEffect(() => {
-    // Obtener datos del usuario del localStorage
-    const storedUserData = localStorage.getItem('userData');
-    if (storedUserData) {
-      try {
-        const user = JSON.parse(storedUserData);
-        setUserData(user);
-        
+    const stored = localStorage.getItem('userData');
+    if (!stored) { navigate('/login'); return; }
 
-        
-        // Establecer automáticamente el nombre del usuario desde localStorage
-        const userName = user.Nombre || user.nombre || user.name || '';
-        setNombre(userName);
-        
-      } catch (error) {
-        navigate('/login');
-        return;
-      }
-    } else {
+    try {
+      const user = JSON.parse(stored);
+      if (user.rol === 'conductor') { navigate('/conductor', { replace: true }); return; }
+      setUserData(user);
+      setNombre(user.Nombre || user.nombre || user.name || '');
+      setTelefono(user.Telefono || user.telefono || user.tel || '');
+    } catch {
       navigate('/login');
       return;
     }
 
-    // Función para cargar estados
-    const fetchEstados = async () => {
+    const loadAll = async () => {
       try {
-        const response = await fetch('https://api-mecaza.geekcorplab.com/api/listarestados');
-        
-        if (!response.ok) {
-          throw new Error(`Error HTTP: ${response.status}`);
-        }
-        
-        const data = await response.json();
-        
-        if (Array.isArray(data)) {
-          setEstados(data);
-        } else if (data && Array.isArray(data.data)) {
-          setEstados(data.data);
-        } else {
-          setEstados([]);
-        }
-        
-      } catch (error) {
-        setEstados([]);
-      }
-    };
+        const [carrosResp, preciosResp, reservasResp] = await Promise.all([
+          fetch(`${API_BASE}/listarcarro`),
+          fetch(`${API_BASE}/listarprecios`),
+          fetch(`${API_BASE}/listarreserva`),
+        ]);
 
-    // Obtener detalles del carro, precios y reservas existentes
-    const fetchCarDetails = async () => {
-      try {
-        // Cargar carros
-        const carrosResponse = await fetch(`https://api-mecaza.geekcorplab.com/api/listarcarro`);
-        
-        if (!carrosResponse.ok) {
-          throw new Error(`Error HTTP: ${carrosResponse.status}`);
-        }
-        
-        const carrosData = await carrosResponse.json();
-        
-        // Extraer el array de carros de la respuesta
-        let carrosArray = [];
-        if (Array.isArray(carrosData)) {
-          carrosArray = carrosData;
-        } else if (carrosData && Array.isArray(carrosData.data)) {
-          carrosArray = carrosData.data;
-        } else {
-          setIsLoading(false);
-          return;
-        }
-        
-        // Buscar el carro específico
-        const carroEncontrado = carrosArray.find(car => {
-          const carIdNum = car.id_carros || car.id || car.ID;
-          return carIdNum == carId;
-        });
-        
-        if (!carroEncontrado) {
-          setIsLoading(false);
-          return;
-        }
-        
-        // Cargar precios
-        const preciosResponse = await fetch('https://api-mecaza.geekcorplab.com/api/listarprecio');
-        
-        if (preciosResponse.ok) {
-          const preciosData = await preciosResponse.json();
-          
-          // Extraer el array de precios de la respuesta
-          let preciosArray = [];
-          if (Array.isArray(preciosData)) {
-            preciosArray = preciosData;
-          } else if (preciosData && Array.isArray(preciosData.data)) {
-            preciosArray = preciosData.data;
-          }
-          
-          if (preciosArray.length > 0) {
-            const preciosActuales = preciosArray[0];
+        const carrosData  = await carrosResp.json();
+        const carrosArray = Array.isArray(carrosData) ? carrosData : (carrosData?.data ?? []);
+        const car = carrosArray.find(c => (c.id_carros || c.id || c.ID) == carId);
+        if (!car) { setIsLoading(false); return; }
+
+        if (preciosResp.ok) {
+          const pd = await preciosResp.json();
+          const pa = Array.isArray(pd) ? pd : (pd?.data ?? []);
+          if (pa.length > 0) {
             setPrecios({
-              zaraMede: preciosActuales['zara-mede'] || 120000,
-              zaraCauca: preciosActuales['zara-cauca'] || 30000,
-              caucaMede: preciosActuales['cauca-mede'] || 100000
+              zaraMede:  pa[0]['zara-mede']  ?? 120000,
+              zaraCauca: pa[0]['zara-cauca'] ?? 30000,
+              caucaMede: pa[0]['cauca-mede'] ?? 100000,
             });
           }
         }
-        
-        // Cargar reservas
-        const reservasResponse = await fetch('https://api-mecaza.geekcorplab.com/api/listarreserva');
-        
-        if (reservasResponse.ok) {
-          const reservasData = await reservasResponse.json();
-          
-          // Extraer el array de reservas de la respuesta
-          let reservasArray = [];
-          if (Array.isArray(reservasData)) {
-            reservasArray = reservasData;
-          } else if (reservasData && Array.isArray(reservasData.data)) {
-            reservasArray = reservasData.data;
-          }
-          
-          // Filtrar reservas del carro actual
-          const reservasDelCarro = reservasArray.filter(reserva => 
-            reserva.id_carros == carId && 
-            reserva.estado !== 'cancelada' && 
-            reserva.estado !== 'rechazada'
-          );
-          
-          // Extraer asientos ocupados
-          const asientosOcupados = reservasDelCarro.map(reserva => 
-            parseInt(reserva.Asiento || reserva.asiento || 0)
-          ).filter(asiento => asiento > 0);
-          
-          // Obtener el teléfono del conductor del carro
-          const telefonoConductor = carroEncontrado.telefono || carroEncontrado.Telefono || carroEncontrado.phone || 'No disponible';
-          
-  
-          
-          // Establecer datos del carro
-          const carDetailsToSet = {
-            id_carros: carroEncontrado.id_carros,
-            conductor: carroEncontrado.conductor || carroEncontrado.Conductor,
-            placa: carroEncontrado.placa || carroEncontrado.Placa,
-            asientos: parseInt(carroEncontrado.asientos) || parseInt(carroEncontrado.Asientos) || 4,
-            asientos_disponibles: (parseInt(carroEncontrado.asientos) || parseInt(carroEncontrado.Asientos) || 4) - asientosOcupados.length,
-            destino: carroEncontrado.destino || carroEncontrado.Destino,
-            horasalida: carroEncontrado.horasalida || carroEncontrado.Horasalida,
-            fecha: carroEncontrado.fecha || carroEncontrado.Fecha,
-            imagencarro: carroEncontrado.imagencarro || carroEncontrado.Imagencarro,
-            // Obtener el teléfono del conductor del carro
-            telefono: telefonoConductor,
-            email: carroEncontrado.email,
-            estado: carroEncontrado.estado || carroEncontrado.Estado || carroEncontrado.id_estados,
-            id_estados: carroEncontrado.id_estados || carroEncontrado.estado || carroEncontrado.Estado
-          };
-          
-          
-          // Actualizar estados
-          setReservasExistentes(reservasDelCarro);
-          setAsientosOcupados(asientosOcupados);
-          setCarDetails(carDetailsToSet);
+
+        if (reservasResp.ok) {
+          const rd = await reservasResp.json();
+          const ra = Array.isArray(rd) ? rd : (rd?.data ?? []);
+          const ocupados = ra
+            .filter(r => r.id_carros == carId && r.estado !== 'cancelada' && r.estado !== 'rechazada')
+            .map(r => parseInt(r.Asiento || r.asiento || 0))
+            .filter(n => n > 0);
+          setAsientosOcupados(ocupados);
         }
-        
-      } catch (error) {
-        // Error silencioso para mejor UX
+
+        setCarDetails({
+          id_carros:  car.id_carros || car.id,
+          conductor:  car.conductor  || car.Conductor,
+          placa:      car.placa      || car.Placa,
+          asientos:   parseInt(car.asientos || car.Asientos) || 4,
+          destino:    car.destino    || car.Destino,
+          horasalida: car.horasalida || car.Horasalida,
+          fecha:      car.fecha      || car.Fecha,
+          imagencarro: car.imagencarro || car.Imagencarro,
+          telefono:   car.telefono   || car.Telefono || 'No disponible',
+          id_estados: car.id_estados || car.estado   || car.Estado,
+        });
+      } catch {
+        // silencioso
       } finally {
         setIsLoading(false);
       }
     };
 
-    // Ejecutar las funciones de carga
-    const loadData = async () => {
-      try {
-        await fetchEstados();
-        await fetchCarDetails();
-      } catch (error) {
-        setIsLoading(false);
-      }
-    };
-    
-    loadData();
+    loadAll();
   }, [carId, navigate]);
 
-  const handleGoBack = () => {
-    navigate(-1);
+  const handleSeatClick = (seat) => {
+    if (asientosOcupados.includes(seat)) {
+      showToast(`El asiento ${seat} ya está ocupado.`, 'error');
+      return;
+    }
+    setSelectedSeat(seat);
+    setSeatInput(String(seat));
   };
 
-  const handleSeatSelection = (seatNumber) => {
-    // Verificar si el asiento ya está ocupado
-    if (asientosOcupados.includes(seatNumber)) {
-      alert(`El asiento ${seatNumber} ya está ocupado. Por favor selecciona otro asiento.`);
-      return;
+  const handleSeatInput = (e) => {
+    const val = e.target.value;
+    setSeatInput(val);
+    const num = parseInt(val);
+    if (!isNaN(num) && num >= 1 && carDetails && num <= carDetails.asientos) {
+      setSelectedSeat(num);
+    } else {
+      setSelectedSeat(null);
     }
-    setSelectedSeat(seatNumber);
   };
 
-  const handleConfirmReservation = () => {
-    if (!userData) {
-      alert('Debes estar autenticado para hacer una reserva. Por favor, inicia sesión.');
-      navigate('/login');
-      return;
-    }
-    
-         if (!selectedSeat || !pickupLocation.trim() || !nombre.trim() || !telefono.trim()) {
-       alert('Por favor selecciona un puesto, agrega tu ubicación de recogida, tu nombre y tu teléfono');
-       return;
-     }
-    
-    // Verificar que el asiento seleccionado no esté ocupado
-    if (asientosOcupados.includes(selectedSeat)) {
-      alert('El asiento seleccionado ya está ocupado. Por favor selecciona otro asiento.');
-      return;
-    }
-    
-    // Verificar que haya asientos disponibles
-    if (carDetails.asientos_disponibles <= 0) {
-      alert('No hay asientos disponibles en este carro. Todos los asientos están ocupados.');
-      return;
-    }
-    
-    // Verificar que el ID del usuario esté disponible
+  const handleConfirm = () => {
+    if (!userData) { navigate('/login'); return; }
+    if (!selectedSeat)                              { showToast('Selecciona o escribe un número de asiento.', 'error'); return; }
+    if (asientosOcupados.includes(selectedSeat))    { showToast('Ese asiento está ocupado. Elige otro.', 'error'); return; }
+    if (!pickupLocation.trim())                     { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
+    if (!nombre.trim())                             { showToast('Ingresa tu nombre.', 'error'); return; }
+    if (!telefono.trim())                           { showToast('Ingresa tu teléfono.', 'error'); return; }
+    if (carDetails.asientos - asientosOcupados.length <= 0) { showToast('No hay asientos disponibles.', 'error'); return; }
     const userId = userData.id || userData.id_users || userData.ID || userData.user_id || userData.userId;
-    if (!userId) {
-      alert('Error: No se pudo identificar tu cuenta de usuario. Por favor, inicia sesión nuevamente.');
-      navigate('/login');
-      return;
-    }
-    
-              // El teléfono ahora se ingresa manualmente, no se valida del usuario
+    if (!userId) { showToast('Error de sesión. Inicia sesión nuevamente.', 'error'); navigate('/login'); return; }
     setShowConfirmation(true);
   };
 
-  const handleReserveTrip = async () => {
+  const handleReserve = async () => {
     setIsReserving(true);
-    
-    // Obtener el ID del usuario de múltiples fuentes posibles
-    const userId = userData.id || userData.id_users || userData.ID || userData.user_id || userData.userId || 1;
-    
-    // Obtener el ID del carro y validar que no sea null
-    const carroId = carDetails.id_carros || carDetails.id || carId;
-    if (!carroId) {
-      alert('Error: No se pudo identificar el carro. Por favor, recarga la página e intenta nuevamente.');
-      return;
-    }
-   
-         try {
-        // Usar el teléfono ingresado por el usuario
-        
-        // Validar que todos los campos requeridos estén presentes
-        if (!nombre.trim() || !pickupLocation.trim() || !selectedSeat || !userId || !carroId || !telefono.trim()) {
-          throw new Error('Todos los campos son obligatorios. Por favor, completa toda la información incluyendo tu teléfono.');
-        }
-        
-        // Validar que el teléfono no sea vacío
-        if (!telefono.trim()) {
-          throw new Error('Por favor ingresa tu número de teléfono para continuar con la reserva.');
-        }
-       
-               // Preparar los datos a enviar - CAMPOS COMPLETOS PARA LA BASE DE DATOS
-        const dataToSend = {
-          Nombre: nombre.trim(),
-          Ubicacion: pickupLocation,
-          Asiento: selectedSeat,
-          Usuario: userId,
-          id_carros: carroId,
-          // Campo teléfono ingresado por el usuario - Cambiado a "Telefono" para coincidir con el backend
-          Telefono: telefono.trim(),
-          // Campos adicionales que pueden ser requeridos por la base de datos
-          comentario: nombre.trim(), // Usar el nombre como comentario si es necesario
-          estado: 'pendiente', // Estado inicial de la reserva
-          // Campos de fecha y hora si son requeridos
-          fecha_reserva: new Date().toISOString().split('T')[0], // Fecha actual
-          hora_reserva: new Date().toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-        };
-
-      // Llamada real a la API usando las rutas proporcionadas
-      const bodyString = JSON.stringify(dataToSend);
-      
-      const response = await fetch('http://127.0.0.1:8000/api/agregarreserva', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: bodyString
+    const carroId = carDetails.id_carros || carId;
+    try {
+      await crearReservaApi({
+        Nombre:    nombre.trim(),
+        Ubicacion: pickupLocation.trim(),
+        Asiento:   selectedSeat,
+        id_carros: carroId,
+        Telefono:  telefono.trim(),
       });
-
-      
-      if (!response.ok) {
-        const errorData = await response.json();
-        
-        // Mostrar más detalles del error para debugging
-        let errorMessage = errorData.message || 'Error al reservar el viaje';
-        if (errorData.error) {
-          errorMessage += ` - Detalles: ${errorData.error}`;
-        }
-        
-        throw new Error(errorMessage);
-      }
-
-      const responseData = await response.json();
-
       setShowConfirmation(false);
       setShowSuccess(true);
-      
-      // Redirigir después de 3 segundos
-      setTimeout(() => {
-        navigate('/indexLogin');
-      }, 3000);
-      
-    } catch (error) {
-      alert(`Error al reservar el viaje: ${error.message}. Inténtalo de nuevo.`);
+      setTimeout(() => navigate('/indexLogin'), 3000);
+    } catch (err) {
+      const msg = err.response?.data?.message || 'Error al reservar. Inténtalo de nuevo.';
+      showToast(msg, 'error');
     } finally {
       setIsReserving(false);
     }
   };
 
-  const handleCancelReservation = () => {
-    setShowConfirmation(false);
-  };
+  if (isLoading) return <LoadingScreen message="Cargando detalles del viaje..." />;
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-white mx-auto mb-4"></div>
-          <div className="text-white text-xl font-semibold mb-2">Cargando detalles del carro...</div>
-        </div>
+  if (!userData || !carDetails) return (
+    <PageBg centered>
+      <div className="text-center text-white space-y-3">
+        <p className="text-lg font-semibold">{!userData ? 'Error de autenticación' : 'No se encontró el viaje'}</p>
+        <button
+          onClick={() => navigate(-1)}
+          className="px-6 py-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors text-sm"
+        >
+          Volver
+        </button>
       </div>
-    );
-  }
+    </PageBg>
+  );
 
-  if (!userData) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-white text-xl mb-4">Error de autenticación</div>
-          <div className="text-blue-200 text-sm mb-4">No se pudieron cargar tus datos de usuario</div>
-          <button 
-            onClick={() => navigate('/login')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Volver al Login
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!carDetails) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-white text-xl mb-4">Error al cargar el carro</div>
-          <div className="text-blue-200 text-sm mb-4">No se pudieron cargar los detalles del carro</div>
-          <button 
-            onClick={() => navigate(-1)}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"
-          >
-            Volver Atrás
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  // Generar asientos disponibles optimizado con useMemo
-  const availableSeats = [];
-  for (let i = 1; i <= carDetails.asientos; i++) {
-    availableSeats.push(i);
-  }
+  const totalAsientos  = carDetails.asientos;
+  const disponibles    = totalAsientos - asientosOcupados.length;
+  const estadoInfo     = getEstadoInfo(carDetails.id_estados);
+  const seatOcupado    = selectedSeat && asientosOcupados.includes(selectedSeat);
+  const isFormComplete = selectedSeat && !seatOcupado && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-900 to-blue-700 relative overflow-hidden">
-      {/* Navbar */}
-      <nav className="bg-white shadow-lg relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-16">
-            {/* Logo y nombre */}
-            <div className="flex items-center space-x-3">
-              <FaCar className="text-blue-900 text-3xl drop-shadow-lg" />
-              <span className="text-2xl font-bold text-blue-900">Mecaza</span>
-            </div>
+    <PageBg>
+      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
+      <InnerNavbar userData={userData} title="Detalles del viaje" />
 
-            
-            <div className="hidden md:flex items-center space-x-6">
-              <button
-                onClick={handleGoBack}
-                className="text-blue-900 hover:text-blue-700 font-medium transition-colors flex items-center"
-              >
-                <FaArrowLeft className="mr-2" />
-                Volver
-              </button>
-              <UserMenu userData={userData} />
-            </div>
+      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6 animate-fade-in-up">
 
-            
-            <div className="md:hidden">
-              <button
-                onClick={() => setIsMenuOpen(!isMenuOpen)}
-                className="text-blue-900 hover:text-blue-700 p-2"
-              >
-                <Bars3Icon className="h-6 w-6" />
-              </button>
-            </div>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-extrabold text-white">{carDetails.destino}</h1>
+            <p className="text-blue-200 text-sm mt-0.5">{carDetails.conductor} · {carDetails.placa}</p>
           </div>
-
-          {isMenuOpen && (
-            <div className="md:hidden bg-white border-t border-gray-200">
-              <div className="px-2 pt-2 pb-3 space-y-1">
-                <button
-                  onClick={handleGoBack}
-                  className="w-full text-left px-3 py-2 text-blue-900 hover:text-blue-700 font-medium flex items-center"
-                >
-                  <FaArrowLeft className="mr-2" />
-                  Volver
-                </button>
-                <button
-                  onClick={() => { localStorage.removeItem('userData'); localStorage.removeItem('authToken'); navigate('/login'); }}
-                  className="w-full text-left px-3 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors font-medium"
-                >
-                  Cerrar Sesión
-                </button>
-              </div>
-            </div>
-          )}
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${estadoInfo.color}`}>
+              {estadoInfo.label}
+            </span>
+            <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${disponibles > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+              {disponibles > 0 ? `${disponibles} asiento${disponibles !== 1 ? 's' : ''} libre${disponibles !== 1 ? 's' : ''}` : 'Sin asientos'}
+            </span>
+          </div>
         </div>
-      </nav>
 
- 
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
-        <div className="bg-white shadow-[0_20px_50px_rgba(0,0,0,0.4)] rounded-xl p-8 transform transition-all duration-300">
+        {/* Cuerpo en dos columnas */}
+        <div className="grid lg:grid-cols-5 gap-6">
 
-                       <div className="text-center mb-8">
-              <h1 className="text-4xl font-extrabold text-blue-900 mb-4">
-                Reserva Tu Viaje 
-              </h1>
-              <p className="text-lg text-gray-600 mb-4">
-                Confirma tu reserva y selecciona tu puesto
-              </p>
-              {/* Caja verde eliminada */}
-              {estados.length > 0 && estados[0].estados === 'Disponible' && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 max-w-md mx-auto mt-4">
-                  <p className="text-sm text-yellow-800">
-                    <strong>⚠️ Modo de respaldo:</strong> Algunos datos se cargaron desde valores por defecto debido a problemas de conexión. La funcionalidad básica está disponible.
+          {/* ── Columna izquierda: información ── */}
+          <div className="lg:col-span-3 space-y-5">
+
+            {/* Imagen */}
+            <div className="rounded-2xl overflow-hidden shadow-xl bg-white/5">
+              <CarImage
+                imageUrl={getCarImageUrl(carDetails.imagencarro)}
+                conductorName={carDetails.conductor}
+                className="w-full h-56 object-cover"
+                fallbackClassName="w-full h-56 bg-gradient-to-br from-blue-800/60 to-violet-800/60 flex items-center justify-center"
+                fallbackIconSize="text-7xl"
+              />
+            </div>
+
+            {/* Conductor */}
+            <SectionCard title="Conductor" icon={<FaUser className="text-xs" />} accent="blue">
+              <div className="grid sm:grid-cols-3 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Nombre</p>
+                  <p className="font-semibold text-gray-800">{carDetails.conductor}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Placa</p>
+                  <p className="font-semibold text-gray-800">{carDetails.placa}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Teléfono</p>
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
+                    <FaPhone className="text-blue-500 text-xs shrink-0" />
+                    {carDetails.telefono}
                   </p>
                 </div>
-              )}
-            </div>
-
-          {/* Información del carro */}
-          <div className="grid md:grid-cols-2 gap-8 mb-8">
-            
-            <div className="space-y-6">
-                             {/* Imagen del carro */}
-                <div className="flex justify-center">
-                  <CarImage 
-                    imageUrl={getCarImageUrl(carDetails.imagencarro)}
-                    conductorName={carDetails.conductor}
-                    className="w-full max-w-md h-64 object-cover rounded-lg shadow-lg"
-                    fallbackClassName="w-full max-w-md h-64 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg shadow-lg flex items-center justify-center"
-                    fallbackIconSize="text-6xl"
-                  />
-                </div>
-
-             
-              <div className="bg-white rounded-lg p-6 border border-gray-200">
-                <h3 className="text-xl font-bold text-gray-900 mb-4">Precios por Ruta</h3>
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">Zaragoza → Medellín</span>
-                    <span className="font-bold text-green-600">
-                      ${precios ? precios.zaraMede?.toLocaleString() : '120.000'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">Zaragoza → Caucasia</span>
-                    <span className="font-bold text-green-600">
-                      ${precios ? precios.zaraCauca?.toLocaleString() : '30.000'}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
-                    <span className="font-medium text-gray-700">Caucasia → Medellín</span>
-                    <span className="font-bold text-green-600">
-                      ${precios ? precios.caucaMede?.toLocaleString() : '100.000'}
-                    </span>
-                  </div>
-                </div>
               </div>
-            </div>
+            </SectionCard>
 
-            {/* Columna derecha: Información del conductor */}
-            <div className="space-y-6">
-              <div className="bg-blue-50 rounded-lg p-6">
-                <h3 className="text-xl font-bold text-blue-900 mb-4 flex items-center">
-                  <FaUser className="mr-2" />
-                  Información del Conductor
-                </h3>
-                <div className="space-y-3">
-                                      <div>
-                        <span className="font-semibold text-gray-700">Nombre:</span>
-                        <p className="text-gray-900">{carDetails.conductor}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-700">Placa:</span>
-                        <p className="text-gray-900">{carDetails.placa}</p>
-                      </div>
-                      <div>
-                        <span className="font-semibold text-gray-700">Teléfono:</span>
-                        <p className="text-gray-900 flex items-center">
-                          <FaPhone className="mr-2 text-blue-600" />
-                          {carDetails.telefono}
-                        </p>
-                      </div>
-                    
-                </div>
-              </div>
-
-              {/* Información del viaje */}
-              <div className="bg-green-50 rounded-lg p-6">
-                <h3 className="text-xl font-bold text-green-900 mb-4 flex items-center">
-                  <FaMapMarkerAlt className="mr-2" />
-                  Detalles del Viaje
-                </h3>
-                                                                   <div className="space-y-3">
-                                    <div>
-                                      <span className="font-semibold text-gray-700">Destino:</span>
-                                      <p className="text-gray-900">{carDetails.destino}</p>
-                                    </div>
-                                    <div>
-                                      <span className="font-semibold text-gray-700">Estado del Carro:</span>
-                                      <div className="flex items-center space-x-2">
-                                        {(() => {
-                                          // Obtener el estado del carro, verificando todos los campos posibles
-                                          const estadoId = carDetails.estado || carDetails.Estado || carDetails.id_estados || carDetails.id_estado;
-                                          
-
-                                          
-                                          // Obtener el nombre del estado
-                                          const estadoNombre = getEstadoNombre(estadoId);
-                                          
-                                          // Determinar el color del badge basado en el estado
-                                          let badgeClass = 'bg-gray-100 text-gray-800';
-                                          const estadoNumero = parseInt(estadoId) || 0;
-                                          
-                                          
-                                          if (estadoNumero === 1) {
-                                            badgeClass = 'bg-green-100 text-green-800';
-                                          } else if (estadoNumero === 2) {
-                                            badgeClass = 'bg-yellow-100 text-yellow-800';
-                                          } else if (estadoNumero === 3) {
-                                            badgeClass = 'bg-orange-100 text-orange-800';
-                                          } else if (estadoNumero === 4) {
-                                            badgeClass = 'bg-red-100 text-red-800';
-                                          } else {
-                                          }
-                                          
-                                          
-                                          return (
-                                            <span className={`px-3 py-1 rounded-full text-sm font-semibold ${badgeClass}`}>
-                                              {estadoNombre}
-                                            </span>
-                                          );
-                                        })()}
-                                      </div>
-                                    </div>
-                                    <div>
-                                      <span className="font-semibold text-gray-700">Fecha:</span>
-                                      <p className="text-gray-900 flex items-center">
-                                        <FaCalendar className="mr-2 text-green-600" />
-                                        {(() => {
-                                          if (!carDetails.fecha) return 'No especificada';
-                                          
-                                          try {
-                                            // Intentar parsear la fecha directamente
-                                            const fecha = new Date(carDetails.fecha);
-                                            
-                                            // Verificar si la fecha es válida
-                                            if (!isNaN(fecha.getTime())) {
-                                              // Si hay diferencia de zona horaria, mostrar la fecha original
-                                              if (fecha.getUTCDate() !== fecha.getDate()) {
-                                                return carDetails.fecha;
-                                              }
-                                              
-                                              return fecha.toLocaleDateString('es-ES');
-                                            }
-                                            
-                                            // Si no se puede parsear, mostrar la fecha original
-                                            return carDetails.fecha;
-                                            
-                                          } catch (error) {
-                                            return carDetails.fecha; // Mostrar la fecha original si hay error
-                                          }
-                                        })()}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="font-semibold text-gray-700">Hora de salida:</span>
-                                      <p className="text-gray-900 flex items-center">
-                                        <FaClock className="mr-2 text-green-600" />
-                                        {carDetails.horasalida}
-                                      </p>
-                                    </div>
-                                    <div>
-                                      <span className="font-semibold text-gray-700">Asientos disponibles:</span>
-                                      <p className="text-gray-900">
-                                        {carDetails.asientos_disponibles || carDetails.asientos} de {carDetails.asientos}
-                                        {asientosOcupados.length > 0 && (
-                                          <span className="text-red-600 text-sm ml-2">
-                                            ({asientosOcupados.length} ocupado{asientosOcupados.length > 1 ? 's' : ''})
-                                          </span>
-                                        )}
-                                      </p>
-                                    </div>
-                                  </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Selección de puesto */}
-          <div className="mb-8">
-            <h3 className="text-2xl font-bold text-gray-900 mb-6 text-center">Selecciona tu Asiento</h3>
-            
-            {/* Layout moderno de asientos */}
-            <div className="max-w-md mx-auto">
-              {/* Información del vehículo */}
-              <div className="bg-gradient-to-r from-blue-500 to-purple-600 rounded-t-xl p-4 text-white text-center mb-4">
-                <h4 className="font-bold text-lg">{carDetails.placa}</h4>
-                <p className="text-sm opacity-90">Vehículo disponible</p>
-              </div>
-              
-              {/* Asientos */}
-              <div className="bg-white rounded-b-xl shadow-xl p-6">
-                {/* Fila del conductor */}
-                <div className="mb-6">
-                  <div className="text-center mb-3">
-                    <span className="text-sm font-medium text-gray-600">Conductor</span>
-                  </div>
-                  <div className="flex justify-center space-x-4">
-                    <div className="w-16 h-12 bg-gradient-to-b from-gray-400 to-gray-500 rounded-lg flex items-center justify-center shadow-md border-2 border-gray-300">
-                      <span className="text-xs font-bold text-gray-700">COND</span>
-                    </div>
-                    <div className="w-16 h-12 bg-gradient-to-b from-gray-400 to-gray-500 rounded-lg flex items-center justify-center shadow-md border-2 border-gray-300">
-                      <span className="text-xs font-bold text-gray-700">COPIL</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Separador */}
-                <div className="border-t border-gray-200 mb-6"></div>
-                
-                {/* Asientos traseros */}
-                <div className="mb-6">
-                  <div className="text-center mb-3">
-                    <span className="text-sm font-medium text-gray-600">Asientos Disponibles</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4 max-w-xs mx-auto">
-                    {[1, 2, 3, 4].map((seat) => {
-                      const isOcupado = asientosOcupados.includes(seat);
-                      const isSeleccionado = selectedSeat === seat;
-                      
-                      return (
-                      <button
-                        key={seat}
-                        onClick={() => handleSeatSelection(seat)}
-                         disabled={isOcupado}
-                        className={`w-16 h-12 rounded-xl transition-all duration-300 flex items-center justify-center shadow-lg transform border-2 ${
-                          isOcupado
-                            ? 'bg-gradient-to-br from-red-400 to-red-500 text-white border-red-300 cursor-not-allowed opacity-75'
-                            : isSeleccionado
-                          ? 'bg-gradient-to-br from-blue-500 to-blue-600 text-white border-blue-400 shadow-blue-200 scale-110'
-                            : 'bg-gradient-to-br from-gray-100 to-gray-200 text-gray-700 border-gray-200 hover:from-blue-100 hover:to-blue-200 hover:border-blue-300 hover:text-blue-700 hover:scale-105'
-                        }`}
-                      >
-                        <span className="text-sm font-bold">
-                          {isOcupado ? '✗' : seat}
-                        </span>
-                      </button>
-                      );
-                    })}
-                  </div>
-                </div>
-                
-                {/* Información de estado */}
-                <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                  <div className="flex items-center justify-center space-x-4 text-xs">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-gray-300 rounded-full"></div>
-                      <span className="text-gray-600">Disponible</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-                      <span className="text-gray-600">Seleccionado</span>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-red-400 rounded-full"></div>
-                      <span className="text-gray-600">Ocupado</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Información de asientos */}
-                <div className="text-center">
-                  <p className="text-sm text-gray-600 mb-2">
-                    <span className="font-semibold">Asientos disponibles:</span> {carDetails.asientos_disponibles || carDetails.asientos} de {carDetails.asientos}
+            {/* Detalles del viaje */}
+            <SectionCard title="Detalles del viaje" icon={<FaMapMarkerAlt className="text-xs" />} accent="green">
+              <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Destino</p>
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
+                    <FaMapMarkerAlt className="text-green-500 text-xs shrink-0" /> {carDetails.destino}
                   </p>
-                  {asientosOcupados.length > 0 && (
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-3">
-                      <p className="text-red-700 font-semibold text-sm">
-                        ⚠️ {asientosOcupados.length} asiento(s) ocupado(s): {asientosOcupados.sort().join(', ')}
-                      </p>
-                    </div>
-                  )}
-                  {selectedSeat && (
-                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                      <p className="text-blue-700 font-semibold text-sm">
-                        ✓ Has seleccionado el asiento {selectedSeat}
-                      </p>
-                    </div>
-                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Fecha</p>
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
+                    <FaCalendar className="text-green-500 text-xs shrink-0" /> {formatFecha(carDetails.fecha)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Hora de salida</p>
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
+                    <FaClock className="text-green-500 text-xs shrink-0" /> {carDetails.horasalida}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Asientos disponibles</p>
+                  <p className="font-semibold text-gray-800">
+                    {disponibles} de {totalAsientos}
+                  </p>
                 </div>
               </div>
-            </div>
+            </SectionCard>
+
+            {/* Precios */}
+            <SectionCard title="Precios por ruta" accent="orange">
+              <div className="divide-y divide-gray-50">
+                {[
+                  { ruta: 'Zaragoza → Medellín', precio: precios?.zaraMede  ?? 120000 },
+                  { ruta: 'Zaragoza → Caucasia', precio: precios?.zaraCauca ?? 30000  },
+                  { ruta: 'Caucasia → Medellín', precio: precios?.caucaMede ?? 100000 },
+                ].map(({ ruta, precio }) => (
+                  <div key={ruta} className="flex justify-between items-center py-2.5">
+                    <span className="text-sm text-gray-600">{ruta}</span>
+                    <span className="text-sm font-bold text-green-600">${precio.toLocaleString('es-CO')}</span>
+                  </div>
+                ))}
+              </div>
+            </SectionCard>
           </div>
 
-                                             {/* Información del pasajero */}
-             <div className="mb-8">
-               <h3 className="text-2xl font-bold text-gray-900 mb-4">Información del Pasajero</h3>
-               <div className="grid md:grid-cols-2 gap-6">
-                 {/* Nombre del pasajero */}
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-2">Tu Nombre</label>
-                   <div className="relative">
-                     <FaUser className="absolute left-3 top-3 text-gray-400" />
-                     <input
-                       type="text"
-                       value={nombre}
-                       onChange={(e) => setNombre(e.target.value)}
-                       placeholder="Tu nombre se toma automáticamente de tu cuenta..."
-                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-gray-50"
-                       readOnly={nombre.trim() !== ''}
-                     />
-                   </div>
-                   <p className="text-sm text-gray-600 mt-2">
-                     {nombre.trim() !== '' ? 
-                       '✓ Nombre tomado automáticamente de tu cuenta' : 
-                       'Este nombre aparecerá en la reserva'
-                     }
-                   </p>
-                 </div>
-                 
-                 {/* Teléfono del pasajero */}
-                 <div>
-                   <label className="block text-sm font-medium text-gray-700 mb-2">Tu Teléfono</label>
-                   <div className="relative">
-                     <FaPhone className="absolute left-3 top-3 text-gray-400" />
-                     <input
-                       type="tel"
-                       value={telefono}
-                       onChange={(e) => setTelefono(e.target.value)}
-                       placeholder="Ingresa tu número de teléfono..."
-                       className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                       required
-                     />
-                   </div>
-                   <p className="text-sm text-gray-600 mt-2">
-                     El conductor te contactará en este número
-                   </p>
-                 </div>
-               </div>
-               
-               {/* Ubicación de recogida - Ahora en una fila separada */}
-               <div className="mt-6">
-                 <label className="block text-sm font-medium text-gray-700 mb-2">Ubicación de Recogida</label>
-                 <div className="relative">
-                   <FaMapMarkerAlt className="absolute left-3 top-3 text-gray-400" />
-                   <input
-                     type="text"
-                     value={pickupLocation}
-                     onChange={(e) => setPickupLocation(e.target.value)}
-                     placeholder="Ingresa tu dirección de recogida..."
-                     className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                   />
-                 </div>
-                 <p className="text-sm text-gray-600 mt-2">
-                   El conductor te recogerá en esta ubicación
-                 </p>
-               </div>
-             </div>
+          {/* ── Columna derecha: reserva ── */}
+          <div className="lg:col-span-2 space-y-5">
 
-          {/* Botón de confirmación */}
-          <div className="text-center">
-                                           <button
-                   onClick={handleConfirmReservation}
-                   disabled={!selectedSeat || !pickupLocation.trim() || !nombre.trim() || !telefono.trim() || carDetails.asientos_disponibles <= 0}
-                   className="bg-blue-600 text-white px-8 py-4 rounded-lg font-semibold text-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center mx-auto"
-                 >
-                   <FaCheck className="mr-2" />
-                   {carDetails.asientos_disponibles <= 0 ? 'Sin Asientos Disponibles' : 'Confirmar Reserva'}
-                 </button>
-              {carDetails.asientos_disponibles <= 0 && (
-                <p className="text-red-600 text-sm mt-2">
-                  ⚠️ No hay asientos disponibles en este carro
-                </p>
-              )}
+            {/* Selección de asiento */}
+            <SectionCard title="Selecciona tu asiento" accent="violet">
+              {/* Grid dinámico de asientos */}
+              <div className="grid grid-cols-4 gap-2 mb-4">
+                {Array.from({ length: totalAsientos }, (_, i) => i + 1).map(seat => {
+                  const ocupado      = asientosOcupados.includes(seat);
+                  const seleccionado = selectedSeat === seat;
+                  return (
+                    <button
+                      key={seat}
+                      onClick={() => handleSeatClick(seat)}
+                      disabled={ocupado}
+                      title={ocupado ? `Asiento ${seat} ocupado` : `Seleccionar asiento ${seat}`}
+                      className={[
+                        'h-10 rounded-xl text-sm font-bold transition-all active:scale-95',
+                        ocupado
+                          ? 'bg-red-100 text-red-400 cursor-not-allowed'
+                          : seleccionado
+                            ? 'bg-gradient-to-br from-violet-500 to-blue-500 text-white shadow-md shadow-violet-200 scale-105'
+                            : 'bg-gray-100 text-gray-600 hover:bg-violet-100 hover:text-violet-700 hover:scale-105',
+                      ].join(' ')}
+                    >
+                      {ocupado ? '✗' : seat}
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Leyenda */}
+              <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-gray-200 inline-block" /> Libre
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-gradient-to-br from-violet-400 to-blue-400 inline-block" /> Tuyo
+                </span>
+                <span className="flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded bg-red-200 inline-block" /> Ocupado
+                </span>
+              </div>
+
+              {/* Input numérico manual */}
+              <FormInput
+                label="O escribe el número de asiento"
+                type="number"
+                min="1"
+                max={totalAsientos}
+                value={seatInput}
+                onChange={handleSeatInput}
+                placeholder={`1 – ${totalAsientos}`}
+                hint={
+                  seatOcupado
+                    ? `Asiento ${selectedSeat} ocupado — elige otro`
+                    : selectedSeat
+                      ? `Asiento ${selectedSeat} seleccionado`
+                      : `Entre 1 y ${totalAsientos}`
+                }
+              />
+            </SectionCard>
+
+            {/* Datos del pasajero + confirmar */}
+            <SectionCard title="Tus datos" icon={<FaUser className="text-xs" />} accent="blue">
+              <div className="space-y-4">
+                <FormInput
+                  label="Nombre"
+                  icon={<FaUser className="text-xs" />}
+                  type="text"
+                  value={nombre}
+                  onChange={e => setNombre(e.target.value)}
+                  placeholder="Tu nombre completo"
+                  required
+                />
+                <FormInput
+                  label="Teléfono"
+                  icon={<FaPhone className="text-xs" />}
+                  type="tel"
+                  value={telefono}
+                  onChange={e => setTelefono(e.target.value)}
+                  placeholder="+57 300 000 0000"
+                  required
+                />
+                <FormInput
+                  label="Ubicación de recogida"
+                  icon={<FaMapMarkerAlt className="text-xs" />}
+                  type="text"
+                  value={pickupLocation}
+                  onChange={e => setPickupLocation(e.target.value)}
+                  placeholder="Tu dirección de recogida"
+                  required
+                />
+
+                <button
+                  onClick={handleConfirm}
+                  disabled={!isFormComplete}
+                  className="w-full py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl shadow-md hover:shadow-violet-300/50 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
+                >
+                  <FaCheck />
+                  {disponibles <= 0 ? 'Sin asientos disponibles' : 'Confirmar Reserva'}
+                </button>
+              </div>
+            </SectionCard>
           </div>
         </div>
       </div>
 
       {/* Modal de confirmación */}
       {showConfirmation && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full">
-            <h3 className="text-2xl font-bold text-gray-900 mb-4">Confirmar Reserva</h3>
-                                                     <div className="space-y-4 mb-6">
-                 <div>
-                   <span className="font-semibold">Conductor:</span> {carDetails.conductor}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Destino:</span> {carDetails.destino}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Fecha:</span> {(() => {
-                     if (!carDetails.fecha) return 'No especificada';
-                     
-                     try {
-                       const fecha = new Date(carDetails.fecha);
-                       
-                       if (!isNaN(fecha.getTime())) {
-                         // Si hay diferencia de zona horaria, mostrar la fecha original
-                         if (fecha.getUTCDate() !== fecha.getDate()) {
-                           return carDetails.fecha;
-                         }
-                         
-                         return fecha.toLocaleDateString('es-ES');
-                       }
-                       
-                       return carDetails.fecha;
-                       
-                     } catch (error) {
-                       return carDetails.fecha;
-                     }
-                   })()}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Hora:</span> {carDetails.horasalida}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Pasajero:</span> {nombre || 'No especificado'}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Puesto:</span> {selectedSeat ? `Asiento ${selectedSeat}` : 'No seleccionado'}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Ubicación:</span> {pickupLocation || 'No especificada'}
-                 </div>
-                 <div>
-                   <span className="font-semibold">Teléfono:</span> {telefono || 'No ingresado'}
-                 </div>
-                 <div className="text-xs text-gray-500 mt-2">
-                   <span className="font-semibold">Campo a enviar:</span> tel = {telefono || 'No ingresado'}
-                 </div>
-               </div>
-            <div className="flex space-x-4">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
+          onClick={e => e.target === e.currentTarget && setShowConfirmation(false)}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
+            <div className="bg-gradient-to-r from-blue-700 to-violet-600 px-6 py-4 flex items-center justify-between">
+              <h2 className="text-base font-bold text-white">Confirmar Reserva</h2>
+              <button onClick={() => setShowConfirmation(false)} className="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+            </div>
+            <div className="p-6 divide-y divide-gray-50">
+              {[
+                ['Conductor',  carDetails.conductor],
+                ['Destino',    carDetails.destino],
+                ['Fecha',      formatFecha(carDetails.fecha)],
+                ['Hora',       carDetails.horasalida],
+                ['Asiento',    `#${selectedSeat}`],
+                ['Pasajero',   nombre],
+                ['Teléfono',   telefono],
+                ['Recogida',   pickupLocation],
+              ].map(([label, val]) => (
+                <div key={label} className="flex justify-between py-2.5 text-sm">
+                  <span className="text-gray-400">{label}</span>
+                  <span className="font-semibold text-gray-800">{val}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 pb-6 flex gap-3">
               <button
-                onClick={handleReserveTrip}
+                onClick={() => setShowConfirmation(false)}
                 disabled={isReserving}
-                className="flex-1 bg-blue-600 text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center justify-center"
+                className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+              >
+                <FaTimes /> Cancelar
+              </button>
+              <button
+                onClick={handleReserve}
+                disabled={isReserving}
+                className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {isReserving ? (
                   <>
-                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    </svg>
                     Reservando...
                   </>
                 ) : (
-                  <>
-                    <FaCheck className="mr-2" />
-                    Confirmar
-                  </>
+                  <><FaCheck /> Confirmar</>
                 )}
-              </button>
-              <button
-                onClick={handleCancelReservation}
-                disabled={isReserving}
-                className="flex-1 bg-gray-300 text-gray-700 py-3 px-4 rounded-lg font-semibold hover:bg-gray-400 transition-colors disabled:opacity-50 flex items-center justify-center"
-              >
-                <FaTimes className="mr-2" />
-                Cancelar
               </button>
             </div>
           </div>
         </div>
       )}
 
-      
+      {/* Modal de éxito */}
       {showSuccess && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-8 max-w-md w-full text-center">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-8 text-center">
             <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
               <FaCheck className="text-green-600 text-2xl" />
             </div>
-            <h3 className="text-2xl font-bold text-gray-900 mb-2">¡Reserva Creada!</h3>
-            <p className="text-gray-600 mb-6">
-              Tu reserva ha sido creada exitosamente y está pendiente de confirmación por el conductor.
+            <h3 className="text-xl font-bold text-gray-900 mb-2">¡Reserva creada!</h3>
+            <p className="text-gray-500 text-sm mb-4">
+              Tu reserva está pendiente de confirmación por el conductor. Te notificaremos cuando sea aprobada.
             </p>
-            <div className="bg-yellow-50 rounded-lg p-4 mb-6">
-              <p className="text-sm text-yellow-800">
-                <strong>Estado:</strong> Pendiente de confirmación por el conductor. Te notificaremos cuando sea confirmada.
-              </p>
-            </div>
-            <div className="bg-green-50 rounded-lg p-4 mb-6">
-              <p className="text-sm text-green-800">
-                <strong>Recordatorio:</strong> Una vez confirmada, llega 10 minutos antes de la hora de salida en tu ubicación de recogida.
-              </p>
-            </div>
-            <p className="text-sm text-gray-500">
-              Redirigiendo a la página principal...
-            </p>
+            <p className="text-xs text-gray-400">Redirigiendo en unos segundos...</p>
           </div>
         </div>
       )}
-    </div>
+    </PageBg>
   );
 };
 
-export default VerDetalles; 
+export default VerDetalles;

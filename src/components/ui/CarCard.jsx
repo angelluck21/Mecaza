@@ -18,7 +18,12 @@ const CarCard = ({ car, onVerDetalles, userData }) => {
 
       {/* Imagen */}
       <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-violet-50 h-44">
-        <CarImage imageUrl={getCarImageUrl(car.imagencarro)} conductorName={car.conductor} />
+        <CarImage
+          imageUrl={getCarImageUrl(car.imagencarro)}
+          conductorName={car.conductor}
+          className="w-full h-full object-cover"
+          fallbackClassName="w-full h-full flex items-center justify-center"
+        />
         <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
 
         {/* Badge estado */}

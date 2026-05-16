@@ -9,8 +9,8 @@ import LoadingScreen from '../../components/ui/LoadingScreen';
 import FormInput     from '../../components/ui/FormInput';
 import SectionCard   from '../../components/ui/SectionCard';
 import ToastNotification from '../../components/ui/ToastNotification';
-import { useToast }  from '../../hooks/useToast';
-import axios         from 'axios';
+import { useToast }            from '../../hooks/useToast';
+import { actualizarUsuarioApi } from '../../services/api';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -81,22 +81,9 @@ const AjustesPerfil = () => {
     }
 
     setIsSaving(true);
-    const authToken = localStorage.getItem('authToken');
-    const userId    = resolveField(userData, ['id', 'id_users', 'ID', 'user_id', 'userId']);
+    const userId = resolveField(userData, ['id', 'id_users', 'ID', 'user_id', 'userId']);
 
     try {
-      // Subir imagen si hay una nueva
-      if (profileImage) {
-        const fd = new FormData();
-        fd.append('foto_perfil', profileImage);
-        fd.append('user_id', userId);
-        await fetch('https://api-mecaza.geekcorplab.com/api/actualizar-foto-perfil', {
-          method: 'POST',
-          body: fd,
-          headers: { Authorization: `Bearer ${authToken}` },
-        });
-      }
-
       const payload = {
         Nombre:   form.nombre,
         Correo:   form.email,
@@ -105,11 +92,15 @@ const AjustesPerfil = () => {
       };
       if (form.contrasena) payload.Contrasena = form.contrasena;
 
-      await axios.put(`https://api-mecaza.geekcorplab.com/api/actualizarusuario/${userId}`, payload, {
-        headers: { Authorization: `Bearer ${authToken}`, Accept: 'application/json' },
-      });
+      await actualizarUsuarioApi(userId, payload);
 
-      const updated = { ...userData, Nombre: form.nombre, Correo: form.email, fotoPerfil: imagePreview };
+      const updated = {
+        ...userData,
+        Nombre:    form.nombre,
+        Correo:    form.email,
+        Telefono:  form.telefono,
+        fotoPerfil: imagePreview,
+      };
       localStorage.setItem('userData', JSON.stringify(updated));
       setUserData(updated);
       setForm(f => ({ ...f, contrasena: '', confirmar: '' }));

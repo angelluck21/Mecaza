@@ -1,6 +1,6 @@
 import { ESTADOS_CARRO } from '../constants';
 
-const API_STORAGE_URL = 'https://api-mecaza.geekcorplab.com';
+const API_STORAGE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api').replace('/api', '');
 
 /**
  * Construye la URL completa de la imagen de un carro.
@@ -56,11 +56,12 @@ export const buildUserData = (data, correo) => {
     user_id: userId,
     userId,
     Nombre:
-      data.user?.Nombre || data.Nombre || data.user?.nombre || data.nombre ||
+      data.user?.Nombre || data.user?.nombre || data.user?.name ||
+      data.Nombre || data.nombre || data.name ||
       correo.split('@')[0],
     Correo: correo,
     rol: data.user?.rol || data.rol || data.user?.Rol || data.Rol || 'usuario',
-    Telefono: data.user?.Telefono || data.Telefono || data.user?.telefono || data.telefono || '',
+    Telefono: data.user?.tel || data.user?.Telefono || data.user?.telefono || data.tel || data.Telefono || data.telefono || '',
     fotoperfil: data.user?.fotoperfil || data.fotoperfil || null,
   };
 };

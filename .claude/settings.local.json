@@ -9,7 +9,9 @@
       "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(f'Carros en BD: {len\\(d.get\\(\\\\\"data\\\\\",[]\\)\\)}'\\)\")",
       "Bash(curl -s http://127.0.0.1:8000/api/listarcarro)",
       "Bash(curl *)",
-      "Bash(git config *)"
+      "Bash(git config *)",
+      "Bash(Get-ChildItem \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\Mecaza\\\\src\" -Recurse -Filter \"utils*\")",
+      "Bash(Select-Object FullName)"
     ]
   }
 }
