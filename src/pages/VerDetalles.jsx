@@ -102,11 +102,16 @@ const SeatIcon = ({ number, state, onClick }) => {
 };
 
 // ── Mapa visual del taxi ─────────────────────────────────────────────────────
-const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeat, onSelect, onOccupied }) => {
+const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeats, onToggle, onSelectAll, onOccupied }) => {
+  const availableSeats = Array.from({ length: totalAsientos }, (_, i) => i + 1)
+    .filter((n) => !asientosOcupados.includes(n));
+
+  const allSelected = availableSeats.length > 0 && availableSeats.every((n) => selectedSeats.includes(n));
+
   const getSeatState = (n) => {
     if (asientosOcupados.includes(n)) return 'occupied';
     if (n > totalAsientos)            return 'blocked';
-    if (selectedSeat === n)           return 'selected';
+    if (selectedSeats.includes(n))    return 'selected';
     return 'available';
   };
 
@@ -114,17 +119,53 @@ const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeat, onSelect, 
     const s = getSeatState(n);
     if (s === 'occupied') { onOccupied(n); return; }
     if (s === 'blocked')  return;
-    onSelect(n);
+    onToggle(n);
   };
 
-  const seatLabel = (n) => {
-    if (n === 1) return 'Asiento 1 — Copiloto (adelante)';
-    if (n <= 4)  return `Asiento ${n} — Fila trasera`;
-    return `Asiento ${n} — Extra`;
+  const handleSelectAll = () => {
+    if (allSelected) onSelectAll([]);
+    else             onSelectAll(availableSeats);
   };
 
   return (
     <div className="space-y-3">
+
+      {/* Botón reservar todos */}
+      <button
+        type="button"
+        onClick={handleSelectAll}
+        disabled={availableSeats.length === 0}
+        className={[
+          'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-150 active:scale-95',
+          allSelected
+            ? 'bg-violet-500 border-violet-500 text-white shadow-md shadow-violet-200/50'
+            : availableSeats.length === 0
+              ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
+              : 'bg-white border-violet-300 text-violet-600 hover:bg-violet-50 hover:border-violet-500',
+        ].join(' ')}
+      >
+        {allSelected ? (
+          <>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+            Deseleccionar todos
+          </>
+        ) : (
+          <>
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+            </svg>
+            Reservar todos los asientos disponibles
+            {availableSeats.length > 0 && (
+              <span className="bg-violet-100 text-violet-700 text-xs font-bold px-2 py-0.5 rounded-full">
+                {availableSeats.length}
+              </span>
+            )}
+          </>
+        )}
+      </button>
+
       {/* Contenedor del vehículo */}
       <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 relative select-none">
 
@@ -137,8 +178,8 @@ const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeat, onSelect, 
 
         {/* Fila delantera: conductor + copiloto (asiento 1) */}
         <div className="flex items-end justify-center gap-8 mb-1">
-          <SeatIcon number={0}  state="driver"                onClick={() => {}}           />
-          <SeatIcon number={1}  state={getSeatState(1)}       onClick={() => handleClick(1)}/>
+          <SeatIcon number={0} state="driver"             onClick={() => {}}            />
+          <SeatIcon number={1} state={getSeatState(1)}    onClick={() => handleClick(1)}/>
         </div>
 
         {/* Separador entre filas */}
@@ -191,21 +232,42 @@ const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeat, onSelect, 
           <span className="w-3 h-3 rounded border-2 border-gray-300 bg-white inline-block" /> Disponible
         </span>
         <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded border-2 border-violet-500 bg-violet-100 inline-block" /> Tu asiento
+          <span className="w-3 h-3 rounded border-2 border-violet-500 bg-violet-100 inline-block" /> Tus asientos
         </span>
         <span className="flex items-center gap-1.5">
           <span className="w-3 h-3 rounded border-2 border-red-300 bg-red-50 inline-block" /> Ocupado
         </span>
       </div>
 
-      {/* Info asiento seleccionado */}
-      {selectedSeat ? (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl py-2.5 px-4 text-center animate-fade-in">
-          <p className="text-sm font-semibold text-violet-700">{seatLabel(selectedSeat)}</p>
+      {/* Info asientos seleccionados */}
+      {selectedSeats.length > 0 ? (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl py-2.5 px-4 animate-fade-in">
+          <p className="text-xs text-violet-500 mb-1.5 font-medium text-center">
+            {selectedSeats.length === 1 ? '1 asiento seleccionado' : `${selectedSeats.length} asientos seleccionados`}
+          </p>
+          <div className="flex flex-wrap gap-1.5 justify-center">
+            {[...selectedSeats].sort((a, b) => a - b).map((n) => (
+              <span
+                key={n}
+                className="inline-flex items-center gap-1 bg-violet-500 text-white text-xs font-bold px-2.5 py-1 rounded-full"
+              >
+                Asiento {n}
+                <button
+                  type="button"
+                  onClick={() => onToggle(n)}
+                  className="ml-0.5 hover:bg-violet-600 rounded-full w-3.5 h-3.5 flex items-center justify-center transition-colors"
+                >
+                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
+                    <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
+                  </svg>
+                </button>
+              </span>
+            ))}
+          </div>
         </div>
       ) : (
         <div className="bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 text-center">
-          <p className="text-xs text-gray-400">Toca un asiento disponible para seleccionarlo</p>
+          <p className="text-xs text-gray-400">Toca un asiento para seleccionarlo — puedes elegir varios</p>
         </div>
       )}
     </div>
@@ -218,7 +280,7 @@ const VerDetalles = () => {
   const [userData,         setUserData]         = useState(null);
   const [isLoading,        setIsLoading]        = useState(true);
   const [carDetails,       setCarDetails]       = useState(null);
-  const [selectedSeat,     setSelectedSeat]     = useState(null);
+  const [selectedSeats,    setSelectedSeats]    = useState([]);
   const [pickupLocation,   setPickupLocation]   = useState('');
   const [nombre,           setNombre]           = useState('');
   const [telefono,         setTelefono]         = useState('');
@@ -305,8 +367,7 @@ const VerDetalles = () => {
 
   const handleConfirm = () => {
     if (!userData) { navigate('/login'); return; }
-    if (!selectedSeat)                              { showToast('Selecciona un asiento.', 'error'); return; }
-    if (asientosOcupados.includes(selectedSeat))    { showToast('Ese asiento está ocupado. Elige otro.', 'error'); return; }
+    if (selectedSeats.length === 0)                 { showToast('Selecciona al menos un asiento.', 'error'); return; }
     if (!pickupLocation.trim())                     { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
     if (!nombre.trim())                             { showToast('Ingresa tu nombre.', 'error'); return; }
     if (!telefono.trim())                           { showToast('Ingresa tu teléfono.', 'error'); return; }
@@ -320,13 +381,18 @@ const VerDetalles = () => {
     setIsReserving(true);
     const carroId = carDetails.id_carros || carId;
     try {
-      await crearReservaApi({
-        Nombre:    nombre.trim(),
-        Ubicacion: pickupLocation.trim(),
-        Asiento:   selectedSeat,
-        id_carros: carroId,
-        Telefono:  telefono.trim(),
-      });
+      // Crear una reserva por cada asiento seleccionado
+      await Promise.all(
+        selectedSeats.map((seat) =>
+          crearReservaApi({
+            Nombre:    nombre.trim(),
+            Ubicacion: pickupLocation.trim(),
+            Asiento:   seat,
+            id_carros: carroId,
+            Telefono:  telefono.trim(),
+          })
+        )
+      );
       setShowConfirmation(false);
       setShowSuccess(true);
       setTimeout(() => navigate('/indexLogin'), 3000);
@@ -357,8 +423,7 @@ const VerDetalles = () => {
   const totalAsientos  = carDetails.asientos;
   const disponibles    = totalAsientos - asientosOcupados.length;
   const estadoInfo     = getEstadoInfo(carDetails.id_estados);
-  const seatOcupado    = selectedSeat && asientosOcupados.includes(selectedSeat);
-  const isFormComplete = selectedSeat && !seatOcupado && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
+  const isFormComplete = selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
 
   return (
     <PageBg>
@@ -476,8 +541,13 @@ const VerDetalles = () => {
               <TaxiSeatMap
                 totalAsientos={totalAsientos}
                 asientosOcupados={asientosOcupados}
-                selectedSeat={selectedSeat}
-                onSelect={(seat) => setSelectedSeat(seat)}
+                selectedSeats={selectedSeats}
+                onToggle={(seat) =>
+                  setSelectedSeats((prev) =>
+                    prev.includes(seat) ? prev.filter((s) => s !== seat) : [...prev, seat]
+                  )
+                }
+                onSelectAll={(seats) => setSelectedSeats(seats)}
                 onOccupied={(seat) => showToast(`El asiento ${seat} ya está ocupado.`, 'error')}
               />
             </SectionCard>
@@ -519,7 +589,11 @@ const VerDetalles = () => {
                   className="w-full py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl shadow-md hover:shadow-violet-300/50 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
                 >
                   <FaCheck />
-                  {disponibles <= 0 ? 'Sin asientos disponibles' : 'Confirmar Reserva'}
+                  {disponibles <= 0
+                    ? 'Sin asientos disponibles'
+                    : selectedSeats.length > 1
+                      ? `Confirmar ${selectedSeats.length} asientos`
+                      : 'Confirmar Reserva'}
                 </button>
               </div>
             </SectionCard>
@@ -545,7 +619,7 @@ const VerDetalles = () => {
                 ['Destino',    carDetails.destino],
                 ['Fecha',      formatFecha(carDetails.fecha)],
                 ['Hora',       carDetails.horasalida],
-                ['Asiento',    `#${selectedSeat}`],
+                ['Asiento(s)', [...selectedSeats].sort((a,b)=>a-b).map(n=>`#${n}`).join(', ')],
                 ['Pasajero',   nombre],
                 ['Teléfono',   telefono],
                 ['Recogida',   pickupLocation],
