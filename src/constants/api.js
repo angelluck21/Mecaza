@@ -1,10 +1,11 @@
 export const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api';
+  import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
 
 export const ENDPOINTS = {
   // Auth
-  LOGIN: `${API_BASE_URL}/login`,
-  REGISTRAR: `${API_BASE_URL}/registrar`,
+  LOGIN:       `${API_BASE_URL}/login`,
+  REGISTRAR:   `${API_BASE_URL}/registrar`,
+  GOOGLE_AUTH: `${API_BASE_URL}/auth/google`,
 
   // Carros
   LISTAR_CARROS: `${API_BASE_URL}/listarcarro`,

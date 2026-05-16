@@ -12,6 +12,9 @@ export const loginApi = (correo, contrasena) =>
 export const registrarApi = (data) =>
   axios.post(ENDPOINTS.REGISTRAR, data, authHeaders());
 
+export const googleAuthApi = (credential) =>
+  axios.post(ENDPOINTS.GOOGLE_AUTH, { credential });
+
 // ── Carros ───────────────────────────────────────────────────────────────────
 
 export const listarCarrosApi = () =>

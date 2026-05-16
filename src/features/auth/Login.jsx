@@ -3,10 +3,11 @@ import { useNavigate } from 'react-router-dom';
 import { LockClosedIcon, EnvelopeIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
 import { FaCar } from 'react-icons/fa';
 
-import { loginApi }      from '../../services/api';
-import { buildUserData } from '../../utils';
-import { useToast }      from '../../hooks/useToast';
-import ToastNotification from '../../components/ui/ToastNotification';
+import { loginApi }        from '../../services/api';
+import { buildUserData }   from '../../utils';
+import { useToast }        from '../../hooks/useToast';
+import ToastNotification   from '../../components/ui/ToastNotification';
+import GoogleAuthButton, { REDIRECT_BY_ROLE as GOOGLE_REDIRECT } from '../../components/ui/GoogleAuthButton';
 
 const REDIRECT_BY_ROLE = {
   usuario:       '/indexLogin',
@@ -144,7 +145,28 @@ const Login = () => {
                 ) : 'Iniciar sesión'}
               </button>
 
-              {/* Separador */}
+              {/* Separador Google */}
+              <div className="relative my-1">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-100" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-xs text-gray-400">o continúa con</span>
+                </div>
+              </div>
+
+              {/* Botón Google */}
+              <GoogleAuthButton
+                label="Iniciar sesión con Google"
+                onSuccess={(userData) => {
+                  showToast('¡Bienvenido!', 'success');
+                  const rol = userData?.rol || 'usuario';
+                  setTimeout(() => navigate(GOOGLE_REDIRECT[rol] ?? '/indexLogin', { replace: true }), 1200);
+                }}
+                onError={(msg) => showToast(msg, 'error')}
+              />
+
+              {/* Separador registro */}
               <div className="relative my-1">
                 <div className="absolute inset-0 flex items-center">
                   <div className="w-full border-t border-gray-100" />

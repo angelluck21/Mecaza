@@ -16,14 +16,209 @@ import { useToast }      from '../hooks/useToast';
 import { crearReservaApi } from '../services/api';
 import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api';
+const API_BASE   = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
+const MAX_SEATS  = 5; // capacidad física máxima del taxi
+
+// ── Icono de asiento individual ──────────────────────────────────────────────
+const SeatIcon = ({ number, state, onClick }) => {
+  const isClickable = state === 'available' || state === 'selected';
+
+  const headrest = {
+    available: 'border-gray-300 bg-gray-200',
+    selected:  'border-violet-500 bg-violet-300',
+    occupied:  'border-red-300   bg-red-200',
+    blocked:   'border-gray-200  bg-gray-100 opacity-50',
+    driver:    'border-blue-300  bg-blue-200',
+  }[state];
+
+  const body = {
+    available: 'border-gray-300 bg-white text-gray-500 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-600 hover:scale-110 cursor-pointer',
+    selected:  'border-violet-500 bg-violet-100 text-violet-700 scale-110 shadow-lg shadow-violet-200/60',
+    occupied:  'border-red-300   bg-red-50    text-red-400   cursor-not-allowed',
+    blocked:   'border-dashed border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50',
+    driver:    'border-blue-300  bg-blue-50   text-blue-400  cursor-not-allowed',
+  }[state];
+
+  const label = {
+    available: 'text-gray-400',
+    selected:  'text-violet-600 font-semibold',
+    occupied:  'text-red-300',
+    blocked:   'text-gray-300 opacity-50',
+    driver:    'text-blue-400',
+  }[state];
+
+  return (
+    <button
+      type="button"
+      onClick={isClickable ? onClick : undefined}
+      disabled={!isClickable}
+      className="flex flex-col items-center gap-0.5 group outline-none"
+      title={
+        state === 'driver'   ? 'Conductor' :
+        state === 'occupied' ? `Asiento ${number} — ocupado` :
+        state === 'blocked'  ? `Asiento ${number} — no disponible` :
+        state === 'selected' ? `Asiento ${number} — seleccionado` :
+        `Seleccionar asiento ${number}`
+      }
+    >
+      {/* Cabecero */}
+      <div className={`w-7 h-2 rounded-t-full border border-b-0 transition-all duration-150 ${headrest}`} />
+
+      {/* Cuerpo del asiento */}
+      <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-150 ${body}`}>
+        {state === 'driver' ? (
+          /* Volante */
+          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="8"  strokeWidth="2"/>
+            <circle cx="12" cy="12" r="2.5" strokeWidth="2"/>
+            <line x1="12" y1="4"    x2="12" y2="9.5"  strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="4.5" y1="16"  x2="9"  y2="13.2" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="19.5" y1="16" x2="15" y2="13.2" strokeWidth="1.8" strokeLinecap="round"/>
+          </svg>
+        ) : state === 'occupied' ? (
+          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        ) : state === 'blocked' ? (
+          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+            <circle cx="12" cy="12" r="9"/>
+            <line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/>
+          </svg>
+        ) : state === 'selected' ? (
+          <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
+          </svg>
+        ) : (
+          <span className="text-sm font-bold">{number}</span>
+        )}
+      </div>
+
+      {/* Etiqueta */}
+      <span className={`text-[10px] mt-0.5 transition-colors ${label}`}>
+        {state === 'driver' ? 'Conductor' : `Asiento ${number}`}
+      </span>
+    </button>
+  );
+};
+
+// ── Mapa visual del taxi ─────────────────────────────────────────────────────
+const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeat, onSelect, onOccupied }) => {
+  const getSeatState = (n) => {
+    if (asientosOcupados.includes(n)) return 'occupied';
+    if (n > totalAsientos)            return 'blocked';
+    if (selectedSeat === n)           return 'selected';
+    return 'available';
+  };
+
+  const handleClick = (n) => {
+    const s = getSeatState(n);
+    if (s === 'occupied') { onOccupied(n); return; }
+    if (s === 'blocked')  return;
+    onSelect(n);
+  };
+
+  const seatLabel = (n) => {
+    if (n === 1) return 'Asiento 1 — Copiloto (adelante)';
+    if (n <= 4)  return `Asiento ${n} — Fila trasera`;
+    return `Asiento ${n} — Extra`;
+  };
+
+  return (
+    <div className="space-y-3">
+      {/* Contenedor del vehículo */}
+      <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 relative select-none">
+
+        {/* Indicador frente */}
+        <div className="flex items-center gap-2 mb-5 justify-center">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Frente</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+
+        {/* Fila delantera: conductor + copiloto (asiento 1) */}
+        <div className="flex items-end justify-center gap-8 mb-1">
+          <SeatIcon number={0}  state="driver"                onClick={() => {}}           />
+          <SeatIcon number={1}  state={getSeatState(1)}       onClick={() => handleClick(1)}/>
+        </div>
+
+        {/* Separador entre filas */}
+        <div className="flex items-center gap-2 my-4">
+          <div className="flex-1 border-t border-dashed border-gray-300" />
+          <div className="flex gap-1">
+            <div className="w-1 h-1 rounded-full bg-gray-300" />
+            <div className="w-1 h-1 rounded-full bg-gray-300" />
+            <div className="w-1 h-1 rounded-full bg-gray-300" />
+          </div>
+          <div className="flex-1 border-t border-dashed border-gray-300" />
+        </div>
+
+        {/* Fila trasera: asientos 2, 3, 4 */}
+        <div className="flex items-end justify-center gap-3 mb-1">
+          <SeatIcon number={2} state={getSeatState(2)} onClick={() => handleClick(2)}/>
+          <SeatIcon number={3} state={getSeatState(3)} onClick={() => handleClick(3)}/>
+          <SeatIcon number={4} state={getSeatState(4)} onClick={() => handleClick(4)}/>
+        </div>
+
+        {/* Asiento 5 (extra / si aplica) */}
+        {MAX_SEATS >= 5 && (
+          <>
+            <div className="flex items-center gap-2 my-4">
+              <div className="flex-1 border-t border-dashed border-gray-200" />
+              <div className="flex gap-1">
+                <div className="w-1 h-1 rounded-full bg-gray-200" />
+                <div className="w-1 h-1 rounded-full bg-gray-200" />
+                <div className="w-1 h-1 rounded-full bg-gray-200" />
+              </div>
+              <div className="flex-1 border-t border-dashed border-gray-200" />
+            </div>
+            <div className="flex justify-center">
+              <SeatIcon number={5} state={getSeatState(5)} onClick={() => handleClick(5)}/>
+            </div>
+          </>
+        )}
+
+        {/* Indicador trasera */}
+        <div className="flex items-center gap-2 mt-5 justify-center">
+          <div className="h-px flex-1 bg-gray-200" />
+          <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Parte trasera</span>
+          <div className="h-px flex-1 bg-gray-200" />
+        </div>
+      </div>
+
+      {/* Leyenda */}
+      <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center text-xs text-gray-400">
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border-2 border-gray-300 bg-white inline-block" /> Disponible
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border-2 border-violet-500 bg-violet-100 inline-block" /> Tu asiento
+        </span>
+        <span className="flex items-center gap-1.5">
+          <span className="w-3 h-3 rounded border-2 border-red-300 bg-red-50 inline-block" /> Ocupado
+        </span>
+      </div>
+
+      {/* Info asiento seleccionado */}
+      {selectedSeat ? (
+        <div className="bg-violet-50 border border-violet-200 rounded-xl py-2.5 px-4 text-center animate-fade-in">
+          <p className="text-sm font-semibold text-violet-700">{seatLabel(selectedSeat)}</p>
+        </div>
+      ) : (
+        <div className="bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 text-center">
+          <p className="text-xs text-gray-400">Toca un asiento disponible para seleccionarlo</p>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Componente principal ─────────────────────────────────────────────────────
 
 const VerDetalles = () => {
   const [userData,         setUserData]         = useState(null);
   const [isLoading,        setIsLoading]        = useState(true);
   const [carDetails,       setCarDetails]       = useState(null);
   const [selectedSeat,     setSelectedSeat]     = useState(null);
-  const [seatInput,        setSeatInput]        = useState('');
   const [pickupLocation,   setPickupLocation]   = useState('');
   const [nombre,           setNombre]           = useState('');
   const [telefono,         setTelefono]         = useState('');
@@ -108,29 +303,9 @@ const VerDetalles = () => {
     loadAll();
   }, [carId, navigate]);
 
-  const handleSeatClick = (seat) => {
-    if (asientosOcupados.includes(seat)) {
-      showToast(`El asiento ${seat} ya está ocupado.`, 'error');
-      return;
-    }
-    setSelectedSeat(seat);
-    setSeatInput(String(seat));
-  };
-
-  const handleSeatInput = (e) => {
-    const val = e.target.value;
-    setSeatInput(val);
-    const num = parseInt(val);
-    if (!isNaN(num) && num >= 1 && carDetails && num <= carDetails.asientos) {
-      setSelectedSeat(num);
-    } else {
-      setSelectedSeat(null);
-    }
-  };
-
   const handleConfirm = () => {
     if (!userData) { navigate('/login'); return; }
-    if (!selectedSeat)                              { showToast('Selecciona o escribe un número de asiento.', 'error'); return; }
+    if (!selectedSeat)                              { showToast('Selecciona un asiento.', 'error'); return; }
     if (asientosOcupados.includes(selectedSeat))    { showToast('Ese asiento está ocupado. Elige otro.', 'error'); return; }
     if (!pickupLocation.trim())                     { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
     if (!nombre.trim())                             { showToast('Ingresa tu nombre.', 'error'); return; }
@@ -298,61 +473,12 @@ const VerDetalles = () => {
 
             {/* Selección de asiento */}
             <SectionCard title="Selecciona tu asiento" accent="violet">
-              {/* Grid dinámico de asientos */}
-              <div className="grid grid-cols-4 gap-2 mb-4">
-                {Array.from({ length: totalAsientos }, (_, i) => i + 1).map(seat => {
-                  const ocupado      = asientosOcupados.includes(seat);
-                  const seleccionado = selectedSeat === seat;
-                  return (
-                    <button
-                      key={seat}
-                      onClick={() => handleSeatClick(seat)}
-                      disabled={ocupado}
-                      title={ocupado ? `Asiento ${seat} ocupado` : `Seleccionar asiento ${seat}`}
-                      className={[
-                        'h-10 rounded-xl text-sm font-bold transition-all active:scale-95',
-                        ocupado
-                          ? 'bg-red-100 text-red-400 cursor-not-allowed'
-                          : seleccionado
-                            ? 'bg-gradient-to-br from-violet-500 to-blue-500 text-white shadow-md shadow-violet-200 scale-105'
-                            : 'bg-gray-100 text-gray-600 hover:bg-violet-100 hover:text-violet-700 hover:scale-105',
-                      ].join(' ')}
-                    >
-                      {ocupado ? '✗' : seat}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Leyenda */}
-              <div className="flex items-center gap-4 text-xs text-gray-400 mb-4">
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-gray-200 inline-block" /> Libre
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-gradient-to-br from-violet-400 to-blue-400 inline-block" /> Tuyo
-                </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-red-200 inline-block" /> Ocupado
-                </span>
-              </div>
-
-              {/* Input numérico manual */}
-              <FormInput
-                label="O escribe el número de asiento"
-                type="number"
-                min="1"
-                max={totalAsientos}
-                value={seatInput}
-                onChange={handleSeatInput}
-                placeholder={`1 – ${totalAsientos}`}
-                hint={
-                  seatOcupado
-                    ? `Asiento ${selectedSeat} ocupado — elige otro`
-                    : selectedSeat
-                      ? `Asiento ${selectedSeat} seleccionado`
-                      : `Entre 1 y ${totalAsientos}`
-                }
+              <TaxiSeatMap
+                totalAsientos={totalAsientos}
+                asientosOcupados={asientosOcupados}
+                selectedSeat={selectedSeat}
+                onSelect={(seat) => setSelectedSeat(seat)}
+                onOccupied={(seat) => showToast(`El asiento ${seat} ya está ocupado.`, 'error')}
               />
             </SectionCard>
 

@@ -7,6 +7,7 @@ import { registrarApi }  from '../../services/api';
 import { extractUserId } from '../../utils';
 import { useToast }      from '../../hooks/useToast';
 import ToastNotification from '../../components/ui/ToastNotification';
+import GoogleAuthButton  from '../../components/ui/GoogleAuthButton';
 
 const REDIRECT_BY_ROLE = {
   usuario:       '/login',
@@ -215,6 +216,26 @@ const Registrar = () => {
                   </span>
                 ) : 'Crear cuenta'}
               </button>
+
+              {/* Separador Google */}
+              <div className="relative">
+                <div className="absolute inset-0 flex items-center">
+                  <div className="w-full border-t border-gray-100" />
+                </div>
+                <div className="relative flex justify-center">
+                  <span className="bg-white px-3 text-xs text-gray-400">o regístrate con</span>
+                </div>
+              </div>
+
+              {/* Botón Google */}
+              <GoogleAuthButton
+                label="Registrarse con Google"
+                onSuccess={(userData) => {
+                  showToast('¡Cuenta creada con Google!', 'success');
+                  setTimeout(() => navigate('/indexLogin', { replace: true }), 1200);
+                }}
+                onError={(msg) => showToast(msg, 'error')}
+              />
 
               <button
                 type="button"

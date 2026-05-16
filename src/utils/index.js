@@ -1,6 +1,6 @@
 import { ESTADOS_CARRO } from '../constants';
 
-const API_STORAGE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'https://api-mecaza.geekcorplab.com/api').replace('/api', '');
+const API_STORAGE_URL = (import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api').replace('/api', '');
 
 /**
  * Construye la URL completa de la imagen de un carro.

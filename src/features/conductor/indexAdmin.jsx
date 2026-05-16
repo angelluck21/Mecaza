@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../../components/ui/UserMenu';
-import axios from 'axios';
+import { agregarPrecioApi, agregarEstadoApi } from '../../services/api';
 
 const IndexAdmin = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -104,39 +104,15 @@ const IndexAdmin = () => {
     };
     
     try {
-      // Llamada a la ruta /agregarprecio que conecta con PrecioviajeController::Create
-      const response = await axios.put('https://api-mecaza.geekcorplab.com/api/agregarprecio', dataToSend, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        }
-      });
-      
-      if (response.data && response.data.success) {
-        showToastNotification('¡Precios guardados exitosamente!');
-        
-        setPreciosData({
-          'ZaraMede': '',
-          'ZaraCauca': '',
-          'CaucaMede': ''
-        });
-        
-        setShowPreciosModal(false);
-      } else {
-        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
-      }
-      
+      await agregarPrecioApi(dataToSend);
+      showToastNotification('¡Precios guardados exitosamente!');
+      setPreciosData({ 'ZaraMede': '', 'ZaraCauca': '', 'CaucaMede': '' });
+      setShowPreciosModal(false);
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el PrecioviajeController esté configurado correctamente', 'error');
-        } else if (error.response.status === 422) {
-          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-        } else {
-          showToastNotification(`Error: ${error.response.data.message || 'No se pudieron guardar los precios'}`, 'error');
-        }
+      if (error.response?.status === 422) {
+        showToastNotification('Error de validación: Verifica los datos enviados', 'error');
       } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
+        showToastNotification('Error de conexión con el servidor.', 'error');
       } else {
         showToastNotification('Error inesperado al guardar los precios', 'error');
       }
@@ -162,34 +138,15 @@ const IndexAdmin = () => {
     };
     
     try {
-      const response = await axios.post('https://api-mecaza.geekcorplab.com/api/agregarestados', dataToSend, {
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`
-        }
-      });
-      
-      if (response.data && response.data.success) {
-        showToastNotification('¡Estado del viaje guardado exitosamente!');
-        
-        setEstadoSeleccionado('');
-        setShowEstadoModal(false);
-      } else {
-        showToastNotification('Advertencia: El servidor no confirmó el guardado', 'error');
-      }
-      
+      await agregarEstadoApi(dataToSend);
+      showToastNotification('¡Estado del viaje guardado exitosamente!');
+      setEstadoSeleccionado('');
+      setShowEstadoModal(false);
     } catch (error) {
-      if (error.response) {
-        if (error.response.status === 500) {
-          showToastNotification('Error del servidor: Verifica que el controlador esté configurado correctamente', 'error');
-        } else if (error.response.status === 422) {
-          showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-        } else {
-          showToastNotification(`Error: ${error.response.data.message || 'No se pudo guardar el estado'}`, 'error');
-        }
+      if (error.response?.status === 422) {
+        showToastNotification('Error de validación: Verifica los datos enviados', 'error');
       } else if (error.request) {
-        showToastNotification('Error de conexión. Verifica que el servidor esté ejecutándose.', 'error');
+        showToastNotification('Error de conexión con el servidor.', 'error');
       } else {
         showToastNotification('Error inesperado al guardar el estado', 'error');
       }
