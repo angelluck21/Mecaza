@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaPlus, FaUsers, FaCog, FaSync, FaTicketAlt,
   FaTrash, FaCheck, FaTimes, FaMapMarkerAlt, FaClock,
-  FaCalendarAlt, FaPhone, FaUser, FaEnvelope,
+  FaCalendarAlt, FaPhone, FaUser, FaEnvelope, FaFileInvoice,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -20,7 +20,7 @@ import {
   listarUsuariosApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, eliminarReservaApi,
   agregarPrecioApi, agregarEstadoApi,
-  invitarConductorApi,
+  invitarConductorApi, listarFacturasApi,
 } from '../../services/api';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -115,6 +115,11 @@ const IndexAdmin = () => {
   // Confirmación eliminación compartida
   const [deleteTarget,    setDeleteTarget]    = useState(null); // { tipo, id, label }
   const [isDeleting,      setIsDeleting]      = useState(false);
+
+  // Modal facturas
+  const [showFacturasModal, setShowFacturasModal] = useState(false);
+  const [facturasList,      setFacturasList]      = useState([]);
+  const [loadingFacturas,   setLoadingFacturas]   = useState(false);
 
   // Modal invitar conductor
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -265,6 +270,18 @@ const IndexAdmin = () => {
     finally { setIsDeleting(false); }
   };
 
+  // ── Facturas ──────────────────────────────────────────────────────────────
+  const fetchFacturas = async () => {
+    setLoadingFacturas(true);
+    setShowFacturasModal(true);
+    try {
+      const { data } = await listarFacturasApi();
+      const list = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
+      setFacturasList(list);
+    } catch { showToast('Error al cargar facturas.', 'error'); }
+    finally { setLoadingFacturas(false); }
+  };
+
   // ── Invitar conductor ─────────────────────────────────────────────────────
   const handleInvitar = async (e) => {
     e.preventDefault();
@@ -343,7 +360,7 @@ const IndexAdmin = () => {
 
         {/* Gestión */}
         <SectionCard title="Gestión" icon={<FaUsers className="text-sm" />} accent="blue" className="animate-fade-in-up">
-          <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-1">
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mt-1">
             <ActionCard
               icon={<FaUsers />}
               title="Ver usuarios"
@@ -367,6 +384,14 @@ const IndexAdmin = () => {
               btnLabel="Ver reservas"
               btnColor="orange"
               onClick={fetchReservas}
+            />
+            <ActionCard
+              icon={<FaFileInvoice />}
+              title="Ver facturas"
+              desc="Consulta todas las facturas generadas del sistema."
+              btnLabel="Ver facturas"
+              btnColor="blue"
+              onClick={fetchFacturas}
             />
             <ActionCard
               icon={<FaEnvelope />}
@@ -478,7 +503,12 @@ const IndexAdmin = () => {
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600">
-                      <span className="flex items-center gap-1"><FaMapMarkerAlt className="text-violet-400 shrink-0" />{car.destino || '—'}</span>
+                      <span className="flex items-center gap-1">
+                        <FaMapMarkerAlt className="text-violet-400 shrink-0" />
+                        {car.origen || car.Origen
+                          ? `${car.origen || car.Origen} → ${car.destino || '—'}`
+                          : (car.destino || '—')}
+                      </span>
                       <span className="flex items-center gap-1"><FaClock className="text-violet-400 shrink-0" />{car.horasalida || '—'}</span>
                       <span className="flex items-center gap-1"><FaCalendarAlt className="text-violet-400 shrink-0" />{formatFecha(car.fecha)}</span>
                       <span className="flex items-center gap-1"><FaPhone className="text-violet-400 shrink-0" />{car.telefono || '—'}</span>
@@ -597,6 +627,59 @@ const IndexAdmin = () => {
                   </div>
                 );
               })}
+            </div>
+          )}
+        </Modal>
+      )}
+
+      {/* ── Modal: Ver Facturas ── */}
+      {showFacturasModal && (
+        <Modal title="Todas las Facturas" maxWidth="max-w-3xl" onClose={() => setShowFacturasModal(false)}>
+          {loadingFacturas ? (
+            <div className="flex items-center justify-center py-10 gap-3">
+              <div className="w-6 h-6 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+              <span className="text-gray-400 text-sm">Cargando facturas...</span>
+            </div>
+          ) : facturasList.length === 0 ? (
+            <div className="text-center py-10">
+              <FaFileInvoice className="text-gray-300 text-3xl mx-auto mb-2" />
+              <p className="text-gray-400 text-sm">No hay facturas registradas.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {facturasList.map((f, idx) => (
+                <div key={f.id_factura ?? idx} className="border border-gray-100 rounded-xl p-4">
+                  <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                    <div>
+                      <p className="font-bold text-gray-800 text-sm font-mono">{f.numero_factura || `#${f.id_factura}`}</p>
+                      <p className="text-xs text-gray-400">
+                        {f.created_at ? new Date(f.created_at).toLocaleDateString('es-ES') : '—'}
+                      </p>
+                    </div>
+                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200">
+                      <FaCheck className="text-[10px]" /> Confirmada
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-gray-600">
+                    <div>
+                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Usuario</p>
+                      <p className="font-medium">{f.nombre || f.name || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Destino</p>
+                      <p className="font-medium">{f.destino || '—'}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Subtotal</p>
+                      <p className="font-medium">${(f.subtotal ?? 0).toLocaleString('es-CO')}</p>
+                    </div>
+                    <div>
+                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Total</p>
+                      <p className="font-bold text-violet-600 text-sm">${(f.total ?? 0).toLocaleString('es-CO')}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </Modal>

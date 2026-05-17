@@ -13,11 +13,10 @@ import FormInput         from '../components/ui/FormInput';
 import CarImage          from '../components/ui/CarImage';
 import ToastNotification from '../components/ui/ToastNotification';
 import { useToast }      from '../hooks/useToast';
-import { crearReservaApi } from '../services/api';
+import { crearReservaApi, listarCarrosApi, listarPreciosApi, listarReservasApi } from '../services/api';
 import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
 
-const API_BASE   = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
-const MAX_SEATS  = 5; // capacidad física máxima del taxi
+const MAX_SEATS = 5;
 
 // ── Icono de asiento individual ──────────────────────────────────────────────
 const SeatIcon = ({ number, state, onClick }) => {
@@ -311,20 +310,18 @@ const VerDetalles = () => {
 
     const loadAll = async () => {
       try {
-        const [carrosResp, preciosResp, reservasResp] = await Promise.all([
-          fetch(`${API_BASE}/listarcarro`),
-          fetch(`${API_BASE}/listarprecios`),
-          fetch(`${API_BASE}/listarreserva`),
+        const [carrosData, preciosResp, reservasData] = await Promise.all([
+          listarCarrosApi(),
+          listarPreciosApi().catch(() => null),
+          listarReservasApi(),
         ]);
 
-        const carrosData  = await carrosResp.json();
         const carrosArray = Array.isArray(carrosData) ? carrosData : (carrosData?.data ?? []);
         const car = carrosArray.find(c => (c.id_carros || c.id || c.ID) == carId);
         if (!car) { setIsLoading(false); return; }
 
-        if (preciosResp.ok) {
-          const pd = await preciosResp.json();
-          const pa = Array.isArray(pd) ? pd : (pd?.data ?? []);
+        if (preciosResp) {
+          const pa = Array.isArray(preciosResp.data) ? preciosResp.data : (preciosResp.data?.data ?? []);
           if (pa.length > 0) {
             setPrecios({
               zaraMede:  pa[0]['zara-mede']  ?? 120000,
@@ -334,27 +331,25 @@ const VerDetalles = () => {
           }
         }
 
-        if (reservasResp.ok) {
-          const rd = await reservasResp.json();
-          const ra = Array.isArray(rd) ? rd : (rd?.data ?? []);
-          const ocupados = ra
-            .filter(r => r.id_carros == carId && r.estado !== 'cancelada' && r.estado !== 'rechazada')
-            .map(r => parseInt(r.Asiento || r.asiento || 0))
-            .filter(n => n > 0);
-          setAsientosOcupados(ocupados);
-        }
+        const ra = Array.isArray(reservasData) ? reservasData : (reservasData?.data ?? []);
+        const ocupados = ra
+          .filter(r => r.id_carros == carId && r.estado !== 'cancelada' && r.estado !== 'rechazada')
+          .map(r => parseInt(r.Asiento || r.asiento || 0))
+          .filter(n => n > 0);
+        setAsientosOcupados(ocupados);
 
         setCarDetails({
-          id_carros:  car.id_carros || car.id,
-          conductor:  car.conductor  || car.Conductor,
-          placa:      car.placa      || car.Placa,
-          asientos:   parseInt(car.asientos || car.Asientos) || 4,
-          destino:    car.destino    || car.Destino,
-          horasalida: car.horasalida || car.Horasalida,
-          fecha:      car.fecha      || car.Fecha,
+          id_carros:   car.id_carros  || car.id,
+          conductor:   car.conductor  || car.Conductor,
+          placa:       car.placa      || car.Placa,
+          asientos:    parseInt(car.asientos || car.Asientos) || 4,
+          origen:      car.origen     || car.Origen     || '',
+          destino:     car.destino    || car.Destino,
+          horasalida:  car.horasalida || car.Horasalida,
+          fecha:       car.fecha      || car.Fecha,
           imagencarro: car.imagencarro || car.Imagencarro,
-          telefono:   car.telefono   || car.Telefono || 'No disponible',
-          id_estados: car.id_estados || car.estado   || car.Estado,
+          telefono:    car.telefono   || car.Telefono || 'No disponible',
+          id_estados:  car.id_estados || car.estado   || car.Estado,
         });
       } catch {
         // silencioso
@@ -526,6 +521,14 @@ const VerDetalles = () => {
             {/* Detalles del viaje */}
             <SectionCard title="Detalles del viaje" icon={<FaMapMarkerAlt className="text-xs" />} accent="green">
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
+                {carDetails.origen && (
+                  <div>
+                    <p className="text-xs text-gray-400 mb-0.5">Origen</p>
+                    <p className="font-semibold text-gray-800 flex items-center gap-1">
+                      <FaMapMarkerAlt className="text-blue-400 text-xs shrink-0" /> {carDetails.origen}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">Destino</p>
                   <p className="font-semibold text-gray-800 flex items-center gap-1">

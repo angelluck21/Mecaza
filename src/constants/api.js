@@ -2,6 +2,8 @@ export const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8000/api';
 
 export const ENDPOINTS = {
+  API_BASE: API_BASE_URL,
+
   // Auth
   LOGIN:       `${API_BASE_URL}/login`,
   REGISTRAR:   `${API_BASE_URL}/registrar`,
@@ -22,6 +24,7 @@ export const ENDPOINTS = {
 
   // Estados
   LISTAR_ESTADOS: `${API_BASE_URL}/listarestados`,
+  AGREGAR_ESTADO: `${API_BASE_URL}/agregarestados`,
 
   // Usuarios
   LISTAR_USUARIOS: `${API_BASE_URL}/listarusuarios`,
@@ -33,11 +36,25 @@ export const ENDPOINTS = {
   LISTAR_PRECIOS: `${API_BASE_URL}/listarprecios`,
   AGREGAR_PRECIO: `${API_BASE_URL}/agregarprecio`,
 
-  // Estados (agregar)
-  AGREGAR_ESTADO: `${API_BASE_URL}/agregarestados`,
-
   // Invitaciones conductor
-  INVITAR_CONDUCTOR:    `${API_BASE_URL}/invitar-conductor`,
-  VALIDAR_INVITACION:   (token) => `${API_BASE_URL}/validar-invitacion/${token}`,
-  REGISTRAR_CONDUCTOR:  (token) => `${API_BASE_URL}/registrar-conductor/${token}`,
+  INVITAR_CONDUCTOR:   `${API_BASE_URL}/invitar-conductor`,
+  VALIDAR_INVITACION:  (token) => `${API_BASE_URL}/validar-invitacion/${token}`,
+  REGISTRAR_CONDUCTOR: (token) => `${API_BASE_URL}/registrar-conductor/${token}`,
+
+  // Motivos de cancelación
+  GUARDAR_MOTIVO_CANCELACION: `${API_BASE_URL}/guardarMotivoCancelacion`,
+  OBTENER_MOTIVO_CANCELACION: (id) => `${API_BASE_URL}/motivosCancelacion/${id}`,
+  LISTAR_MOTIVOS: `${API_BASE_URL}/listarMotivos`,
+
+  // Viaje
+  INICIAR_VIAJE:    (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
+  TERMINAR_VIAJE:   (id) => `${API_BASE_URL}/terminarviaje/${id}`,
+  COMPLETAR_RESERVA: (id) => `${API_BASE_URL}/completarreserva/${id}`,
+
+  // Facturas
+  GENERAR_FACTURA:  (id) => `${API_BASE_URL}/generarFactura/${id}`,
+  OBTENER_FACTURA:  (id) => `${API_BASE_URL}/facturaReserva/${id}`,
+  MIS_FACTURAS:     `${API_BASE_URL}/misFacturas`,
+  LISTAR_FACTURAS:  `${API_BASE_URL}/listarFacturas`,
+  DESCARGAR_FACTURA: (id) => `${API_BASE_URL}/descargarFactura/${id}`,
 };

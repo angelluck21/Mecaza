@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaSignOutAlt, FaCar, FaBell, FaTicketAlt } from 'react-icons/fa';
+import { FaSignOutAlt, FaCar, FaBell, FaTicketAlt, FaFileInvoice } from 'react-icons/fa';
 import { UserCircleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '../../constants';
@@ -78,9 +78,14 @@ const UserMenu = ({ userData }) => {
             </MenuItem>
 
             {isUsuario && (
-              <MenuItem icon={<FaTicketAlt className="w-4 h-4" />} onClick={() => go('/mis-reservas')}>
-                Mis Reservas
-              </MenuItem>
+              <>
+                <MenuItem icon={<FaTicketAlt className="w-4 h-4" />} onClick={() => go('/mis-reservas')}>
+                  Mis Reservas
+                </MenuItem>
+                <MenuItem icon={<FaFileInvoice className="w-4 h-4" />} onClick={() => go('/mis-facturas')}>
+                  Mis Facturas
+                </MenuItem>
+              </>
             )}
 
             {isConductor && (

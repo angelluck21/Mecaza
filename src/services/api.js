@@ -54,6 +54,15 @@ export const actualizarReservaApi = (id, data) =>
 export const confirmarReservaApi = (id, estado) =>
   axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado }, authHeaders());
 
+export const iniciarViajeApi = (id) =>
+  axios.post(ENDPOINTS.INICIAR_VIAJE(id), {}, authHeaders());
+
+export const terminarViajeApi = (id) =>
+  axios.post(ENDPOINTS.TERMINAR_VIAJE(id), {}, authHeaders());
+
+export const completarReservaApi = (id) =>
+  axios.put(ENDPOINTS.COMPLETAR_RESERVA(id), {}, authHeaders());
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 
 export const listarEstadosApi = () =>
@@ -104,3 +113,31 @@ export const agregarPrecioApi = (data) =>
 
 export const agregarEstadoApi = (data) =>
   axios.post(ENDPOINTS.AGREGAR_ESTADO, data, authHeaders());
+
+// ── Motivos de cancelación ───────────────────────────────────────────────────
+
+export const guardarMotivoCancelacionApi = (id_reservarviajes, motivo, tipo) =>
+  axios.post(ENDPOINTS.GUARDAR_MOTIVO_CANCELACION, { id_reservarviajes, motivo, tipo }, authHeaders());
+
+export const obtenerMotivoCancelacionApi = (id_reservarviajes) =>
+  axios.get(ENDPOINTS.OBTENER_MOTIVO_CANCELACION(id_reservarviajes), authHeaders());
+
+export const listarMotivosApi = () =>
+  axios.get(ENDPOINTS.LISTAR_MOTIVOS, authHeaders());
+
+// ── Facturas ─────────────────────────────────────────────────────────────────
+
+export const generarFacturaApi = (id_reservarviajes) =>
+  axios.post(ENDPOINTS.GENERAR_FACTURA(id_reservarviajes), {}, authHeaders());
+
+export const obtenerFacturaApi = (id_reservarviajes) =>
+  axios.get(ENDPOINTS.OBTENER_FACTURA(id_reservarviajes), authHeaders());
+
+export const obtenerMisFacturasApi = () =>
+  axios.get(ENDPOINTS.MIS_FACTURAS, authHeaders());
+
+export const listarFacturasApi = () =>
+  axios.get(ENDPOINTS.LISTAR_FACTURAS, authHeaders());
+
+export const descargarFacturaApi = (id) =>
+  axios.get(ENDPOINTS.DESCARGAR_FACTURA(id), { ...authHeaders(), responseType: 'blob' });

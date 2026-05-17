@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaPlus, FaTrash, FaListAlt,
   FaMapMarkerAlt, FaClock, FaCalendarAlt, FaPhone,
-  FaUser, FaCheck, FaTimes, FaIdCard,
+  FaUser, FaCheck, FaTimes, FaIdCard, FaPlay, FaFlagCheckered,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -16,7 +16,7 @@ import { useToast }      from '../../hooks/useToast';
 import {
   listarCarrosApi, listarReservasApi, listarEstadosApi,
   crearCarroApi, eliminarCarroApi, actualizarEstadoCarroApi,
-  confirmarReservaApi,
+  confirmarReservaApi, iniciarViajeApi, terminarViajeApi,
 } from '../../services/api';
 import { compressImage } from '../../utils';
 
@@ -104,11 +104,12 @@ const Conductor = () => {
   const [isSaving,        setIsSaving]        = useState(false);
   const [isDeleting,      setIsDeleting]      = useState(false);
   const [procesando,      setProcesando]      = useState(null);
+  const [accionCarroId,   setAccionCarroId]   = useState(null);
 
   // Formulario agregar carro
   const [carData, setCarData] = useState({
     Placa: '', Conductor: '', Imagencarro: null,
-    Asientos: '', Destino: '', Horasalida: '',
+    Asientos: '', Origen: '', Destino: '', Horasalida: '',
     Fecha: '', Telefono: '', Estado: '',
   });
   const [newEstado, setNewEstado] = useState('');
@@ -184,9 +185,9 @@ const Conductor = () => {
   // ── Agregar carro ─────────────────────────────────────────────────────────────
   const handleAddCar = async (e) => {
     e.preventDefault();
-    const { Conductor, Placa, Asientos, Destino, Horasalida, Fecha, Telefono, Estado, Imagencarro } = carData;
+    const { Conductor, Placa, Asientos, Origen, Destino, Horasalida, Fecha, Telefono, Estado, Imagencarro } = carData;
 
-    if (!Conductor || !Placa || !Asientos || !Destino || !Horasalida || !Fecha || !Telefono || !Estado) {
+    if (!Conductor || !Placa || !Asientos || !Origen || !Destino || !Horasalida || !Fecha || !Telefono || !Estado) {
       showToast('Completa todos los campos requeridos.', 'error'); return;
     }
 
@@ -205,6 +206,7 @@ const Conductor = () => {
       formData.append('Telefono',   Telefono.trim());
       formData.append('Placa',      Placa.trim());
       formData.append('Asientos',   Asientos);
+      formData.append('Origen',     Origen.trim());
       formData.append('Destino',    Destino.trim());
       formData.append('Horasalida', Horasalida.trim());
       formData.append('Fecha',      Fecha.trim());
@@ -218,7 +220,7 @@ const Conductor = () => {
 
       await crearCarroApi(formData);
       showToast('Vehículo registrado exitosamente.', 'success');
-      setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', Destino: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
+      setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', Origen: '', Destino: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
       setShowAddCar(false);
     } catch (err) {
       const errors = err.response?.data?.errors;
@@ -259,6 +261,29 @@ const Conductor = () => {
       await fetchCarros();
     } catch { showToast('Error al eliminar el vehículo.', 'error'); }
     finally { setIsDeleting(false); }
+  };
+
+  // ── Iniciar / terminar viaje ──────────────────────────────────────────────────
+  const handleIniciarViaje = async (carroId) => {
+    setAccionCarroId(carroId);
+    try {
+      await iniciarViajeApi(carroId);
+      showToast('Viaje iniciado. Se notificó a los pasajeros por correo.', 'success');
+      await fetchCarros();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al iniciar el viaje.', 'error');
+    } finally { setAccionCarroId(null); }
+  };
+
+  const handleTerminarViaje = async (carroId) => {
+    setAccionCarroId(carroId);
+    try {
+      await terminarViajeApi(carroId);
+      showToast('Viaje finalizado correctamente.', 'success');
+      await fetchCarros();
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al finalizar el viaje.', 'error');
+    } finally { setAccionCarroId(null); }
   };
 
   // ── Confirmar / rechazar reserva ──────────────────────────────────────────────
@@ -367,13 +392,20 @@ const Conductor = () => {
                 required
               />
               <FormInput
+                label="Origen"
+                icon={<FaMapMarkerAlt />}
+                value={carData.Origen}
+                onChange={e => setCarData(p => ({ ...p, Origen: e.target.value }))}
+                placeholder="Zaragoza"
+                required
+              />
+              <FormInput
                 label="Destino"
                 icon={<FaMapMarkerAlt />}
                 value={carData.Destino}
                 onChange={e => setCarData(p => ({ ...p, Destino: e.target.value }))}
                 placeholder="Medellín"
                 required
-                className="col-span-2"
               />
               <FormInput
                 label="Hora de salida"
@@ -544,11 +576,44 @@ const Conductor = () => {
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
+                      {(carro.origen || carro.Origen) && (
+                        <InfoRow icon={<FaMapMarkerAlt />} label="Origen" value={carro.origen || carro.Origen} />
+                      )}
                       <InfoRow icon={<FaMapMarkerAlt />} label="Destino"    value={carro.destino} />
                       <InfoRow icon={<FaClock />}        label="Hora"       value={carro.horasalida} />
                       <InfoRow icon={<FaCalendarAlt />}  label="Fecha"      value={carro.fecha} />
                       <InfoRow icon={<FaPhone />}        label="Teléfono"   value={carro.telefono} />
                     </div>
+                    {/* Acciones de viaje */}
+                    {(parseInt(carro.id_estados) === 1 || parseInt(carro.id_estados) === 2) && (
+                      <div className="flex gap-2 pt-2">
+                        {parseInt(carro.id_estados) === 1 && (
+                          <button
+                            onClick={() => handleIniciarViaje(id)}
+                            disabled={accionCarroId === id}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            {accionCarroId === id
+                              ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                              : <FaPlay className="text-[10px]" />}
+                            Iniciar viaje
+                          </button>
+                        )}
+                        {parseInt(carro.id_estados) === 2 && (
+                          <button
+                            onClick={() => handleTerminarViaje(id)}
+                            disabled={accionCarroId === id}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                          >
+                            {accionCarroId === id
+                              ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                              : <FaFlagCheckered className="text-[10px]" />}
+                            Terminar viaje
+                          </button>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex gap-2 pt-2 border-t border-gray-100">
                       <button
                         onClick={() => { setSelectedCarro(carro); setNewEstado(''); setShowEstadoModal(true); }}

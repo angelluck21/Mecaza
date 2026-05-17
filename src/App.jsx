@@ -8,6 +8,7 @@ import Registrar from './features/auth/Registrar';
 // Usuario
 import IndexLogin   from './features/usuario/IndexLogin';
 import MisReservas  from './features/usuario/MisReservas';
+import MisFacturas  from './features/usuario/MisFacturas';
 import VerPerfil    from './features/usuario/VerPerfil';
 import AjustesPerfil from './features/usuario/AjustesPerfil';
 
@@ -38,6 +39,7 @@ function App() {
         {/* Usuario autenticado */}
         <Route path="/indexLogin"  element={<IndexLogin />} />
         <Route path="/mis-reservas" element={<MisReservas />} />
+        <Route path="/mis-facturas" element={<MisFacturas />} />
         <Route path="/ver-perfil"           element={<VerPerfil />} />
         <Route path="/ver-perfil/:userId"   element={<VerPerfil />} />
         <Route path="/ajustes-perfil" element={<AjustesPerfil />} />

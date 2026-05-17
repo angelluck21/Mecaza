@@ -60,7 +60,12 @@ const CarCard = ({ car, onVerDetalles, userData }) => {
 
           <div className="flex items-center gap-2">
             <FaMapMarkerAlt className="text-violet-500 shrink-0 text-xs" />
-            <span className="truncate">{car.destino || 'Destino no especificado'}</span>
+            <span className="truncate">
+              {car.origen || car.Origen
+                ? `${car.origen || car.Origen} → ${car.destino || car.Destino || ''}`
+                : (car.destino || car.Destino || 'Destino no especificado')
+              }
+            </span>
           </div>
 
           <div className="flex items-center gap-2">

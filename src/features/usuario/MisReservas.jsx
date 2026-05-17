@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaUser, FaMapMarkerAlt, FaClock,
-  FaCalendarAlt, FaTrash, FaCarSide, FaTicketAlt,
+  FaCalendarAlt, FaTrash, FaCarSide, FaTicketAlt, FaCheck,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -11,16 +11,17 @@ import LoadingScreen     from '../../components/ui/LoadingScreen';
 import CarImage          from '../../components/ui/CarImage';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
-import { listarCarrosApi, listarReservasApi, eliminarReservaApi } from '../../services/api';
+import { listarCarrosApi, listarReservasApi, eliminarReservaApi, guardarMotivoCancelacionApi, completarReservaApi } from '../../services/api';
 import { getCarImageUrl } from '../../utils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 const STATUS = {
-  confirmada: { label: 'Confirmada', cls: 'bg-green-100 text-green-700 border-green-200' },
-  pendiente:  { label: 'Pendiente',  cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
-  rechazada:  { label: 'Rechazada',  cls: 'bg-red-100 text-red-700 border-red-200' },
-  cancelada:  { label: 'Cancelada',  cls: 'bg-red-100 text-red-700 border-red-200' },
+  confirmada:  { label: 'Confirmada',  cls: 'bg-green-100 text-green-700 border-green-200' },
+  pendiente:   { label: 'Pendiente',   cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
+  rechazada:   { label: 'Rechazada',   cls: 'bg-red-100 text-red-700 border-red-200' },
+  cancelada:   { label: 'Cancelada',   cls: 'bg-red-100 text-red-700 border-red-200' },
+  completada:  { label: 'Completada',  cls: 'bg-blue-100 text-blue-700 border-blue-200' },
 };
 const getStatus = (s) => STATUS[s?.toLowerCase()] ?? STATUS.pendiente;
 
@@ -34,20 +35,27 @@ const MisReservas = () => {
   const [showDeleteModal,    setShowDeleteModal]    = useState(false);
   const [reservationToDelete,setReservationToDelete] = useState(null);
   const [isDeleting,         setIsDeleting]         = useState(false);
+  const [motivoCancelacion,  setMotivoCancelacion]  = useState('');
+  const [completandoId,      setCompletandoId]      = useState(null);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
   const getCarInfo = (r) => {
-    const id = r.id_carros || r.id_carro || r.carro_id;
+    const id = r.id_carros || r.id_carro || r.carro_id || r.carroId || r.carro;
     if (!id) return null;
-    return cars.find(c => c.id_carros == id || c.id == id || c.ID == id);
+    return cars.find(c =>
+      String(c.id_carros) === String(id) ||
+      String(c.id)        === String(id) ||
+      String(c.ID)        === String(id)
+    );
   };
 
   const fetchData = async (user) => {
     try {
       const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
-      const carsData     = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
+      const rawCars  = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
+      const carsData = Array.isArray(rawCars)  ? rawCars  : (Array.isArray(rawCars.data) ? rawCars.data : []);
       const reservasArray = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
       setCars(carsData);
       const userId = user?.id || user?.ID || user?.id_users;
@@ -75,15 +83,33 @@ const MisReservas = () => {
 
   const openDelete = (r) => { setReservationToDelete(r); setShowDeleteModal(true); };
 
+  const handleCompletar = async (reservation) => {
+    const id = reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID;
+    setCompletandoId(id);
+    try {
+      await completarReservaApi(id);
+      showToast('¡Gracias por viajar con Mecaza!', 'success');
+      await fetchData(userData);
+    } catch {
+      showToast('Error al registrar el viaje completado.', 'error');
+    } finally { setCompletandoId(null); }
+  };
+
   const confirmDelete = async () => {
     const id = reservationToDelete?.id_reservarviajes || reservationToDelete?.id_reservarviaje || reservationToDelete?.id || reservationToDelete?.ID;
     if (!id) { showToast('No se pudo identificar la reserva.', 'error'); return; }
     setIsDeleting(true);
     try {
       await eliminarReservaApi(id);
+      if (motivoCancelacion.trim()) {
+        try {
+          await guardarMotivoCancelacionApi(id, motivoCancelacion.trim(), 'usuario');
+        } catch { /* no bloqueante */ }
+      }
       showToast('Reserva cancelada exitosamente.', 'success');
       setShowDeleteModal(false);
       setReservationToDelete(null);
+      setMotivoCancelacion('');
       await fetchData(userData);
     } catch (err) {
       const s = err.response?.status;
@@ -178,7 +204,12 @@ const MisReservas = () => {
                       <div className="sm:col-span-1">
                         <div className="rounded-xl overflow-hidden bg-gray-50 h-28">
                           {carInfo
-                            ? <CarImage imageUrl={getCarImageUrl(carInfo.imagencarro)} conductorName={carInfo.conductor} />
+                            ? <CarImage
+                                imageUrl={getCarImageUrl(carInfo.imagencarro || carInfo.imagen_carro || carInfo.imagenCarro)}
+                                conductorName={carInfo.conductor}
+                                className="w-full h-full object-cover"
+                                fallbackClassName="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-violet-100"
+                              />
                             : <div className="w-full h-full flex items-center justify-center"><FaCar className="text-3xl text-gray-300" /></div>
                           }
                         </div>
@@ -229,14 +260,28 @@ const MisReservas = () => {
                       </div>
                     </div>
 
-                    {/* Botón cancelar */}
-                    <div className="mt-4 pt-4 border-t border-gray-50">
-                      <button
-                        onClick={() => openDelete(reservation)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
-                      >
-                        <FaTrash className="text-xs" /> Cancelar reserva
-                      </button>
+                    {/* Acciones */}
+                    <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2 flex-wrap">
+                      {reservation.estado?.toLowerCase() === 'confirmada' && (
+                        <button
+                          onClick={() => handleCompletar(reservation)}
+                          disabled={completandoId === reservaId}
+                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                        >
+                          {completandoId === reservaId
+                            ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                            : <FaCheck className="text-xs" />}
+                          Terminé mi viaje
+                        </button>
+                      )}
+                      {reservation.estado?.toLowerCase() !== 'completada' && (
+                        <button
+                          onClick={() => openDelete(reservation)}
+                          className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
+                        >
+                          <FaTrash className="text-xs" /> Cancelar reserva
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -266,9 +311,16 @@ const MisReservas = () => {
               <p className="text-sm text-gray-500 mb-5">
                 Esta acción <span className="font-semibold text-red-600">no se puede deshacer</span>. ¿Confirmas la cancelación?
               </p>
+              <textarea
+                value={motivoCancelacion}
+                onChange={(e) => setMotivoCancelacion(e.target.value)}
+                placeholder="(Opcional) ¿Cuál es el motivo de la cancelación?"
+                className="w-full p-2.5 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-red-400 resize-none mb-4"
+                rows="3"
+              />
               <div className="flex gap-3">
                 <button
-                  onClick={() => { setShowDeleteModal(false); setReservationToDelete(null); }}
+                  onClick={() => { setShowDeleteModal(false); setReservationToDelete(null); setMotivoCancelacion(''); }}
                   disabled={isDeleting}
                   className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
                 >
