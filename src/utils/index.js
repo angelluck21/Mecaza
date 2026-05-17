@@ -67,6 +67,19 @@ export const buildUserData = (data, correo) => {
 };
 
 /**
+ * Calcula asientos disponibles cruzando carros con reservas activas.
+ */
+export const calcularAsientosDisponibles = (carsData, reservasArray) =>
+  carsData.map((car) => {
+    const carroId          = car.id_carros || car.id || car.ID;
+    const reservasDelCarro = reservasArray.filter((r) => {
+      const rId = r.id_carros || r.id_carro || r.carro_id || r.carroId;
+      return rId == carroId && r.estado !== 'cancelada' && r.estado !== 'rechazada';
+    });
+    return { ...car, asientos_disponibles: Math.max(0, (car.asientos || 4) - reservasDelCarro.length) };
+  });
+
+/**
  * Obtiene los headers de autenticación.
  */
 export const getAuthHeaders = () => ({

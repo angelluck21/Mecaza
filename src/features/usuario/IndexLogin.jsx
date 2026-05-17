@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaChevronDown, FaFilter, FaTimes, FaMapMarkerAlt } from 'react-icons/fa';
+import { FaCar, FaChevronDown, FaFilter, FaTimes, FaMapMarkerAlt, FaCalendarAlt } from 'react-icons/fa';
 
 import Navbar       from '../../components/layout/Navbar';
 import Footer       from '../../components/layout/Footer';
@@ -10,26 +10,12 @@ import LoadingScreen from '../../components/ui/LoadingScreen';
 import PageBg       from '../../components/ui/PageBg';
 
 import { listarCarrosApi, listarReservasApi } from '../../services/api';
+import { calcularAsientosDisponibles } from '../../utils';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-const calcularAsientosDisponibles = (carsData, reservasArray) =>
-  carsData.map((car) => {
-    const carroId         = car.id_carros || car.id || car.ID;
-    const reservasDelCarro = reservasArray.filter((r) => {
-      const rId = r.id_carros || r.id_carro || r.carro_id || r.carroId;
-      return rId == carroId && r.estado !== 'cancelada' && r.estado !== 'rechazada';
-    });
-    return { ...car, asientos_disponibles: Math.max(0, (car.asientos || 4) - reservasDelCarro.length) };
-  });
-
-const filtrarCarros = (cars, term, ruta) => {
+const filtrarCarros = (cars, term, ruta, fecha) => {
   let result = cars;
-  if (ruta) {
-    result = result.filter((c) =>
-      c.destino && c.destino.toLowerCase() === ruta.toLowerCase()
-    );
-  }
+  if (ruta)  result = result.filter((c) => c.destino && c.destino.toLowerCase() === ruta.toLowerCase());
+  if (fecha) result = result.filter((c) => c.fecha && c.fecha.startsWith(fecha));
   if (term.trim()) {
     const lower = term.toLowerCase();
     result = result.filter((c) =>
@@ -52,6 +38,7 @@ const IndexLogin = () => {
   const [filteredCars,  setFilteredCars]  = useState([]);
   const [searchTerm,    setSearchTerm]    = useState('');
   const [selectedRuta,  setSelectedRuta]  = useState('');
+  const [selectedFecha, setSelectedFecha] = useState('');
   const [filterOpen,    setFilterOpen]    = useState(false);
   const navigate = useNavigate();
 
@@ -93,18 +80,24 @@ const IndexLogin = () => {
 
   const handleSearch = (value) => {
     setSearchTerm(value);
-    setFilteredCars(filtrarCarros(cars, value, selectedRuta));
+    setFilteredCars(filtrarCarros(cars, value, selectedRuta, selectedFecha));
   };
 
   const handleRuta = (ruta) => {
     const next = ruta === selectedRuta ? '' : ruta;
     setSelectedRuta(next);
-    setFilteredCars(filtrarCarros(cars, searchTerm, next));
+    setFilteredCars(filtrarCarros(cars, searchTerm, next, selectedFecha));
+  };
+
+  const handleFecha = (fecha) => {
+    setSelectedFecha(fecha);
+    setFilteredCars(filtrarCarros(cars, searchTerm, selectedRuta, fecha));
   };
 
   const handleClearFilters = () => {
     setSelectedRuta('');
     setSearchTerm('');
+    setSelectedFecha('');
     setFilteredCars(cars);
   };
 
@@ -142,19 +135,24 @@ const IndexLogin = () => {
                 onClick={() => setFilterOpen((o) => !o)}
                 className="w-full flex items-center justify-between px-5 py-4 text-white hover:bg-white/5 transition-colors"
               >
-                <div className="flex items-center gap-2.5">
-                  <div className="w-7 h-7 rounded-lg bg-violet-500/30 flex items-center justify-center">
+                <div className="flex items-center gap-2.5 flex-wrap">
+                  <div className="w-7 h-7 rounded-lg bg-violet-500/30 flex items-center justify-center shrink-0">
                     <FaFilter className="text-violet-300 text-xs" />
                   </div>
-                  <span className="font-semibold text-sm">Filtrar por ruta</span>
+                  <span className="font-semibold text-sm">Filtros</span>
                   {selectedRuta && (
                     <span className="bg-violet-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
                       {selectedRuta}
                     </span>
                   )}
+                  {selectedFecha && (
+                    <span className="bg-blue-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
+                      {new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
+                    </span>
+                  )}
                 </div>
                 <div className="flex items-center gap-3">
-                  {(selectedRuta || searchTerm) && (
+                  {(selectedRuta || searchTerm || selectedFecha) && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); handleClearFilters(); }}
@@ -172,39 +170,69 @@ const IndexLogin = () => {
               {/* Contenido desplegable */}
               <div
                 className={`transition-all duration-300 ease-in-out overflow-hidden ${
-                  filterOpen ? 'max-h-96 opacity-100' : 'max-h-0 opacity-0'
+                  filterOpen ? 'max-h-[28rem] opacity-100' : 'max-h-0 opacity-0'
                 }`}
               >
-                <div className="px-5 pb-5 pt-1 border-t border-white/10">
-                  <p className="text-blue-200 text-xs mb-3">Selecciona un destino para filtrar los viajes:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {rutasDisponibles.map((ruta) => {
-                      const isActive  = selectedRuta === ruta;
-                      const count     = cars.filter((c) => c.destino === ruta).length;
-                      return (
+                <div className="px-5 pb-5 pt-1 border-t border-white/10 space-y-4">
+
+                  {/* Filtro por fecha */}
+                  <div>
+                    <p className="text-blue-200 text-xs mb-2 flex items-center gap-1.5">
+                      <FaCalendarAlt className="text-blue-300" /> Filtrar por fecha:
+                    </p>
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="date"
+                        value={selectedFecha}
+                        onChange={(e) => handleFecha(e.target.value)}
+                        className="bg-white/10 border border-white/20 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 [color-scheme:dark]"
+                      />
+                      {selectedFecha && (
                         <button
-                          key={ruta}
                           type="button"
-                          onClick={() => handleRuta(ruta)}
-                          className={[
-                            'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95',
-                            isActive
-                              ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30 scale-105'
-                              : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white border border-white/10',
-                          ].join(' ')}
+                          onClick={() => handleFecha('')}
+                          className="text-xs text-white/50 hover:text-white transition-colors"
                         >
-                          <FaMapMarkerAlt className={`text-xs shrink-0 ${isActive ? 'text-violet-200' : 'text-blue-300'}`} />
-                          {ruta}
-                          <span
-                            className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
-                              isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white/60'
-                            }`}
-                          >
-                            {count}
-                          </span>
+                          <FaTimes />
                         </button>
-                      );
-                    })}
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Filtro por destino */}
+                  <div>
+                    <p className="text-blue-200 text-xs mb-2 flex items-center gap-1.5">
+                      <FaMapMarkerAlt className="text-blue-300" /> Filtrar por destino:
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {rutasDisponibles.map((ruta) => {
+                        const isActive  = selectedRuta === ruta;
+                        const count     = cars.filter((c) => c.destino === ruta).length;
+                        return (
+                          <button
+                            key={ruta}
+                            type="button"
+                            onClick={() => handleRuta(ruta)}
+                            className={[
+                              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95',
+                              isActive
+                                ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30 scale-105'
+                                : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white border border-white/10',
+                            ].join(' ')}
+                          >
+                            <FaMapMarkerAlt className={`text-xs shrink-0 ${isActive ? 'text-violet-200' : 'text-blue-300'}`} />
+                            {ruta}
+                            <span
+                              className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${
+                                isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white/60'
+                              }`}
+                            >
+                              {count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -224,12 +252,14 @@ const IndexLogin = () => {
             </p>
             <p className="text-blue-200 text-sm">
               {selectedRuta
-                ? `No hay viajes hacia "${selectedRuta}"${searchTerm ? ` que coincidan con "${searchTerm}"` : ''}.`
-                : searchTerm
-                  ? `No encontramos coincidencias para "${searchTerm}".`
-                  : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
+                ? `No hay viajes hacia "${selectedRuta}"${selectedFecha ? ` el ${new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES')}` : ''}${searchTerm ? ` que coincidan con "${searchTerm}"` : ''}.`
+                : selectedFecha
+                  ? `No encontramos viajes para el ${new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES')}.`
+                  : searchTerm
+                    ? `No encontramos coincidencias para "${searchTerm}".`
+                    : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
             </p>
-            {(searchTerm || selectedRuta) && (
+            {(searchTerm || selectedRuta || selectedFecha) && (
               <button
                 onClick={handleClearFilters}
                 className="mt-4 px-5 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-xl transition-colors"

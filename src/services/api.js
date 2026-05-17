@@ -63,6 +63,9 @@ export const terminarViajeApi = (id) =>
 export const completarReservaApi = (id) =>
   axios.put(ENDPOINTS.COMPLETAR_RESERVA(id), {}, authHeaders());
 
+export const calificarReservaApi = (id, calificacion, comentario) =>
+  axios.put(ENDPOINTS.CALIFICAR_RESERVA(id), { calificacion, comentario }, authHeaders());
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 
 export const listarEstadosApi = () =>

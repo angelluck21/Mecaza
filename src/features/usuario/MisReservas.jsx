@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaUser, FaMapMarkerAlt, FaClock,
   FaCalendarAlt, FaTrash, FaCarSide, FaTicketAlt, FaCheck,
+  FaWhatsapp, FaStar, FaTimes,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -11,7 +12,11 @@ import LoadingScreen     from '../../components/ui/LoadingScreen';
 import CarImage          from '../../components/ui/CarImage';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
-import { listarCarrosApi, listarReservasApi, eliminarReservaApi, guardarMotivoCancelacionApi, completarReservaApi } from '../../services/api';
+import {
+  listarCarrosApi, listarReservasApi,
+  eliminarReservaApi, guardarMotivoCancelacionApi,
+  completarReservaApi, calificarReservaApi,
+} from '../../services/api';
 import { getCarImageUrl } from '../../utils';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -25,18 +30,52 @@ const STATUS = {
 };
 const getStatus = (s) => STATUS[s?.toLowerCase()] ?? STATUS.pendiente;
 
+const waLink = (tel) => {
+  const digits = String(tel ?? '').replace(/\D/g, '');
+  const num = digits.startsWith('57') ? digits : `57${digits}`;
+  return `https://wa.me/${num}`;
+};
+
+// ── Star rating ───────────────────────────────────────────────────────────────
+
+const StarRating = ({ value, onChange }) => (
+  <div className="flex gap-1 justify-center">
+    {[1, 2, 3, 4, 5].map((n) => (
+      <button
+        key={n}
+        type="button"
+        onClick={() => onChange(n)}
+        className="focus:outline-none transition-transform active:scale-90"
+      >
+        <FaStar
+          className={`text-3xl transition-colors ${
+            n <= value ? 'text-yellow-400' : 'text-gray-200'
+          }`}
+        />
+      </button>
+    ))}
+  </div>
+);
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const MisReservas = () => {
-  const [userData,           setUserData]           = useState(null);
-  const [isLoading,          setIsLoading]          = useState(true);
-  const [reservations,       setReservations]       = useState([]);
-  const [cars,               setCars]               = useState([]);
-  const [showDeleteModal,    setShowDeleteModal]    = useState(false);
-  const [reservationToDelete,setReservationToDelete] = useState(null);
-  const [isDeleting,         setIsDeleting]         = useState(false);
-  const [motivoCancelacion,  setMotivoCancelacion]  = useState('');
-  const [completandoId,      setCompletandoId]      = useState(null);
+  const [userData,            setUserData]            = useState(null);
+  const [isLoading,           setIsLoading]           = useState(true);
+  const [reservations,        setReservations]        = useState([]);
+  const [cars,                setCars]                = useState([]);
+  const [showDeleteModal,     setShowDeleteModal]     = useState(false);
+  const [reservationToDelete, setReservationToDelete] = useState(null);
+  const [isDeleting,          setIsDeleting]          = useState(false);
+  const [motivoCancelacion,   setMotivoCancelacion]   = useState('');
+  const [completandoId,       setCompletandoId]       = useState(null);
+
+  // Calificación
+  const [showRatingModal,     setShowRatingModal]     = useState(false);
+  const [ratingReserva,       setRatingReserva]       = useState(null);
+  const [ratingStars,         setRatingStars]         = useState(0);
+  const [ratingComentario,    setRatingComentario]    = useState('');
+  const [isSavingRating,      setIsSavingRating]      = useState(false);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -54,8 +93,8 @@ const MisReservas = () => {
   const fetchData = async (user) => {
     try {
       const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
-      const rawCars  = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
-      const carsData = Array.isArray(rawCars)  ? rawCars  : (Array.isArray(rawCars.data) ? rawCars.data : []);
+      const rawCars       = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
+      const carsData      = Array.isArray(rawCars)  ? rawCars  : (Array.isArray(rawCars.data) ? rawCars.data : []);
       const reservasArray = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
       setCars(carsData);
       const userId = user?.id || user?.ID || user?.id_users;
@@ -90,9 +129,28 @@ const MisReservas = () => {
       await completarReservaApi(id);
       showToast('¡Gracias por viajar con Mecaza!', 'success');
       await fetchData(userData);
+      // Abrir modal de calificación
+      setRatingReserva({ ...reservation, id_reservarviajes: id });
+      setRatingStars(0);
+      setRatingComentario('');
+      setShowRatingModal(true);
     } catch {
       showToast('Error al registrar el viaje completado.', 'error');
     } finally { setCompletandoId(null); }
+  };
+
+  const handleSaveRating = async () => {
+    if (ratingStars === 0) { showToast('Selecciona una calificación.', 'error'); return; }
+    const id = ratingReserva?.id_reservarviajes || ratingReserva?.id;
+    setIsSavingRating(true);
+    try {
+      await calificarReservaApi(id, ratingStars, ratingComentario.trim() || null);
+      showToast('¡Calificación guardada!', 'success');
+      setShowRatingModal(false);
+      await fetchData(userData);
+    } catch {
+      showToast('Error al guardar la calificación.', 'error');
+    } finally { setIsSavingRating(false); }
   };
 
   const confirmDelete = async () => {
@@ -102,9 +160,7 @@ const MisReservas = () => {
     try {
       await eliminarReservaApi(id);
       if (motivoCancelacion.trim()) {
-        try {
-          await guardarMotivoCancelacionApi(id, motivoCancelacion.trim(), 'usuario');
-        } catch { /* no bloqueante */ }
+        try { await guardarMotivoCancelacionApi(id, motivoCancelacion.trim(), 'usuario'); } catch { /* no bloqueante */ }
       }
       showToast('Reserva cancelada exitosamente.', 'success');
       setShowDeleteModal(false);
@@ -117,9 +173,7 @@ const MisReservas = () => {
       else if (s === 401) showToast('No autorizado.', 'error');
       else if (err.request) showToast('Sin conexión al servidor.', 'error');
       else showToast('Error inesperado.', 'error');
-    } finally {
-      setIsDeleting(false);
-    }
+    } finally { setIsDeleting(false); }
   };
 
   if (isLoading) return <LoadingScreen message="Cargando reservas..." />;
@@ -167,6 +221,9 @@ const MisReservas = () => {
               const reservaId = reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID;
               const carInfo   = getCarInfo(reservation);
               const status    = getStatus(reservation.estado);
+              const estado    = reservation.estado?.toLowerCase();
+              const yaCalificada = reservation.calificacion != null;
+              const conductorTel = carInfo?.telefono;
 
               return (
                 <div
@@ -174,7 +231,6 @@ const MisReservas = () => {
                   className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden animate-fade-in-up hover:shadow-lg transition-all"
                   style={{ animationDelay: `${idx * 80}ms` }}
                 >
-                  {/* Borde superior degradado */}
                   <div className="h-1 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
 
                   <div className="p-5">
@@ -200,7 +256,7 @@ const MisReservas = () => {
 
                     {/* Contenido */}
                     <div className="grid sm:grid-cols-3 gap-4">
-                      {/* Vehículo */}
+                      {/* Imagen vehículo */}
                       <div className="sm:col-span-1">
                         <div className="rounded-xl overflow-hidden bg-gray-50 h-28">
                           {carInfo
@@ -257,12 +313,49 @@ const MisReservas = () => {
                             </div>
                           </div>
                         </div>
+
+                        {/* Ubicación de recogida */}
+                        {(reservation.ubicacion || reservation.Ubicacion) && (
+                          <div className="flex items-start gap-1.5 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mt-1">
+                            <FaMapMarkerAlt className="text-blue-400 text-xs mt-0.5 shrink-0" />
+                            <div>
+                              <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wide">Tu punto de recogida</p>
+                              <p className="text-xs text-blue-700 font-medium leading-tight">{reservation.ubicacion || reservation.Ubicacion}</p>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Calificación existente */}
+                        {yaCalificada && (
+                          <div className="flex items-center gap-1.5 bg-yellow-50 border border-yellow-100 rounded-xl px-3 py-2">
+                            <div className="flex gap-0.5">
+                              {[1,2,3,4,5].map(n => (
+                                <FaStar key={n} className={`text-xs ${n <= reservation.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
+                              ))}
+                            </div>
+                            <p className="text-xs text-yellow-700 font-medium">Tu calificación</p>
+                          </div>
+                        )}
                       </div>
                     </div>
 
                     {/* Acciones */}
                     <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2 flex-wrap">
-                      {reservation.estado?.toLowerCase() === 'confirmada' && (
+
+                      {/* WhatsApp al conductor (solo si confirmada y hay teléfono) */}
+                      {estado === 'confirmada' && conductorTel && (
+                        <a
+                          href={waLink(conductorTel)}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-2 px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-xl hover:bg-green-600 transition-all active:scale-95"
+                        >
+                          <FaWhatsapp /> Contactar conductor
+                        </a>
+                      )}
+
+                      {/* Terminé mi viaje */}
+                      {estado === 'confirmada' && (
                         <button
                           onClick={() => handleCompletar(reservation)}
                           disabled={completandoId === reservaId}
@@ -274,7 +367,24 @@ const MisReservas = () => {
                           Terminé mi viaje
                         </button>
                       )}
-                      {reservation.estado?.toLowerCase() !== 'completada' && (
+
+                      {/* Calificar (solo completadas sin calificación) */}
+                      {estado === 'completada' && !yaCalificada && (
+                        <button
+                          onClick={() => {
+                            setRatingReserva(reservation);
+                            setRatingStars(0);
+                            setRatingComentario('');
+                            setShowRatingModal(true);
+                          }}
+                          className="flex items-center gap-2 px-4 py-2 bg-yellow-400 text-white text-sm font-semibold rounded-xl hover:bg-yellow-500 transition-all active:scale-95"
+                        >
+                          <FaStar className="text-xs" /> Calificar viaje
+                        </button>
+                      )}
+
+                      {/* Cancelar reserva */}
+                      {estado !== 'completada' && (
                         <button
                           onClick={() => openDelete(reservation)}
                           className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
@@ -291,7 +401,7 @@ const MisReservas = () => {
         )}
       </div>
 
-      {/* Modal confirmar cancelación */}
+      {/* ── Modal: Cancelar reserva ── */}
       {showDeleteModal && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
@@ -332,6 +442,70 @@ const MisReservas = () => {
                   className="flex-1 py-2.5 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition-all disabled:opacity-60"
                 >
                   {isDeleting ? 'Cancelando...' : 'Sí, cancelar'}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Modal: Calificación ── */}
+      {showRatingModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          style={{ background: 'rgba(15,10,40,0.80)', backdropFilter: 'blur(6px)' }}
+          onClick={(e) => e.target === e.currentTarget && setShowRatingModal(false)}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-scale-in overflow-hidden">
+            <div className="bg-gradient-to-r from-yellow-400 to-orange-400 px-6 py-5 flex items-center justify-between">
+              <div>
+                <h3 className="text-lg font-bold text-white">¿Cómo estuvo el viaje?</h3>
+                <p className="text-yellow-100 text-xs mt-0.5">Tu opinión ayuda a mejorar Mecaza</p>
+              </div>
+              <button
+                onClick={() => setShowRatingModal(false)}
+                className="p-1 hover:bg-white/20 rounded-lg transition-all"
+              >
+                <FaTimes className="text-white" />
+              </button>
+            </div>
+            <div className="p-6 space-y-5">
+
+              {/* Estrellas */}
+              <div className="text-center">
+                <p className="text-sm text-gray-500 mb-3">Toca las estrellas para calificar</p>
+                <StarRating value={ratingStars} onChange={setRatingStars} />
+                {ratingStars > 0 && (
+                  <p className="text-xs text-gray-400 mt-2">
+                    {['', 'Muy malo', 'Malo', 'Regular', 'Bueno', '¡Excelente!'][ratingStars]}
+                  </p>
+                )}
+              </div>
+
+              {/* Comentario */}
+              <textarea
+                value={ratingComentario}
+                onChange={(e) => setRatingComentario(e.target.value)}
+                placeholder="(Opcional) Cuéntanos más sobre tu experiencia..."
+                className="w-full p-3 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none"
+                rows="3"
+              />
+
+              {/* Botones */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowRatingModal(false)}
+                  disabled={isSavingRating}
+                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
+                >
+                  Omitir
+                </button>
+                <button
+                  onClick={handleSaveRating}
+                  disabled={isSavingRating || ratingStars === 0}
+                  className="flex-1 py-2.5 bg-gradient-to-r from-yellow-400 to-orange-400 text-white font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {isSavingRating ? 'Guardando...' : 'Enviar'}
                 </button>
               </div>
             </div>

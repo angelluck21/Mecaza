@@ -49,7 +49,8 @@ export const ENDPOINTS = {
   // Viaje
   INICIAR_VIAJE:    (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
   TERMINAR_VIAJE:   (id) => `${API_BASE_URL}/terminarviaje/${id}`,
-  COMPLETAR_RESERVA: (id) => `${API_BASE_URL}/completarreserva/${id}`,
+  COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
+  CALIFICAR_RESERVA:  (id) => `${API_BASE_URL}/calificarreserva/${id}`,
 
   // Facturas
   GENERAR_FACTURA:  (id) => `${API_BASE_URL}/generarFactura/${id}`,
