@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FaUser, FaMapMarkerAlt, FaClock, FaCalendar,
-  FaPhone, FaCheck, FaTimes,
+  FaPhone, FaCheck, FaTimes, FaLocationArrow, FaSpinner,
 } from 'react-icons/fa';
 
 import PageBg            from '../components/ui/PageBg';
@@ -289,6 +289,7 @@ const VerDetalles = () => {
   const [showConfirmation, setShowConfirmation] = useState(false);
   const [isReserving,      setIsReserving]      = useState(false);
   const [showSuccess,      setShowSuccess]      = useState(false);
+  const [locLoading,       setLocLoading]       = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
   const { carId } = useParams();
@@ -364,6 +365,42 @@ const VerDetalles = () => {
 
     loadAll();
   }, [carId, navigate]);
+
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      showToast('Tu navegador no soporta geolocalización.', 'error');
+      return;
+    }
+    setLocLoading(true);
+    navigator.geolocation.getCurrentPosition(
+      async ({ coords }) => {
+        try {
+          const res = await fetch(
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&accept-language=es`,
+            { headers: { 'Accept-Language': 'es' } }
+          );
+          const data = await res.json();
+          const addr = data.display_name || `${coords.latitude}, ${coords.longitude}`;
+          setPickupLocation(addr);
+        } catch {
+          // Si falla la geocodificación inversa, usar coordenadas crudas
+          setPickupLocation(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
+        } finally {
+          setLocLoading(false);
+        }
+      },
+      (err) => {
+        setLocLoading(false);
+        const msgs = {
+          1: 'Permiso de ubicación denegado. Actívalo en la configuración del navegador.',
+          2: 'No se pudo obtener tu ubicación. Verifica tu GPS.',
+          3: 'Tiempo de espera agotado. Inténtalo de nuevo.',
+        };
+        showToast(msgs[err.code] || 'Error al obtener ubicación.', 'error');
+      },
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+    );
+  };
 
   const handleConfirm = () => {
     if (!userData) { navigate('/login'); return; }
@@ -573,15 +610,40 @@ const VerDetalles = () => {
                   placeholder="+57 300 000 0000"
                   required
                 />
-                <FormInput
-                  label="Ubicación de recogida"
-                  icon={<FaMapMarkerAlt className="text-xs" />}
-                  type="text"
-                  value={pickupLocation}
-                  onChange={e => setPickupLocation(e.target.value)}
-                  placeholder="Tu dirección de recogida"
-                  required
-                />
+                {/* Ubicación de recogida con botón GPS */}
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
+                    Ubicación de recogida
+                  </label>
+                  <div className="relative">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                      <FaMapMarkerAlt className="text-xs" />
+                    </div>
+                    <input
+                      type="text"
+                      value={pickupLocation}
+                      onChange={e => setPickupLocation(e.target.value)}
+                      placeholder="Tu dirección de recogida"
+                      className="w-full pl-8 pr-[7.5rem] py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleGetLocation}
+                      disabled={locLoading}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg transition-all active:scale-95 whitespace-nowrap"
+                    >
+                      {locLoading
+                        ? <><FaSpinner className="animate-spin text-[10px]" /> Buscando...</>
+                        : <><FaLocationArrow className="text-[10px]" /> Mi ubicación</>
+                      }
+                    </button>
+                  </div>
+                  {pickupLocation && (
+                    <p className="text-[10px] text-gray-400 pl-1 truncate" title={pickupLocation}>
+                      {pickupLocation}
+                    </p>
+                  )}
+                </div>
 
                 <button
                   onClick={handleConfirm}
