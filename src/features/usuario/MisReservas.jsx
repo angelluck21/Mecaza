@@ -106,10 +106,13 @@ const MisReservas = () => {
         ? reservasArray.filter(r => (r.id_users || r.id_user || r.user_id) == userId)
         : [];
 
-      // Ocultar reservas completadas que ya fueron calificadas
-      const visibles = misReservas.filter(
-        r => !(r.estado?.toLowerCase() === 'completada' && r.calificacion != null)
-      );
+      // Ocultar: rechazadas, canceladas, y completadas ya calificadas
+      const visibles = misReservas.filter(r => {
+        const estado = r.estado?.toLowerCase();
+        if (estado === 'rechazada' || estado === 'cancelada') return false;
+        if (estado === 'completada' && r.calificacion != null) return false;
+        return true;
+      });
       setReservations(visibles);
 
       // Abrir modal de calificación si hay una completada sin calificar
@@ -296,6 +299,13 @@ const MisReservas = () => {
                           <div>
                             <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Placa</p>
                             <p className="font-mono font-medium text-gray-700">{carInfo?.placa || '—'}</p>
+                          </div>
+                          <div className="flex items-start gap-1">
+                            <FaMapMarkerAlt className="text-blue-400 text-xs mt-1 shrink-0" />
+                            <div>
+                              <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Origen</p>
+                              <p className="font-medium text-gray-700">{carInfo?.origen || '—'}</p>
+                            </div>
                           </div>
                           <div className="flex items-start gap-1">
                             <FaMapMarkerAlt className="text-violet-400 text-xs mt-1 shrink-0" />
