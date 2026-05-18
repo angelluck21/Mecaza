@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   FaUser, FaMapMarkerAlt, FaClock, FaCalendar,
   FaPhone, FaCheck, FaTimes, FaLocationArrow, FaSpinner,
+  FaStar, FaRegStar, FaRoad,
 } from 'react-icons/fa';
 
 import PageBg            from '../components/ui/PageBg';
@@ -11,12 +12,24 @@ import SectionCard       from '../components/ui/SectionCard';
 import LoadingScreen     from '../components/ui/LoadingScreen';
 import FormInput         from '../components/ui/FormInput';
 import CarImage          from '../components/ui/CarImage';
+import UserAvatar        from '../components/ui/UserAvatar';
 import ToastNotification from '../components/ui/ToastNotification';
 import { useToast }      from '../hooks/useToast';
-import { crearReservaApi, listarCarrosApi, listarPreciosApi, listarReservasApi } from '../services/api';
+import { crearReservaApi, listarCarrosApi, listarPreciosApi, listarReservasApi, getConductorPerfilApi } from '../services/api';
 import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
 
 const MAX_SEATS = 5;
+
+// ── Fila de estrellas ────────────────────────────────────────────────────────
+const StarRow = ({ value, size = 'text-sm', emptyClass = 'text-gray-300' }) => (
+  <span className="inline-flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map((n) =>
+      n <= Math.round(value ?? 0)
+        ? <FaStar key={n} className={`${size} text-amber-400`} />
+        : <FaRegStar key={n} className={`${size} ${emptyClass}`} />
+    )}
+  </span>
+);
 
 // ── Icono de asiento individual ──────────────────────────────────────────────
 const SeatIcon = ({ number, state, onClick }) => {
@@ -276,19 +289,20 @@ const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeats, onToggle,
 // ── Componente principal ─────────────────────────────────────────────────────
 
 const VerDetalles = () => {
-  const [userData,         setUserData]         = useState(null);
-  const [isLoading,        setIsLoading]        = useState(true);
-  const [carDetails,       setCarDetails]       = useState(null);
-  const [selectedSeats,    setSelectedSeats]    = useState([]);
-  const [pickupLocation,   setPickupLocation]   = useState('');
-  const [nombre,           setNombre]           = useState('');
-  const [telefono,         setTelefono]         = useState('');
-  const [precios,          setPrecios]          = useState(null);
-  const [asientosOcupados, setAsientosOcupados] = useState([]);
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [isReserving,      setIsReserving]      = useState(false);
-  const [showSuccess,      setShowSuccess]      = useState(false);
-  const [locLoading,       setLocLoading]       = useState(false);
+  const [userData,          setUserData]          = useState(null);
+  const [isLoading,         setIsLoading]         = useState(true);
+  const [carDetails,        setCarDetails]        = useState(null);
+  const [selectedSeats,     setSelectedSeats]     = useState([]);
+  const [pickupLocation,    setPickupLocation]    = useState('');
+  const [nombre,            setNombre]            = useState('');
+  const [telefono,          setTelefono]          = useState('');
+  const [precios,           setPrecios]           = useState(null);
+  const [asientosOcupados,  setAsientosOcupados]  = useState([]);
+  const [showConfirmation,  setShowConfirmation]  = useState(false);
+  const [isReserving,       setIsReserving]       = useState(false);
+  const [showSuccess,       setShowSuccess]       = useState(false);
+  const [locLoading,        setLocLoading]        = useState(false);
+  const [conductorPerfil,   setConductorPerfil]   = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
   const { carId } = useParams();
@@ -338,6 +352,7 @@ const VerDetalles = () => {
           .filter(n => n > 0);
         setAsientosOcupados(ocupados);
 
+        const conductorUserId = car.id_users || car.Userid || car.userid || null;
         setCarDetails({
           id_carros:   car.id_carros  || car.id,
           conductor:   car.conductor  || car.Conductor,
@@ -350,7 +365,15 @@ const VerDetalles = () => {
           imagencarro: car.imagencarro || car.Imagencarro,
           telefono:    car.telefono   || car.Telefono || 'No disponible',
           id_estados:  car.id_estados || car.estado   || car.Estado,
+          id_users:    conductorUserId,
         });
+
+        // Cargar perfil del conductor en paralelo (no bloquea la carga principal)
+        if (conductorUserId) {
+          getConductorPerfilApi(conductorUserId)
+            .then(res => { if (res?.data) setConductorPerfil(res.data); })
+            .catch(() => {});
+        }
       } catch {
         // silencioso
       } finally {
@@ -499,21 +522,74 @@ const VerDetalles = () => {
 
             {/* Conductor */}
             <SectionCard title="Conductor" icon={<FaUser className="text-xs" />} accent="blue">
-              <div className="grid sm:grid-cols-3 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Nombre</p>
-                  <p className="font-semibold text-gray-800">{carDetails.conductor}</p>
+              <div className="flex items-start gap-4">
+
+                {/* Foto del conductor */}
+                <div className="shrink-0">
+                  <UserAvatar
+                    userData={{
+                      fotoperfil: conductorPerfil?.fotoperfil ?? null,
+                      name: carDetails.conductor,
+                    }}
+                    size="xl"
+                    className="ring-2 ring-blue-200 shadow-md"
+                  />
                 </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Placa</p>
-                  <p className="font-semibold text-gray-800">{carDetails.placa}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Teléfono</p>
-                  <p className="font-semibold text-gray-800 flex items-center gap-1">
-                    <FaPhone className="text-blue-500 text-xs shrink-0" />
-                    {carDetails.telefono}
-                  </p>
+
+                {/* Info conductor */}
+                <div className="flex-1 min-w-0 space-y-2">
+                  <div>
+                    <p className="font-bold text-gray-900 text-base leading-tight">{carDetails.conductor}</p>
+                    <p className="text-xs text-gray-400">{carDetails.placa}</p>
+                  </div>
+
+                  {/* Estrellas y viajes */}
+                  {conductorPerfil ? (
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <div className="flex items-center gap-1">
+                        <StarRow value={conductorPerfil.promedio_estrellas ?? 0} />
+                        {conductorPerfil.promedio_estrellas != null ? (
+                          <span className="text-xs font-bold text-amber-600 ml-1">
+                            {Number(conductorPerfil.promedio_estrellas).toFixed(1)}
+                          </span>
+                        ) : (
+                          <span className="text-xs text-gray-400 ml-1">Sin calificaciones</span>
+                        )}
+                        {conductorPerfil.total_calificaciones > 0 && (
+                          <span className="text-xs text-gray-400">
+                            ({conductorPerfil.total_calificaciones})
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-1 text-xs text-gray-500">
+                        <FaRoad className="text-blue-400 text-[10px]" />
+                        <span className="font-semibold">{conductorPerfil.total_viajes}</span>
+                        <span>{conductorPerfil.total_viajes === 1 ? 'viaje' : 'viajes'}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1">
+                      {[1,2,3,4,5].map(n => <FaRegStar key={n} className="text-gray-200 text-sm" />)}
+                      <span className="text-xs text-gray-300 ml-1">Cargando...</span>
+                    </div>
+                  )}
+
+                  {/* Teléfono + Ver perfil */}
+                  <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
+                    <p className="text-sm text-gray-700 flex items-center gap-1">
+                      <FaPhone className="text-blue-500 text-xs shrink-0" />
+                      {carDetails.telefono}
+                    </p>
+                    {carDetails.id_users && (
+                      <button
+                        type="button"
+                        onClick={() => navigate(`/usuario/${carDetails.id_users}`)}
+                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
+                      >
+                        Ver perfil completo
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
             </SectionCard>
@@ -521,14 +597,13 @@ const VerDetalles = () => {
             {/* Detalles del viaje */}
             <SectionCard title="Detalles del viaje" icon={<FaMapMarkerAlt className="text-xs" />} accent="green">
               <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                {carDetails.origen && (
-                  <div>
-                    <p className="text-xs text-gray-400 mb-0.5">Origen</p>
-                    <p className="font-semibold text-gray-800 flex items-center gap-1">
-                      <FaMapMarkerAlt className="text-blue-400 text-xs shrink-0" /> {carDetails.origen}
-                    </p>
-                  </div>
-                )}
+                <div>
+                  <p className="text-xs text-gray-400 mb-0.5">Origen</p>
+                  <p className="font-semibold text-gray-800 flex items-center gap-1">
+                    <FaMapMarkerAlt className="text-blue-400 text-xs shrink-0" />
+                    {carDetails.origen || 'No especificado'}
+                  </p>
+                </div>
                 <div>
                   <p className="text-xs text-gray-400 mb-0.5">Destino</p>
                   <p className="font-semibold text-gray-800 flex items-center gap-1">
@@ -743,6 +818,7 @@ const VerDetalles = () => {
           </div>
         </div>
       )}
+
     </PageBg>
   );
 };

@@ -51,12 +51,15 @@ const MisFacturas = () => {
     setIsDownloading(true);
     try {
       const { data } = await descargarFacturaApi(factura.id_factura);
-      const url = URL.createObjectURL(new Blob([data], { type: 'application/pdf' }));
-      const a = document.createElement('a');
-      a.href = url;
+      const blob = new Blob([data], { type: 'application/pdf' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
       a.download = `${factura.numero_factura}.pdf`;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
     } catch {
       showToast('No se pudo descargar la factura.', 'error');
     } finally {
@@ -136,8 +139,10 @@ const MisFacturas = () => {
 
                   <div className="grid sm:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Destino</p>
-                      <p className="font-medium text-gray-700">{factura.destino || '—'}</p>
+                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Ruta</p>
+                      <p className="font-medium text-gray-700">
+                        {factura.origen ? `${factura.origen} → ${factura.destino || '—'}` : (factura.destino || '—')}
+                      </p>
                     </div>
                     <div>
                       <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Fecha Emisión</p>
@@ -224,8 +229,12 @@ const MisFacturas = () => {
               </div>
 
               <div>
-                <p className="text-xs text-gray-400 font-semibold uppercase">Destino</p>
-                <p className="font-medium text-gray-700">{selectedFactura.destino || '—'}</p>
+                <p className="text-xs text-gray-400 font-semibold uppercase">Ruta</p>
+                <p className="font-medium text-gray-700">
+                  {selectedFactura.origen
+                    ? `${selectedFactura.origen} → ${selectedFactura.destino || '—'}`
+                    : (selectedFactura.destino || '—')}
+                </p>
               </div>
 
               <div className="flex gap-2 pt-4">

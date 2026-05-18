@@ -50,7 +50,8 @@ export const ENDPOINTS = {
   INICIAR_VIAJE:    (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
   TERMINAR_VIAJE:   (id) => `${API_BASE_URL}/terminarviaje/${id}`,
   COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
-  CALIFICAR_RESERVA:  (id) => `${API_BASE_URL}/calificarreserva/${id}`,
+  CALIFICAR_RESERVA:   (id) => `${API_BASE_URL}/calificarreserva/${id}`,
+  CONDUCTOR_PERFIL:    (id) => `${API_BASE_URL}/conductor-perfil/${id}`,
 
   // Facturas
   GENERAR_FACTURA:  (id) => `${API_BASE_URL}/generarFactura/${id}`,

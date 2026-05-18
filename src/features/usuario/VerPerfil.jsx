@@ -3,6 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   FaUser, FaEnvelope, FaPhone, FaShieldAlt,
   FaEdit, FaTrash, FaIdCard, FaArrowLeft,
+  FaStar, FaRegStar, FaRoad, FaCommentAlt,
 } from 'react-icons/fa';
 
 import PageBg        from '../../components/ui/PageBg';
@@ -12,7 +13,7 @@ import SectionCard   from '../../components/ui/SectionCard';
 import InfoRow       from '../../components/ui/InfoRow';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
-import { verUsuarioApi, eliminarUsuarioApi } from '../../services/api';
+import { verUsuarioApi, eliminarUsuarioApi, getConductorPerfilApi } from '../../services/api';
 import { getUserPhotoUrl } from '../../utils';
 import UserAvatar from '../../components/ui/UserAvatar';
 
@@ -26,17 +27,43 @@ const resolveField = (obj, keys) => {
   return null;
 };
 
+// ── Fila de estrellas ─────────────────────────────────────────────────────────
+const StarRow = ({ value, size = 'text-sm' }) => (
+  <span className="inline-flex items-center gap-0.5">
+    {[1, 2, 3, 4, 5].map((n) =>
+      n <= Math.round(value ?? 0)
+        ? <FaStar    key={n} className={`${size} text-amber-400`} />
+        : <FaRegStar key={n} className={`${size} text-gray-300`}  />
+    )}
+  </span>
+);
+
+// ── Barra distribución ────────────────────────────────────────────────────────
+const StarBar = ({ label, count, total }) => {
+  const pct = total > 0 ? Math.round((count / total) * 100) : 0;
+  return (
+    <div className="flex items-center gap-2 text-xs">
+      <span className="w-14 text-gray-500 text-right shrink-0">{label} ★</span>
+      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+        <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="w-6 text-gray-400 shrink-0">{count}</span>
+    </div>
+  );
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 const VerPerfil = () => {
   const { userId: paramUserId } = useParams();
 
-  const [loggedInUser,   setLoggedInUser]   = useState(null); // siempre el usuario autenticado
-  const [userData,       setUserData]       = useState(null); // perfil que se muestra
-  const [isViewingOther, setIsViewingOther] = useState(false);
-  const [isLoading,      setIsLoading]      = useState(true);
-  const [showDelete,     setShowDelete]     = useState(false);
-  const [isDeleting,     setIsDeleting]     = useState(false);
+  const [loggedInUser,    setLoggedInUser]    = useState(null);
+  const [userData,        setUserData]        = useState(null);
+  const [isViewingOther,  setIsViewingOther]  = useState(false);
+  const [isLoading,       setIsLoading]       = useState(true);
+  const [showDelete,      setShowDelete]      = useState(false);
+  const [isDeleting,      setIsDeleting]      = useState(false);
+  const [conductorStats,  setConductorStats]  = useState(null);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -51,17 +78,16 @@ const VerPerfil = () => {
       let loggedIn;
       try { loggedIn = JSON.parse(stored); } catch { navigate('/login'); return; }
 
-      const rol     = loggedIn.rol;
-      const isAdmin = rol === 'admin' || rol === 'administrador';
+      const loggedInRol = loggedIn.rol;
+      const isAdmin     = loggedInRol === 'admin' || loggedInRol === 'administrador';
 
-      // Admin viendo a otro usuario
-      const viewingOther = !!(paramUserId && isAdmin);
+      // Cualquier usuario autenticado puede ver el perfil de otro cuando hay paramUserId
+      const viewingOther = !!paramUserId;
       setLoggedInUser(loggedIn);
       setIsViewingOther(viewingOther);
 
-      const targetId = viewingOther
-        ? paramUserId
-        : resolveField(loggedIn, ['id_users', 'id', 'ID', 'id_user', 'user_id', 'userId']);
+      const loggedInId = resolveField(loggedIn, ['id_users', 'id', 'ID', 'id_user', 'user_id', 'userId']);
+      const targetId   = viewingOther ? paramUserId : loggedInId;
 
       if (!targetId) { navigate('/login'); return; }
 
@@ -69,17 +95,27 @@ const VerPerfil = () => {
         const { data } = await verUsuarioApi(targetId);
         const perfil   = data?.data ?? data?.user ?? data ?? {};
 
+        let finalData;
         if (viewingOther) {
+          finalData = perfil;
           setUserData(perfil);
         } else {
-          const merged = { ...loggedIn, ...perfil };
-          localStorage.setItem('userData', JSON.stringify(merged));
-          setUserData(merged);
+          finalData = { ...loggedIn, ...perfil };
+          localStorage.setItem('userData', JSON.stringify(finalData));
+          setUserData(finalData);
+        }
+
+        // Si es conductor, cargar estadísticas
+        const perfilRol = finalData.rol ?? perfil.rol;
+        if (perfilRol === 'conductor') {
+          getConductorPerfilApi(targetId)
+            .then(res => { if (res?.data) setConductorStats(res.data); })
+            .catch(() => {});
         }
       } catch {
         if (viewingOther) {
-          showToast('No se pudo cargar el perfil del usuario.', 'error');
-          navigate('/lista-usuarios');
+          showToast('No se pudo cargar el perfil.', 'error');
+          navigate(-1);
         } else {
           setUserData(loggedIn);
         }
@@ -98,9 +134,8 @@ const VerPerfil = () => {
       await eliminarUsuarioApi(targetId);
       showToast(isViewingOther ? 'Usuario eliminado correctamente.' : 'Cuenta eliminada exitosamente.', 'success');
       setTimeout(() => {
-        if (isViewingOther) {
-          navigate('/lista-usuarios');
-        } else {
+        if (isViewingOther) navigate('/lista-usuarios');
+        else {
           localStorage.removeItem('userData');
           localStorage.removeItem('authToken');
           navigate('/login');
@@ -108,9 +143,9 @@ const VerPerfil = () => {
       }, 1500);
     } catch (err) {
       const status = err.response?.status;
-      if (status === 401) showToast('Sesión expirada.', 'error');
+      if (status === 401)      showToast('Sesión expirada.', 'error');
       else if (status === 404) showToast('Usuario no encontrado.', 'error');
-      else showToast('Error al eliminar. Intenta nuevamente.', 'error');
+      else                     showToast('Error al eliminar. Intenta nuevamente.', 'error');
     } finally {
       setIsDeleting(false);
       setShowDelete(false);
@@ -126,8 +161,24 @@ const VerPerfil = () => {
   const userId   = resolveField(userData, ['id_users', 'id', 'ID', 'user_id', 'userId']);
   const rol      = userData.rol ?? 'usuario';
 
-  const loggedInRol   = loggedInUser.rol;
+  const loggedInRol     = loggedInUser.rol;
   const loggedInIsAdmin = loggedInRol === 'admin' || loggedInRol === 'administrador';
+  const loggedInId      = resolveField(loggedInUser, ['id_users', 'id', 'ID', 'id_user', 'user_id', 'userId']);
+  const isOwnProfile    = !isViewingOther || String(loggedInId) === String(userId);
+  const esConductor     = rol === 'conductor';
+
+  // Estadísticas del conductor
+  const resenas  = conductorStats?.resenas ?? [];
+  const totalCal = conductorStats?.total_calificaciones ?? 0;
+  const promedio = conductorStats?.promedio_estrellas    ?? null;
+  const distrib  = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: resenas.filter(r => Math.round(r.calificacion) === star).length,
+  }));
+
+  // Foto de perfil procesada
+  const fotoRaw = userData.fotoperfil || userData.fotoPerfil || null;
+  const fotoUrl = fotoRaw ? (getUserPhotoUrl(fotoRaw) || fotoRaw) : null;
 
   return (
     <PageBg>
@@ -135,24 +186,26 @@ const VerPerfil = () => {
 
       <InnerNavbar
         userData={loggedInUser}
-        title={isViewingOther ? `Perfil de ${nombre || 'Usuario'}` : 'Mi Perfil'}
-        backTo={isViewingOther ? '/lista-usuarios' : undefined}
+        title={isViewingOther ? `Perfil de ${nombre || 'conductor'}` : 'Mi Perfil'}
+        backTo={isViewingOther ? undefined : undefined}
       />
 
-      <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8">
+      <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
 
-        {/* Hero card */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-violet-900/20 overflow-hidden mb-6 animate-fade-in-up">
+        {/* ── Hero card ─────────────────────────────────────────────────────── */}
+        <div className="bg-white rounded-2xl shadow-xl shadow-violet-900/20 overflow-hidden animate-fade-in-up">
           <div className="h-24 bg-gradient-to-r from-blue-800 to-violet-700 relative">
             <div className="absolute -bottom-10 left-8">
               <div className="w-20 h-20 rounded-2xl bg-white shadow-lg overflow-hidden border-4 border-white">
-                {(() => {
-                  const fotoRaw = userData.fotoperfil || userData.fotoPerfil || null;
-                  const fotoUrl = fotoRaw ? (getUserPhotoUrl(fotoRaw) || fotoRaw) : null;
-                  return fotoUrl
-                    ? <img src={fotoUrl} alt="Foto" className="w-full h-full object-cover" />
-                    : <UserAvatar userData={userData} size="xl" className="rounded-none w-full h-full" />;
-                })()}
+                {fotoUrl
+                  ? <img
+                      src={fotoUrl}
+                      alt={nombre}
+                      className="w-full h-full object-cover"
+                      onError={e => { e.currentTarget.style.display='none'; }}
+                    />
+                  : <UserAvatar userData={userData} size="xl" className="rounded-none w-full h-full" />
+                }
               </div>
             </div>
           </div>
@@ -161,33 +214,62 @@ const VerPerfil = () => {
             <div>
               <h1 className="text-2xl font-extrabold text-gray-900">{nombre || 'Sin nombre'}</h1>
               <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
-                rol === 'conductor'                          ? 'bg-blue-100 text-blue-700'
-                : rol === 'admin' || rol === 'administrador' ? 'bg-violet-100 text-violet-700'
+                esConductor                                        ? 'bg-blue-100 text-blue-700'
+                : rol === 'admin' || rol === 'administrador'       ? 'bg-violet-100 text-violet-700'
                 : 'bg-green-100 text-green-700'
               }`}>
                 {ROL_LABEL[rol] ?? 'Usuario'}
               </span>
+
+              {/* Estrellas rápidas en el hero (solo conductor con stats) */}
+              {esConductor && conductorStats && (
+                <div className="flex items-center gap-2 mt-2">
+                  <StarRow value={promedio ?? 0} size="text-sm" />
+                  {promedio != null
+                    ? <span className="text-sm font-bold text-amber-600">{Number(promedio).toFixed(1)}</span>
+                    : <span className="text-xs text-gray-400">Sin calificaciones</span>
+                  }
+                  {totalCal > 0 && (
+                    <span className="text-xs text-gray-400">· {totalCal} {totalCal === 1 ? 'reseña' : 'reseñas'}</span>
+                  )}
+                  <span className="text-xs text-gray-400 flex items-center gap-1">
+                    · <FaRoad className="text-blue-400" /> {conductorStats.total_viajes} {conductorStats.total_viajes === 1 ? 'viaje' : 'viajes'}
+                  </span>
+                </div>
+              )}
             </div>
 
-            <div className="flex gap-2">
+            <div className="flex gap-2 shrink-0">
               {isViewingOther ? (
-                /* Admin viendo perfil ajeno: solo eliminar */
-                <>
-                  <button
-                    onClick={() => navigate('/lista-usuarios')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
-                  >
-                    <FaArrowLeft /> Volver a lista
-                  </button>
-                  <button
-                    onClick={() => setShowDelete(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
-                  >
-                    <FaTrash /> Eliminar usuario
-                  </button>
-                </>
+                isOwnProfile ? null : (
+                  loggedInIsAdmin ? (
+                    /* Admin viendo otro usuario */
+                    <>
+                      <button
+                        onClick={() => navigate('/lista-usuarios')}
+                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
+                      >
+                        <FaArrowLeft /> Lista
+                      </button>
+                      <button
+                        onClick={() => setShowDelete(true)}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
+                      >
+                        <FaTrash /> Eliminar
+                      </button>
+                    </>
+                  ) : (
+                    /* Usuario regular viendo perfil de conductor */
+                    <button
+                      onClick={() => navigate(-1)}
+                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
+                    >
+                      <FaArrowLeft /> Volver
+                    </button>
+                  )
+                )
               ) : (
-                /* Perfil propio: editar y eliminar */
+                /* Perfil propio */
                 <>
                   <button
                     onClick={() => navigate('/ajustes-perfil')}
@@ -207,10 +289,10 @@ const VerPerfil = () => {
           </div>
         </div>
 
-        {/* Info cards */}
+        {/* ── Info cards ────────────────────────────────────────────────────── */}
         <div className="grid md:grid-cols-2 gap-4 animate-fade-in-up">
           <SectionCard title="Información personal" icon={<FaUser className="text-sm" />} accent="violet">
-            {(loggedInIsAdmin) && (
+            {loggedInIsAdmin && (
               <InfoRow label="ID de usuario" value={`#${userId}`} icon={<FaIdCard className="text-xs" />} />
             )}
             <InfoRow label="Nombre" value={nombre}         icon={<FaUser      className="text-xs" />} />
@@ -218,13 +300,97 @@ const VerPerfil = () => {
           </SectionCard>
 
           <SectionCard title="Información de contacto" icon={<FaEnvelope className="text-sm" />} accent="blue">
-            <InfoRow label="Correo"   value={correo}   icon={<FaEnvelope className="text-xs" />} />
-            <InfoRow label="Teléfono" value={telefono} icon={<FaPhone    className="text-xs" />} />
+            {/* Mostrar email: propio, admin, o perfil de conductor */}
+            {(isOwnProfile || loggedInIsAdmin || esConductor) && (
+              <InfoRow label="Correo" value={correo} icon={<FaEnvelope className="text-xs" />} />
+            )}
+            <InfoRow label="Teléfono" value={telefono} icon={<FaPhone className="text-xs" />} />
           </SectionCard>
         </div>
+
+        {/* ── Sección conductor: estadísticas ───────────────────────────────── */}
+        {esConductor && (
+          <div className="space-y-4 animate-fade-in-up">
+
+            {/* Stats tiles */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
+                <p className="text-3xl font-extrabold text-blue-700">
+                  {conductorStats ? conductorStats.total_viajes : '—'}
+                </p>
+                <p className="text-xs text-blue-500 font-medium mt-1">
+                  {conductorStats?.total_viajes === 1 ? 'Viaje completado' : 'Viajes completados'}
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
+                <p className="text-3xl font-extrabold text-amber-600">
+                  {conductorStats && promedio != null ? Number(promedio).toFixed(1) : '—'}
+                </p>
+                <p className="text-xs text-amber-500 font-medium mt-1">Promedio de estrellas</p>
+              </div>
+            </div>
+
+            {/* Distribución de calificaciones */}
+            <SectionCard title="Calificaciones" icon={<FaStar className="text-xs text-amber-400" />} accent="orange">
+              {!conductorStats ? (
+                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+              ) : totalCal === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  {isOwnProfile
+                    ? 'Aún no tienes calificaciones. ¡Completa viajes para recibirlas!'
+                    : 'Este conductor aún no tiene calificaciones.'}
+                </p>
+              ) : (
+                <div className="flex gap-6 items-start">
+                  {/* Número grande */}
+                  <div className="flex flex-col items-center shrink-0">
+                    <p className="text-5xl font-extrabold text-gray-900 leading-none">
+                      {Number(promedio).toFixed(1)}
+                    </p>
+                    <StarRow value={promedio} size="text-base" />
+                    <p className="text-xs text-gray-400 mt-1">
+                      {totalCal} {totalCal === 1 ? 'reseña' : 'reseñas'}
+                    </p>
+                  </div>
+
+                  {/* Barras por estrella */}
+                  <div className="flex-1 space-y-2 pt-1">
+                    {distrib.map(({ star, count }) => (
+                      <StarBar key={star} label={star} count={count} total={totalCal} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Reseñas recientes */}
+            <SectionCard title="Reseñas recientes" icon={<FaCommentAlt className="text-xs" />} accent="violet">
+              {!conductorStats ? (
+                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+              ) : resenas.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  {isOwnProfile ? 'Aún no tienes comentarios escritos.' : 'Sin comentarios por el momento.'}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {resenas.map((r, i) => (
+                    <div key={i} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <StarRow value={r.calificacion} size="text-sm" />
+                        <span className="text-[11px] text-gray-400">{r.fecha}</span>
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed">{r.comentario}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+
+          </div>
+        )}
       </div>
 
-      {/* Modal confirmación eliminar */}
+      {/* ── Modal confirmación eliminar ───────────────────────────────────────── */}
       {showDelete && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center p-4"
@@ -241,8 +407,7 @@ const VerPerfil = () => {
               Esta acción es <span className="font-semibold text-red-600">irreversible</span>.
               {isViewingOther
                 ? ` Se eliminará toda la información de ${nombre || 'este usuario'}.`
-                : ' Se eliminará toda tu información, reservas y datos del sistema.'
-              }
+                : ' Se eliminará toda tu información, reservas y datos del sistema.'}
             </p>
             <div className="flex gap-3">
               <button

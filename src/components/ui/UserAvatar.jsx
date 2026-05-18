@@ -1,4 +1,5 @@
 import React from 'react';
+import { getUserPhotoUrl } from '../../utils';
 
 const GRADIENT = 'bg-gradient-to-br from-blue-600 to-violet-600';
 
@@ -11,9 +12,10 @@ const SIZE = {
 };
 
 const UserAvatar = ({ userData, size = 'md', className = '' }) => {
-  const foto   = userData?.fotoperfil || userData?.fotoPerfil || userData?.Fotoperfil || null;
-  const nombre = userData?.Nombre || userData?.nombre || userData?.name || '?';
-  const inicial = nombre.charAt(0).toUpperCase();
+  const fotoRaw  = userData?.fotoperfil || userData?.fotoPerfil || userData?.Fotoperfil || null;
+  const foto     = fotoRaw ? (getUserPhotoUrl(fotoRaw) || fotoRaw) : null;
+  const nombre   = userData?.Nombre || userData?.nombre || userData?.name || '?';
+  const inicial  = nombre.charAt(0).toUpperCase();
   const sizeClass = SIZE[size] ?? SIZE.md;
 
   if (foto) {
@@ -22,6 +24,7 @@ const UserAvatar = ({ userData, size = 'md', className = '' }) => {
         src={foto}
         alt={nombre}
         className={`${sizeClass} rounded-full object-cover shrink-0 ${className}`}
+        onError={e => { e.currentTarget.style.display = 'none'; e.currentTarget.nextSibling?.style && (e.currentTarget.nextSibling.style.display = 'flex'); }}
       />
     );
   }

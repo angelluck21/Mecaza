@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaUser, FaMapMarkerAlt, FaClock,
-  FaCalendarAlt, FaTrash, FaCarSide, FaTicketAlt, FaCheck,
-  FaWhatsapp, FaStar, FaTimes,
+  FaCalendarAlt, FaTrash, FaCarSide, FaTicketAlt,
+  FaWhatsapp, FaStar, FaTimes, FaFileInvoice, FaRoad,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -15,7 +15,7 @@ import { useToast }      from '../../hooks/useToast';
 import {
   listarCarrosApi, listarReservasApi,
   eliminarReservaApi, guardarMotivoCancelacionApi,
-  completarReservaApi, calificarReservaApi,
+  calificarReservaApi,
 } from '../../services/api';
 import { getCarImageUrl } from '../../utils';
 
@@ -23,12 +23,21 @@ import { getCarImageUrl } from '../../utils';
 
 const STATUS = {
   confirmada:  { label: 'Confirmada',  cls: 'bg-green-100 text-green-700 border-green-200' },
+  en_viaje:    { label: 'En viaje',    cls: 'bg-blue-100 text-blue-700 border-blue-200' },
   pendiente:   { label: 'Pendiente',   cls: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
   rechazada:   { label: 'Rechazada',   cls: 'bg-red-100 text-red-700 border-red-200' },
   cancelada:   { label: 'Cancelada',   cls: 'bg-red-100 text-red-700 border-red-200' },
-  completada:  { label: 'Completada',  cls: 'bg-blue-100 text-blue-700 border-blue-200' },
+  completada:  { label: 'Completada',  cls: 'bg-violet-100 text-violet-700 border-violet-200' },
 };
-const getStatus = (s) => STATUS[s?.toLowerCase()] ?? STATUS.pendiente;
+
+// Si el carro está "En viaje" (id_estados=2) y la reserva es confirmada → mostrar "En viaje"
+const getDisplayStatus = (reservation, carInfo) => {
+  const estado = reservation.estado?.toLowerCase();
+  if (estado === 'confirmada' && parseInt(carInfo?.id_estados) === 2) {
+    return STATUS.en_viaje;
+  }
+  return STATUS[estado] ?? STATUS.pendiente;
+};
 
 const waLink = (tel) => {
   const digits = String(tel ?? '').replace(/\D/g, '');
@@ -47,11 +56,7 @@ const StarRating = ({ value, onChange }) => (
         onClick={() => onChange(n)}
         className="focus:outline-none transition-transform active:scale-90"
       >
-        <FaStar
-          className={`text-3xl transition-colors ${
-            n <= value ? 'text-yellow-400' : 'text-gray-200'
-          }`}
-        />
+        <FaStar className={`text-3xl transition-colors ${n <= value ? 'text-yellow-400' : 'text-gray-200'}`} />
       </button>
     ))}
   </div>
@@ -68,14 +73,13 @@ const MisReservas = () => {
   const [reservationToDelete, setReservationToDelete] = useState(null);
   const [isDeleting,          setIsDeleting]          = useState(false);
   const [motivoCancelacion,   setMotivoCancelacion]   = useState('');
-  const [completandoId,       setCompletandoId]       = useState(null);
 
   // Calificación
-  const [showRatingModal,     setShowRatingModal]     = useState(false);
-  const [ratingReserva,       setRatingReserva]       = useState(null);
-  const [ratingStars,         setRatingStars]         = useState(0);
-  const [ratingComentario,    setRatingComentario]    = useState('');
-  const [isSavingRating,      setIsSavingRating]      = useState(false);
+  const [showRatingModal,  setShowRatingModal]  = useState(false);
+  const [ratingReserva,    setRatingReserva]    = useState(null);
+  const [ratingStars,      setRatingStars]      = useState(0);
+  const [ratingComentario, setRatingComentario] = useState('');
+  const [isSavingRating,   setIsSavingRating]   = useState(false);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -85,24 +89,39 @@ const MisReservas = () => {
     if (!id) return null;
     return cars.find(c =>
       String(c.id_carros) === String(id) ||
-      String(c.id)        === String(id) ||
-      String(c.ID)        === String(id)
+      String(c.id)        === String(id)
     );
   };
 
   const fetchData = async (user) => {
     try {
       const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
-      const rawCars       = Array.isArray(carsResp) ? carsResp : (carsResp.data ?? []);
-      const carsData      = Array.isArray(rawCars)  ? rawCars  : (Array.isArray(rawCars.data) ? rawCars.data : []);
+      const rawCars       = Array.isArray(carsResp)     ? carsResp     : (carsResp.data ?? []);
+      const carsData      = Array.isArray(rawCars)      ? rawCars      : (Array.isArray(rawCars.data) ? rawCars.data : []);
       const reservasArray = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
       setCars(carsData);
+
       const userId = user?.id || user?.ID || user?.id_users;
-      setReservations(
-        userId
-          ? reservasArray.filter(r => (r.id_users || r.id_user || r.user_id) == userId)
-          : []
+      const misReservas = userId
+        ? reservasArray.filter(r => (r.id_users || r.id_user || r.user_id) == userId)
+        : [];
+
+      // Ocultar reservas completadas que ya fueron calificadas
+      const visibles = misReservas.filter(
+        r => !(r.estado?.toLowerCase() === 'completada' && r.calificacion != null)
       );
+      setReservations(visibles);
+
+      // Abrir modal de calificación si hay una completada sin calificar
+      const pendienteRating = misReservas.find(
+        r => r.estado?.toLowerCase() === 'completada' && r.calificacion == null
+      );
+      if (pendienteRating) {
+        setRatingReserva(pendienteRating);
+        setRatingStars(0);
+        setRatingComentario('');
+        setShowRatingModal(true);
+      }
     } catch {
       showToast('Error al cargar las reservas.', 'error');
     } finally {
@@ -122,23 +141,6 @@ const MisReservas = () => {
 
   const openDelete = (r) => { setReservationToDelete(r); setShowDeleteModal(true); };
 
-  const handleCompletar = async (reservation) => {
-    const id = reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID;
-    setCompletandoId(id);
-    try {
-      await completarReservaApi(id);
-      showToast('¡Gracias por viajar con Mecaza!', 'success');
-      await fetchData(userData);
-      // Abrir modal de calificación
-      setRatingReserva({ ...reservation, id_reservarviajes: id });
-      setRatingStars(0);
-      setRatingComentario('');
-      setShowRatingModal(true);
-    } catch {
-      showToast('Error al registrar el viaje completado.', 'error');
-    } finally { setCompletandoId(null); }
-  };
-
   const handleSaveRating = async () => {
     if (ratingStars === 0) { showToast('Selecciona una calificación.', 'error'); return; }
     const id = ratingReserva?.id_reservarviajes || ratingReserva?.id;
@@ -154,7 +156,7 @@ const MisReservas = () => {
   };
 
   const confirmDelete = async () => {
-    const id = reservationToDelete?.id_reservarviajes || reservationToDelete?.id_reservarviaje || reservationToDelete?.id || reservationToDelete?.ID;
+    const id = reservationToDelete?.id_reservarviajes || reservationToDelete?.id_reservarviaje || reservationToDelete?.id;
     if (!id) { showToast('No se pudo identificar la reserva.', 'error'); return; }
     setIsDeleting(true);
     try {
@@ -162,17 +164,17 @@ const MisReservas = () => {
       if (motivoCancelacion.trim()) {
         try { await guardarMotivoCancelacionApi(id, motivoCancelacion.trim(), 'usuario'); } catch { /* no bloqueante */ }
       }
-      showToast('Reserva cancelada exitosamente.', 'success');
+      showToast('Reserva cancelada.', 'success');
       setShowDeleteModal(false);
       setReservationToDelete(null);
       setMotivoCancelacion('');
       await fetchData(userData);
     } catch (err) {
       const s = err.response?.status;
-      if (s === 404)      showToast('Reserva no encontrada.', 'error');
-      else if (s === 401) showToast('No autorizado.', 'error');
+      if (s === 404)        showToast('Reserva no encontrada.', 'error');
+      else if (s === 401)   showToast('No autorizado.', 'error');
       else if (err.request) showToast('Sin conexión al servidor.', 'error');
-      else showToast('Error inesperado.', 'error');
+      else                  showToast('Error inesperado.', 'error');
     } finally { setIsDeleting(false); }
   };
 
@@ -193,7 +195,9 @@ const MisReservas = () => {
             </div>
             <div>
               <h1 className="text-2xl font-extrabold text-white">Mis Reservas</h1>
-              <p className="text-blue-200 text-sm">{reservations.length} reserva{reservations.length !== 1 ? 's' : ''} encontrada{reservations.length !== 1 ? 's' : ''}</p>
+              <p className="text-blue-200 text-sm">
+                {reservations.length} reserva{reservations.length !== 1 ? 's' : ''} encontrada{reservations.length !== 1 ? 's' : ''}
+              </p>
             </div>
           </div>
         </div>
@@ -218,12 +222,14 @@ const MisReservas = () => {
         ) : (
           <div className="space-y-4">
             {reservations.map((reservation, idx) => {
-              const reservaId = reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id || reservation.ID;
-              const carInfo   = getCarInfo(reservation);
-              const status    = getStatus(reservation.estado);
-              const estado    = reservation.estado?.toLowerCase();
-              const yaCalificada = reservation.calificacion != null;
-              const conductorTel = carInfo?.telefono;
+              const reservaId    = reservation.id_reservarviajes || reservation.id_reservarviaje || reservation.id;
+              const carInfo      = getCarInfo(reservation);
+              const estado       = reservation.estado?.toLowerCase();
+              const carEnViaje   = parseInt(carInfo?.id_estados) === 2;
+              const displayStatus = getDisplayStatus(reservation, carInfo);
+              const yaCalificada  = reservation.calificacion != null;
+              const conductorTel  = carInfo?.telefono;
+              const puedeCancel   = estado !== 'completada' && estado !== 'cancelada' && estado !== 'rechazada' && !carEnViaje;
 
               return (
                 <div
@@ -231,7 +237,16 @@ const MisReservas = () => {
                   className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden animate-fade-in-up hover:shadow-lg transition-all"
                   style={{ animationDelay: `${idx * 80}ms` }}
                 >
-                  <div className="h-1 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
+                  {/* Borde superior */}
+                  <div className={`h-1.5 ${carEnViaje ? 'bg-blue-500' : estado === 'completada' ? 'bg-violet-500' : 'bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600'}`} />
+
+                  {/* Banner "En viaje" */}
+                  {carEnViaje && (
+                    <div className="bg-blue-50 border-b border-blue-100 px-5 py-2 flex items-center gap-2">
+                      <FaRoad className="text-blue-500 text-xs animate-pulse" />
+                      <p className="text-blue-700 text-xs font-semibold">Tu viaje está en curso ahora mismo</p>
+                    </div>
+                  )}
 
                   <div className="p-5">
                     {/* Header reserva */}
@@ -249,19 +264,19 @@ const MisReservas = () => {
                           </p>
                         </div>
                       </div>
-                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${status.cls}`}>
-                        {status.label}
+                      <span className={`text-xs font-bold px-3 py-1 rounded-full border ${displayStatus.cls}`}>
+                        {displayStatus.label}
                       </span>
                     </div>
 
                     {/* Contenido */}
                     <div className="grid sm:grid-cols-3 gap-4">
-                      {/* Imagen vehículo */}
+                      {/* Imagen */}
                       <div className="sm:col-span-1">
                         <div className="rounded-xl overflow-hidden bg-gray-50 h-28">
                           {carInfo
                             ? <CarImage
-                                imageUrl={getCarImageUrl(carInfo.imagencarro || carInfo.imagen_carro || carInfo.imagenCarro)}
+                                imageUrl={getCarImageUrl(carInfo.imagencarro)}
                                 conductorName={carInfo.conductor}
                                 className="w-full h-full object-cover"
                                 fallbackClassName="w-full h-full flex items-center justify-center bg-gradient-to-br from-blue-100 to-violet-100"
@@ -316,7 +331,7 @@ const MisReservas = () => {
 
                         {/* Ubicación de recogida */}
                         {(reservation.ubicacion || reservation.Ubicacion) && (
-                          <div className="flex items-start gap-1.5 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2 mt-1">
+                          <div className="flex items-start gap-1.5 bg-blue-50 border border-blue-100 rounded-xl px-3 py-2">
                             <FaMapMarkerAlt className="text-blue-400 text-xs mt-0.5 shrink-0" />
                             <div>
                               <p className="text-[10px] text-blue-400 font-semibold uppercase tracking-wide">Tu punto de recogida</p>
@@ -333,7 +348,7 @@ const MisReservas = () => {
                                 <FaStar key={n} className={`text-xs ${n <= reservation.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
                               ))}
                             </div>
-                            <p className="text-xs text-yellow-700 font-medium">Tu calificación</p>
+                            <p className="text-xs text-yellow-700 font-medium">Tu calificación del viaje</p>
                           </div>
                         )}
                       </div>
@@ -342,8 +357,8 @@ const MisReservas = () => {
                     {/* Acciones */}
                     <div className="mt-4 pt-4 border-t border-gray-50 flex gap-2 flex-wrap">
 
-                      {/* WhatsApp al conductor (solo si confirmada y hay teléfono) */}
-                      {estado === 'confirmada' && conductorTel && (
+                      {/* WhatsApp al conductor (reservas confirmadas o en viaje) */}
+                      {(estado === 'confirmada' || carEnViaje) && conductorTel && (
                         <a
                           href={waLink(conductorTel)}
                           target="_blank"
@@ -354,21 +369,17 @@ const MisReservas = () => {
                         </a>
                       )}
 
-                      {/* Terminé mi viaje */}
-                      {estado === 'confirmada' && (
+                      {/* Ver factura (viaje completado) */}
+                      {estado === 'completada' && (
                         <button
-                          onClick={() => handleCompletar(reservation)}
-                          disabled={completandoId === reservaId}
-                          className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-semibold rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
+                          onClick={() => navigate('/mis-facturas')}
+                          className="flex items-center gap-2 px-4 py-2 bg-violet-600 text-white text-sm font-semibold rounded-xl hover:bg-violet-700 transition-all active:scale-95"
                         >
-                          {completandoId === reservaId
-                            ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                            : <FaCheck className="text-xs" />}
-                          Terminé mi viaje
+                          <FaFileInvoice className="text-xs" /> Ver factura
                         </button>
                       )}
 
-                      {/* Calificar (solo completadas sin calificación) */}
+                      {/* Calificar (completada sin calificación) */}
                       {estado === 'completada' && !yaCalificada && (
                         <button
                           onClick={() => {
@@ -383,8 +394,8 @@ const MisReservas = () => {
                         </button>
                       )}
 
-                      {/* Cancelar reserva */}
-                      {estado !== 'completada' && (
+                      {/* Cancelar (solo si no está en viaje, completada, cancelada o rechazada) */}
+                      {puedeCancel && (
                         <button
                           onClick={() => openDelete(reservation)}
                           className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
@@ -404,18 +415,16 @@ const MisReservas = () => {
       {/* ── Modal: Cancelar reserva ── */}
       {showDeleteModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
           style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
         >
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-scale-in text-center overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl text-center overflow-hidden">
             <div className="bg-gradient-to-r from-red-500 to-red-600 px-6 py-5">
               <div className="w-12 h-12 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-3">
                 <FaTrash className="text-white text-xl" />
               </div>
               <h3 className="text-lg font-bold text-white">Cancelar reserva</h3>
-              <p className="text-red-100 text-sm mt-1">
-                Reserva #{reservationToDelete?.id_reservarviajes || reservationToDelete?.id}
-              </p>
+              <p className="text-red-100 text-sm mt-1">Reserva #{reservationToDelete?.id_reservarviajes || reservationToDelete?.id}</p>
             </div>
             <div className="p-6">
               <p className="text-sm text-gray-500 mb-5">
@@ -452,26 +461,21 @@ const MisReservas = () => {
       {/* ── Modal: Calificación ── */}
       {showRatingModal && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-          style={{ background: 'rgba(15,10,40,0.80)', backdropFilter: 'blur(6px)' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ background: 'rgba(15,10,40,0.85)', backdropFilter: 'blur(6px)' }}
           onClick={(e) => e.target === e.currentTarget && setShowRatingModal(false)}
         >
-          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl animate-scale-in overflow-hidden">
+          <div className="bg-white rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
             <div className="bg-gradient-to-r from-yellow-400 to-orange-400 px-6 py-5 flex items-center justify-between">
               <div>
                 <h3 className="text-lg font-bold text-white">¿Cómo estuvo el viaje?</h3>
                 <p className="text-yellow-100 text-xs mt-0.5">Tu opinión ayuda a mejorar Mecaza</p>
               </div>
-              <button
-                onClick={() => setShowRatingModal(false)}
-                className="p-1 hover:bg-white/20 rounded-lg transition-all"
-              >
+              <button onClick={() => setShowRatingModal(false)} className="p-1 hover:bg-white/20 rounded-lg transition-all">
                 <FaTimes className="text-white" />
               </button>
             </div>
             <div className="p-6 space-y-5">
-
-              {/* Estrellas */}
               <div className="text-center">
                 <p className="text-sm text-gray-500 mb-3">Toca las estrellas para calificar</p>
                 <StarRating value={ratingStars} onChange={setRatingStars} />
@@ -481,8 +485,6 @@ const MisReservas = () => {
                   </p>
                 )}
               </div>
-
-              {/* Comentario */}
               <textarea
                 value={ratingComentario}
                 onChange={(e) => setRatingComentario(e.target.value)}
@@ -490,8 +492,6 @@ const MisReservas = () => {
                 className="w-full p-3 border border-gray-200 rounded-xl text-sm text-gray-700 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-yellow-400 resize-none"
                 rows="3"
               />
-
-              {/* Botones */}
               <div className="flex gap-3">
                 <button
                   onClick={() => setShowRatingModal(false)}
@@ -508,6 +508,14 @@ const MisReservas = () => {
                   {isSavingRating ? 'Guardando...' : 'Enviar'}
                 </button>
               </div>
+
+              {/* Acceso directo a factura */}
+              <button
+                onClick={() => { setShowRatingModal(false); navigate('/mis-facturas'); }}
+                className="w-full flex items-center justify-center gap-2 text-xs text-violet-600 hover:text-violet-800 transition-colors"
+              >
+                <FaFileInvoice /> Ver mi factura del viaje
+              </button>
             </div>
           </div>
         </div>

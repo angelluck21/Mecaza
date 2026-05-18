@@ -144,3 +144,8 @@ export const listarFacturasApi = () =>
 
 export const descargarFacturaApi = (id) =>
   axios.get(ENDPOINTS.DESCARGAR_FACTURA(id), { ...authHeaders(), responseType: 'blob' });
+
+// ── Perfil conductor (público) ───────────────────────────────────────────────
+
+export const getConductorPerfilApi = (idUsers) =>
+  fetch(ENDPOINTS.CONDUCTOR_PERFIL(idUsers)).then(r => r.json());

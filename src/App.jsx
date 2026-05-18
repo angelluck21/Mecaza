@@ -21,9 +21,10 @@ import IndexAdmin    from './features/admin/indexAdmin';
 import ListaUsuarios from './features/admin/ListaUsuarios';
 
 // Pages
-import Home          from './pages/Home';
-import VerDetalles   from './pages/VerDetalles';
-import RegConductor  from './pages/RegConductor';
+import Home             from './pages/Home';
+import VerDetalles      from './pages/VerDetalles';
+import RegConductor     from './pages/RegConductor';
+import PerfilConductor  from './pages/PerfilConductor';
 
 function App() {
   return (
@@ -47,7 +48,8 @@ function App() {
         <Route path="/editar-usuario/:userId" element={<AjustesPerfil />} />
 
         {/* Detalles de viaje */}
-        <Route path="/ver-detalles/:carId" element={<VerDetalles />} />
+        <Route path="/ver-detalles/:carId"             element={<VerDetalles />} />
+        <Route path="/conductor-perfil/:conductorId"   element={<PerfilConductor />} />
 
         {/* Conductor */}
         <Route path="/conductor"               element={<Conductor />} />

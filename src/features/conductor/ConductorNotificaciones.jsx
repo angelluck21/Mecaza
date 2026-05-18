@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaBell, FaCheck, FaTimes, FaMapMarkerAlt,
-  FaCar, FaCalendarAlt, FaExternalLinkAlt, FaUser,
+  FaCar, FaCalendarAlt, FaExternalLinkAlt, FaUser, FaPhone,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -203,6 +203,24 @@ const ConductorNotificaciones = () => {
                           <div>
                             <p className="text-xs text-gray-400 font-medium mb-0.5">Pasajero</p>
                             <p className="text-gray-700">{reserva.nombre}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Teléfono pasajero */}
+                      {reserva.tel && (
+                        <div className="flex items-start gap-2 text-sm">
+                          <FaPhone className="text-blue-400 mt-0.5 shrink-0" />
+                          <div>
+                            <p className="text-xs text-gray-400 font-medium mb-0.5">Teléfono</p>
+                            <a
+                              href={`https://wa.me/57${String(reserva.tel).replace(/\D/g,'')}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-blue-600 hover:underline font-medium"
+                            >
+                              {reserva.tel}
+                            </a>
                           </div>
                         </div>
                       )}
