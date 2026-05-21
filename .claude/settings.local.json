@@ -14,7 +14,18 @@
       "Bash(Select-Object FullName)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\MecazaBack\" -Directory)",
       "Bash(Select-Object Name)",
-      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\Mecaza\\\\src\" -Recurse -Include \"*.jsx\", \"*.js\")"
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\Mecaza\\\\src\" -Recurse -Include \"*.jsx\", \"*.js\")",
+      "Bash(ls \"c:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\\")",
+      "Read(//c/Users/dsfwg/**)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\MecazaBack\\\\database\\\\migrations\" -Filter \"*.php\")",
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(Remove-Item \"C:\\\\Users\\\\dsfwg\\\\DIRECTORIOS SOFTWARE\\\\MecazaBack\\\\database\\\\migrations\\\\2026_05_18_000001_redesign_precioviajes_table.php\")",
+      "Bash(xargs grep -l \"Ruta\\\\|ruta\\\\|origen\\\\|destino\")",
+      "Bash(xargs grep -l \"DETALLES DEL VIAJE\\\\|detalles del viaje\")",
+      "Bash(cd \"/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza\" && grep -n \"TERMINAR_VIAJE\\\\|HISTORIAL\" src/constants/api.js)",
+      "Read(//c/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza/src/constants/**)",
+      "Bash(cd \"/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza\" && grep -n \"iniciarViajeApi\\\\|terminarViajeApi\" src/services/api.js)",
+      "Read(//c/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza/src/services/**)"
     ]
   }
 }

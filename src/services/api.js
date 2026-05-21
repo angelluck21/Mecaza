@@ -54,6 +54,9 @@ export const actualizarReservaApi = (id, data) =>
 export const confirmarReservaApi = (id, estado) =>
   axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado }, authHeaders());
 
+export const historialConductorApi = () =>
+  axios.get(ENDPOINTS.HISTORIAL_CONDUCTOR, authHeaders());
+
 export const iniciarViajeApi = (id) =>
   axios.post(ENDPOINTS.INICIAR_VIAJE(id), {}, authHeaders());
 
@@ -112,10 +115,19 @@ export const listarPreciosApi = () =>
 export const agregarPrecioApi = (data) =>
   axios.post(ENDPOINTS.AGREGAR_PRECIO, data, authHeaders());
 
+export const eliminarPrecioApi = (id) =>
+  axios.delete(ENDPOINTS.ELIMINAR_PRECIO(id), authHeaders());
+
+export const actualizarPrecioApi = (id, data) =>
+  axios.put(ENDPOINTS.ACTUALIZAR_PRECIO(id), data, authHeaders());
+
 // ── Estados ──────────────────────────────────────────────────────────────────
 
 export const agregarEstadoApi = (data) =>
   axios.post(ENDPOINTS.AGREGAR_ESTADO, data, authHeaders());
+
+export const eliminarEstadoApi = (id) =>
+  axios.delete(ENDPOINTS.ELIMINAR_ESTADO(id), authHeaders());
 
 // ── Motivos de cancelación ───────────────────────────────────────────────────
 

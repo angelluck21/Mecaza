@@ -3,6 +3,7 @@ export const ESTADOS_CARRO = {
   2: { label: 'En viaje',            color: 'bg-yellow-100 text-yellow-800' },
   3: { label: 'En mantenimiento',    color: 'bg-orange-100 text-orange-800' },
   4: { label: 'Fuera de servicio',   color: 'bg-red-100 text-red-800' },
+  5: { label: 'Viaje terminado',     color: 'bg-gray-100 text-gray-600' },
 };
 
 export const ROLES = {

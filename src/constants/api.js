@@ -23,8 +23,9 @@ export const ENDPOINTS = {
   CONFIRMAR_RESERVA:  (id) => `${API_BASE_URL}/confirmarreserva/${id}`,
 
   // Estados
-  LISTAR_ESTADOS: `${API_BASE_URL}/listarestados`,
-  AGREGAR_ESTADO: `${API_BASE_URL}/agregarestados`,
+  LISTAR_ESTADOS:  `${API_BASE_URL}/listarestados`,
+  AGREGAR_ESTADO:  `${API_BASE_URL}/agregarestados`,
+  ELIMINAR_ESTADO: (id) => `${API_BASE_URL}/eliminarestados/${id}`,
 
   // Usuarios
   LISTAR_USUARIOS: `${API_BASE_URL}/listarusuarios`,
@@ -33,8 +34,10 @@ export const ENDPOINTS = {
   ELIMINAR_USUARIO: (id) => `${API_BASE_URL}/eliminarusuario/${id}`,
 
   // Precios
-  LISTAR_PRECIOS: `${API_BASE_URL}/listarprecios`,
-  AGREGAR_PRECIO: `${API_BASE_URL}/agregarprecio`,
+  LISTAR_PRECIOS:    `${API_BASE_URL}/listarprecios`,
+  AGREGAR_PRECIO:    `${API_BASE_URL}/agregarprecio`,
+  ELIMINAR_PRECIO:   (id) => `${API_BASE_URL}/eliminarprecio/${id}`,
+  ACTUALIZAR_PRECIO: (id) => `${API_BASE_URL}/actualizarprecio/${id}`,
 
   // Invitaciones conductor
   INVITAR_CONDUCTOR:   `${API_BASE_URL}/invitar-conductor`,
@@ -47,8 +50,9 @@ export const ENDPOINTS = {
   LISTAR_MOTIVOS: `${API_BASE_URL}/listarMotivos`,
 
   // Viaje
-  INICIAR_VIAJE:    (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
-  TERMINAR_VIAJE:   (id) => `${API_BASE_URL}/terminarviaje/${id}`,
+  INICIAR_VIAJE:       (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
+  TERMINAR_VIAJE:      (id) => `${API_BASE_URL}/terminarviaje/${id}`,
+  HISTORIAL_CONDUCTOR: `${API_BASE_URL}/historial-conductor`,
   COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
   CALIFICAR_RESERVA:   (id) => `${API_BASE_URL}/calificarreserva/${id}`,
   CONDUCTOR_PERFIL:    (id) => `${API_BASE_URL}/conductor-perfil/${id}`,

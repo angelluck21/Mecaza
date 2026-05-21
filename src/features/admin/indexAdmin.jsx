@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaPlus, FaUsers, FaCog, FaSync, FaTicketAlt,
   FaTrash, FaCheck, FaTimes, FaMapMarkerAlt, FaClock,
-  FaCalendarAlt, FaPhone, FaUser, FaEnvelope, FaFileInvoice,
+  FaCalendarAlt, FaPhone, FaUser, FaEnvelope, FaFileInvoice, FaEdit,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -19,8 +19,9 @@ import {
   listarCarrosApi, listarReservasApi, listarEstadosApi,
   listarUsuariosApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, eliminarReservaApi,
-  agregarPrecioApi, agregarEstadoApi,
-  invitarConductorApi, listarFacturasApi,
+  agregarPrecioApi, eliminarPrecioApi, actualizarPrecioApi,
+  agregarEstadoApi, eliminarEstadoApi,
+  invitarConductorApi, listarFacturasApi, listarPreciosApi,
 } from '../../services/api';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -30,12 +31,6 @@ const ESTADOS_LABELS = [
   { id: 2, label: 'En viaje',            color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
   { id: 3, label: 'En mantenimiento',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
   { id: 4, label: 'Fuera de servicio',   color: 'bg-red-100 text-red-700 border-red-200' },
-];
-
-const RUTAS = [
-  { key: 'ZaraMede',  label: 'Zaragoza → Medellín' },
-  { key: 'ZaraCauca', label: 'Zaragoza → Caucasia' },
-  { key: 'CaucaMede', label: 'Caucasia → Medellín' },
 ];
 
 // ── Sub-componentes ────────────────────────────────────────────────────────────
@@ -95,8 +90,17 @@ const IndexAdmin = () => {
   const [showPreciosModal, setShowPreciosModal] = useState(false);
   const [showEstadoModal,  setShowEstadoModal]  = useState(false);
   const [isSaving,         setIsSaving]         = useState(false);
-  const [precios,          setPrecios]          = useState({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' });
-  const [estadoSel,        setEstadoSel]        = useState('');
+  const [nuevoPrecio,      setNuevoPrecio]      = useState({ Origen: '', Destino: '', Precio: '' });
+  const [preciosList,      setPreciosList]      = useState([]);
+  const [loadingPrecios,   setLoadingPrecios]   = useState(false);
+  const [deletingPrecioId,  setDeletingPrecioId]  = useState(null);
+  const [editingPrecioId,   setEditingPrecioId]   = useState(null);
+  const [editingPrecioForm, setEditingPrecioForm] = useState({ Origen: '', Destino: '', Precio: '' });
+  const [savingPrecioId,    setSavingPrecioId]    = useState(null);
+  const [estadoSel,         setEstadoSel]         = useState('');
+  const [estadosConfigList,  setEstadosConfigList]  = useState([]);
+  const [loadingEstadosConf, setLoadingEstadosConf] = useState(false);
+  const [deletingEstadoId,   setDeletingEstadoId]   = useState(null);
 
   // Modal carros
   const [showCarrosModal, setShowCarrosModal] = useState(false);
@@ -162,24 +166,77 @@ const IndexAdmin = () => {
   };
 
   // ── Precios ───────────────────────────────────────────────────────────────
-  const handleSavePrecios = async (e) => {
+  const fetchPrecios = async () => {
+    setLoadingPrecios(true);
+    try {
+      const { data } = await listarPreciosApi();
+      setPreciosList(Array.isArray(data.data) ? data.data : []);
+    } catch { showToast('Error al cargar rutas.', 'error'); }
+    finally { setLoadingPrecios(false); }
+  };
+
+  const handleSaveNuevoPrecio = async (e) => {
     e.preventDefault();
-    if (!precios.ZaraMede || !precios.ZaraCauca || !precios.CaucaMede) {
-      showToast('Completa todos los campos de precio.', 'error'); return;
+    if (!nuevoPrecio.Origen || !nuevoPrecio.Destino || !nuevoPrecio.Precio) {
+      showToast('Completa todos los campos.', 'error'); return;
     }
     setIsSaving(true);
     try {
       await agregarPrecioApi({
-        ZaraMede:  parseFloat(precios.ZaraMede),
-        ZaraCauca: parseFloat(precios.ZaraCauca),
-        CaucaMede: parseFloat(precios.CaucaMede),
+        Origen:  nuevoPrecio.Origen.trim(),
+        Destino: nuevoPrecio.Destino.trim(),
+        Precio:  parseFloat(nuevoPrecio.Precio),
       });
-      showToast('Precios guardados correctamente.', 'success');
-      setPrecios({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' });
-      setShowPreciosModal(false);
+      showToast('Ruta agregada correctamente.', 'success');
+      setNuevoPrecio({ Origen: '', Destino: '', Precio: '' });
+      await fetchPrecios();
     } catch (err) {
-      showToast(err.response?.data?.message || 'Error al guardar precios.', 'error');
+      showToast(err.response?.data?.message || 'Error al guardar la ruta.', 'error');
     } finally { setIsSaving(false); }
+  };
+
+  const handleEliminarPrecio = async (id) => {
+    setDeletingPrecioId(id);
+    try {
+      await eliminarPrecioApi(id);
+      showToast('Ruta eliminada.', 'success');
+      await fetchPrecios();
+    } catch { showToast('Error al eliminar la ruta.', 'error'); }
+    finally { setDeletingPrecioId(null); }
+  };
+
+  const handleUpdatePrecio = async (id) => {
+    setSavingPrecioId(id);
+    try {
+      await actualizarPrecioApi(id, {
+        Origen:  editingPrecioForm.Origen.trim(),
+        Destino: editingPrecioForm.Destino.trim(),
+        Precio:  parseFloat(editingPrecioForm.Precio),
+      });
+      showToast('Ruta actualizada.', 'success');
+      setEditingPrecioId(null);
+      await fetchPrecios();
+    } catch { showToast('Error al actualizar la ruta.', 'error'); }
+    finally { setSavingPrecioId(null); }
+  };
+
+  const fetchEstadosConfig = async () => {
+    setLoadingEstadosConf(true);
+    try {
+      const { data } = await listarEstadosApi();
+      setEstadosConfigList(Array.isArray(data.data) ? data.data : []);
+    } catch { showToast('Error al cargar estados.', 'error'); }
+    finally { setLoadingEstadosConf(false); }
+  };
+
+  const handleEliminarEstado = async (id) => {
+    setDeletingEstadoId(id);
+    try {
+      await eliminarEstadoApi(id);
+      showToast('Estado eliminado.', 'success');
+      await fetchEstadosConfig();
+    } catch { showToast('Error al eliminar el estado.', 'error'); }
+    finally { setDeletingEstadoId(null); }
   };
 
   // ── Estados ───────────────────────────────────────────────────────────────
@@ -343,17 +400,17 @@ const IndexAdmin = () => {
               icon={<FaCar />}
               title="Estado del viaje"
               desc="Configura los estados disponibles para los viajes del sistema."
-              btnLabel="Agregar estado"
+              btnLabel="Gestionar estados"
               btnColor="green"
-              onClick={() => setShowEstadoModal(true)}
+              onClick={() => { setShowEstadoModal(true); fetchEstadosConfig(); }}
             />
             <ActionCard
               icon={<FaTicketAlt />}
               title="Precios de rutas"
-              desc="Gestiona los precios por ruta: Zaragoza, Caucasia y Medellín."
-              btnLabel="Agregar precios"
+              desc="Gestiona las rutas y precios disponibles para los conductores."
+              btnLabel="Gestionar rutas"
               btnColor="blue"
-              onClick={() => setShowPreciosModal(true)}
+              onClick={() => { setShowPreciosModal(true); fetchPrecios(); }}
             />
           </div>
         </SectionCard>
@@ -405,69 +462,237 @@ const IndexAdmin = () => {
         </SectionCard>
       </div>
 
-      {/* ── Modal: Agregar Estado ── */}
+      {/* ── Modal: Gestionar Estados ── */}
       {showEstadoModal && (
-        <Modal title="Agregar Estado de Viaje" onClose={() => { setShowEstadoModal(false); setEstadoSel(''); }}>
-          <form onSubmit={handleSaveEstado} className="space-y-4">
-            <p className="text-sm text-gray-500">Selecciona el estado que deseas configurar en el sistema.</p>
-            <div className="grid grid-cols-1 gap-2">
-              {ESTADOS_LABELS.map(e => (
-                <label
-                  key={e.id}
-                  className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                    estadoSel == e.id ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-300'
-                  }`}
-                >
-                  <input type="radio" name="estado" value={e.id} checked={estadoSel == e.id} onChange={ev => setEstadoSel(ev.target.value)} className="sr-only" />
-                  <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${e.color}`}>{e.label}</span>
-                </label>
-              ))}
+        <Modal title="Gestionar Estados de Viaje" maxWidth="max-w-2xl" onClose={() => { setShowEstadoModal(false); setEstadoSel(''); }}>
+          <div className="grid grid-cols-2 gap-6">
+
+            {/* Izquierda: agregar */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Agregar estado</p>
+              <form onSubmit={handleSaveEstado} className="space-y-2">
+                {ESTADOS_LABELS.map(e => (
+                  <label
+                    key={e.id}
+                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                      estadoSel == e.id ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-300'
+                    }`}
+                  >
+                    <input type="radio" name="estado" value={e.id} checked={estadoSel == e.id} onChange={ev => setEstadoSel(ev.target.value)} className="sr-only" />
+                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${e.color}`}>{e.label}</span>
+                  </label>
+                ))}
+                <div className="flex gap-2 pt-2">
+                  <button type="submit" disabled={isSaving || !estadoSel}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold rounded-xl disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                    {isSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</> : <><FaPlus className="text-xs" /> Agregar</>}
+                  </button>
+                  <button type="button" onClick={() => setShowEstadoModal(false)}
+                    className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
+                    Cerrar
+                  </button>
+                </div>
+              </form>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={isSaving || !estadoSel}
-                className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl disabled:opacity-50 transition-all">
-                {isSaving ? 'Guardando...' : 'Guardar estado'}
-              </button>
-              <button type="button" onClick={() => setShowEstadoModal(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
-                Cancelar
-              </button>
+
+            {/* Derecha: lista */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Estados registrados</p>
+              {loadingEstadosConf ? (
+                <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
+                  <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
+                  Cargando...
+                </div>
+              ) : estadosConfigList.length === 0 ? (
+                <p className="text-sm text-gray-400 py-3 text-center">Sin estados registrados.</p>
+              ) : (
+                <div className="space-y-2">
+                  {estadosConfigList.map(est => {
+                    const id  = est.id_estados || est.id;
+                    const lbl = est.estados || est.nombre || `Estado ${id}`;
+                    const info = ESTADOS_LABELS.find(e => e.label.toLowerCase() === lbl.toLowerCase());
+                    const deleting = deletingEstadoId === id;
+                    return (
+                      <div key={id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
+                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${info?.color ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
+                          {lbl}
+                        </span>
+                        <button
+                          onClick={() => handleEliminarEstado(id)}
+                          disabled={deleting}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
+                          title="Eliminar estado"
+                        >
+                          {deleting
+                            ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                            : <FaTrash className="text-xs" />}
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-          </form>
+          </div>
         </Modal>
       )}
 
-      {/* ── Modal: Agregar Precios ── */}
+      {/* ── Modal: Gestionar Rutas y Precios ── */}
       {showPreciosModal && (
-        <Modal title="Agregar Precios de Rutas" onClose={() => { setShowPreciosModal(false); setPrecios({ ZaraMede: '', ZaraCauca: '', CaucaMede: '' }); }}>
-          <form onSubmit={handleSavePrecios} className="space-y-4">
-            <p className="text-sm text-gray-500">Configura los precios por ruta en pesos colombianos.</p>
-            {RUTAS.map(({ key, label }) => (
-              <div key={key}>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">{label}</label>
-                <div className="relative">
-                  <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-medium">$</span>
+        <Modal title="Gestionar Rutas y Precios" maxWidth="max-w-3xl" onClose={() => { setShowPreciosModal(false); setNuevoPrecio({ Origen: '', Destino: '', Precio: '' }); setEditingPrecioId(null); }}>
+          <div className="grid grid-cols-2 gap-6">
+
+            {/* Izquierda: agregar */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Agregar nueva ruta</p>
+              <form onSubmit={handleSaveNuevoPrecio} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Origen</label>
                   <input
-                    type="number" min="0" step="0.01" required
-                    value={precios[key]}
-                    onChange={e => setPrecios(p => ({ ...p, [key]: e.target.value }))}
-                    placeholder="0.00"
-                    className="w-full pl-7 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    type="text" required
+                    value={nuevoPrecio.Origen}
+                    onChange={e => setNuevoPrecio(p => ({ ...p, Origen: e.target.value }))}
+                    placeholder="Ej. Zaragoza"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
                   />
                 </div>
-              </div>
-            ))}
-            <div className="flex gap-3 pt-2">
-              <button type="submit" disabled={isSaving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl disabled:opacity-50 transition-all">
-                {isSaving ? 'Guardando...' : 'Guardar precios'}
-              </button>
-              <button type="button" onClick={() => setShowPreciosModal(false)}
-                className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
-                Cancelar
-              </button>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Destino</label>
+                  <input
+                    type="text" required
+                    value={nuevoPrecio.Destino}
+                    onChange={e => setNuevoPrecio(p => ({ ...p, Destino: e.target.value }))}
+                    placeholder="Ej. Medellín"
+                    className="w-full px-3 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Precio (COP)</label>
+                  <div className="relative">
+                    <span className="absolute left-3 top-2.5 text-gray-400 text-sm font-medium">$</span>
+                    <input
+                      type="number" min="0" step="0.01" required
+                      value={nuevoPrecio.Precio}
+                      onChange={e => setNuevoPrecio(p => ({ ...p, Precio: e.target.value }))}
+                      placeholder="0.00"
+                      className="w-full pl-7 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                    />
+                  </div>
+                </div>
+                <div className="flex gap-2 pt-1">
+                  <button type="submit" disabled={isSaving}
+                    className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl disabled:opacity-50 transition-all flex items-center justify-center gap-2">
+                    {isSaving
+                      ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</>
+                      : <><FaPlus className="text-xs" /> Agregar ruta</>}
+                  </button>
+                  <button type="button" onClick={() => setShowPreciosModal(false)}
+                    className="px-3 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
+                    Cerrar
+                  </button>
+                </div>
+              </form>
             </div>
-          </form>
+
+            {/* Derecha: lista con edición */}
+            <div>
+              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Rutas registradas</p>
+              {loadingPrecios ? (
+                <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
+                  <div className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin" />
+                  Cargando...
+                </div>
+              ) : preciosList.length === 0 ? (
+                <p className="text-sm text-gray-400 py-3 text-center">Sin rutas registradas aún.</p>
+              ) : (
+                <div className="space-y-2">
+                  {preciosList.map(ruta => {
+                    const id       = ruta.id_precioviajes || ruta.id;
+                    const deleting = deletingPrecioId === id;
+                    const editing  = editingPrecioId  === id;
+                    const saving   = savingPrecioId   === id;
+
+                    return (
+                      <div key={id} className="p-3 bg-gray-50 rounded-xl border border-gray-100 space-y-2">
+                        {editing ? (
+                          <>
+                            <input
+                              value={editingPrecioForm.Origen}
+                              onChange={e => setEditingPrecioForm(p => ({ ...p, Origen: e.target.value }))}
+                              placeholder="Origen"
+                              className="w-full px-2.5 py-1.5 border border-violet-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                            />
+                            <input
+                              value={editingPrecioForm.Destino}
+                              onChange={e => setEditingPrecioForm(p => ({ ...p, Destino: e.target.value }))}
+                              placeholder="Destino"
+                              className="w-full px-2.5 py-1.5 border border-violet-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                            />
+                            <div className="relative">
+                              <span className="absolute left-2.5 top-1.5 text-gray-400 text-sm">$</span>
+                              <input
+                                type="number" min="0" step="0.01"
+                                value={editingPrecioForm.Precio}
+                                onChange={e => setEditingPrecioForm(p => ({ ...p, Precio: e.target.value }))}
+                                placeholder="Precio"
+                                className="w-full pl-6 pr-3 py-1.5 border border-violet-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-violet-400"
+                              />
+                            </div>
+                            <div className="flex gap-2">
+                              <button
+                                onClick={() => handleUpdatePrecio(id)}
+                                disabled={saving}
+                                className="flex-1 py-1.5 bg-violet-600 text-white text-xs font-bold rounded-lg hover:bg-violet-700 transition-all disabled:opacity-50 flex items-center justify-center gap-1"
+                              >
+                                {saving ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck className="text-[10px]" />}
+                                Guardar
+                              </button>
+                              <button
+                                onClick={() => setEditingPrecioId(null)}
+                                className="px-3 py-1.5 bg-gray-200 text-gray-600 text-xs font-bold rounded-lg hover:bg-gray-300 transition-all"
+                              >
+                                Cancelar
+                              </button>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="flex items-center justify-between gap-2">
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm font-semibold text-gray-800 truncate">
+                                {ruta.origen} <span className="text-gray-400">→</span> {ruta.destino}
+                              </p>
+                              <p className="text-xs text-violet-600 font-bold">
+                                ${Number(ruta.precio).toLocaleString('es-CO')}
+                              </p>
+                            </div>
+                            <div className="flex gap-1 shrink-0">
+                              <button
+                                onClick={() => { setEditingPrecioId(id); setEditingPrecioForm({ Origen: ruta.origen, Destino: ruta.destino, Precio: ruta.precio }); }}
+                                className="p-1.5 text-violet-500 hover:text-violet-700 hover:bg-violet-50 rounded-lg transition-all"
+                                title="Editar ruta"
+                              >
+                                <FaEdit className="text-xs" />
+                              </button>
+                              <button
+                                onClick={() => handleEliminarPrecio(id)}
+                                disabled={deleting}
+                                className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
+                                title="Eliminar ruta"
+                              >
+                                {deleting
+                                  ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
+                                  : <FaTrash className="text-xs" />}
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </div>
         </Modal>
       )}
 
@@ -505,9 +730,9 @@ const IndexAdmin = () => {
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600">
                       <span className="flex items-center gap-1">
                         <FaMapMarkerAlt className="text-violet-400 shrink-0" />
-                        {car.origen || car.Origen
-                          ? `${car.origen || car.Origen} → ${car.destino || '—'}`
-                          : (car.destino || '—')}
+                        {car.precioviaje
+                          ? `${car.precioviaje.origen} → ${car.precioviaje.destino}`
+                          : '—'}
                       </span>
                       <span className="flex items-center gap-1"><FaClock className="text-violet-400 shrink-0" />{car.horasalida || '—'}</span>
                       <span className="flex items-center gap-1"><FaCalendarAlt className="text-violet-400 shrink-0" />{formatFecha(car.fecha)}</span>

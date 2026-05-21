@@ -1,5 +1,6 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import GlobalRatingCheck from './components/GlobalRatingCheck';
 
 // Auth
 import Login    from './features/auth/Login';
@@ -29,6 +30,7 @@ import PerfilConductor  from './pages/PerfilConductor';
 function App() {
   return (
     <BrowserRouter>
+      <GlobalRatingCheck />
       <Routes>
         {/* Públicas */}
         <Route path="/"       element={<Home />} />

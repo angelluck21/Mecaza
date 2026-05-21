@@ -68,6 +68,7 @@ const MisReservas = () => {
   const [userData,            setUserData]            = useState(null);
   const [isLoading,           setIsLoading]           = useState(true);
   const [reservations,        setReservations]        = useState([]);
+  const [historial,           setHistorial]           = useState([]);
   const [cars,                setCars]                = useState([]);
   const [showDeleteModal,     setShowDeleteModal]     = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState(null);
@@ -106,7 +107,7 @@ const MisReservas = () => {
         ? reservasArray.filter(r => (r.id_users || r.id_user || r.user_id) == userId)
         : [];
 
-      // Ocultar: rechazadas, canceladas, y completadas ya calificadas
+      // Activas: excluir rechazadas, canceladas y completadas calificadas
       const visibles = misReservas.filter(r => {
         const estado = r.estado?.toLowerCase();
         if (estado === 'rechazada' || estado === 'cancelada') return false;
@@ -114,6 +115,15 @@ const MisReservas = () => {
         return true;
       });
       setReservations(visibles);
+
+      // Historial: rechazadas, canceladas y completadas calificadas
+      const hist = misReservas.filter(r => {
+        const estado = r.estado?.toLowerCase();
+        if (estado === 'rechazada' || estado === 'cancelada') return true;
+        if (estado === 'completada' && r.calificacion != null) return true;
+        return false;
+      });
+      setHistorial(hist);
 
       // Abrir modal de calificación si hay una completada sin calificar
       const pendienteRating = misReservas.find(
@@ -304,14 +314,14 @@ const MisReservas = () => {
                             <FaMapMarkerAlt className="text-blue-400 text-xs mt-1 shrink-0" />
                             <div>
                               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Origen</p>
-                              <p className="font-medium text-gray-700">{carInfo?.origen || '—'}</p>
+                              <p className="font-medium text-gray-700">{carInfo?.precioviaje?.origen || '—'}</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-1">
                             <FaMapMarkerAlt className="text-violet-400 text-xs mt-1 shrink-0" />
                             <div>
                               <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Destino</p>
-                              <p className="font-medium text-gray-700">{carInfo?.destino || '—'}</p>
+                              <p className="font-medium text-gray-700">{carInfo?.precioviaje?.destino || '—'}</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-1">
@@ -418,6 +428,61 @@ const MisReservas = () => {
                 </div>
               );
             })}
+          </div>
+        )}
+
+        {/* ── Historial ── */}
+        {historial.length > 0 && (
+          <div className="mt-10 animate-fade-in-up">
+            <div className="flex items-center gap-2 mb-4">
+              <FaRoad className="text-blue-300 text-sm" />
+              <h2 className="text-lg font-bold text-white">Historial de viajes</h2>
+              <span className="text-xs bg-white/10 text-white px-2 py-0.5 rounded-full">{historial.length}</span>
+            </div>
+            <div className="space-y-3">
+              {historial.map((r, idx) => {
+                const rid     = r.id_reservarviajes || r.id;
+                const carInfo = getCarInfo(r);
+                const estado  = r.estado?.toLowerCase();
+                const cls     =
+                  estado === 'completada' ? 'bg-violet-100 text-violet-700 border-violet-200' :
+                  estado === 'cancelada'  ? 'bg-gray-100 text-gray-500 border-gray-200'       :
+                  'bg-red-100 text-red-600 border-red-200';
+                const label   =
+                  estado === 'completada' ? 'Completada' :
+                  estado === 'cancelada'  ? 'Cancelada'  : 'Rechazada';
+
+                return (
+                  <div key={rid ?? idx}
+                    className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl p-4 flex items-center justify-between gap-3"
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-8 h-8 rounded-xl bg-white/10 flex items-center justify-center shrink-0">
+                        <FaCarSide className="text-white text-sm" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-white font-semibold text-sm truncate">
+                          {carInfo?.precioviaje?.origen || '—'} → {carInfo?.precioviaje?.destino || '—'}
+                        </p>
+                        <p className="text-blue-200 text-xs">
+                          {carInfo?.conductor || '—'} · {carInfo?.fecha ? new Date(carInfo.fecha).toLocaleDateString('es-ES') : '—'}
+                        </p>
+                        {estado === 'completada' && r.calificacion != null && (
+                          <div className="flex gap-0.5 mt-0.5">
+                            {[1,2,3,4,5].map(n => (
+                              <FaStar key={n} className={`text-[10px] ${n <= r.calificacion ? 'text-yellow-400' : 'text-white/20'}`} />
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shrink-0 ${cls}`}>
+                      {label}
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

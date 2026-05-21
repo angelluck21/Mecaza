@@ -4,6 +4,7 @@ import {
   FaCar, FaPlus, FaTrash, FaListAlt,
   FaMapMarkerAlt, FaClock, FaCalendarAlt, FaPhone,
   FaUser, FaCheck, FaTimes, FaIdCard, FaPlay, FaFlagCheckered,
+  FaSync, FaRoad, FaStar,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -14,11 +15,12 @@ import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
 
 import {
-  listarCarrosApi, listarReservasApi, listarEstadosApi,
+  listarCarrosApi, listarReservasApi, listarEstadosApi, listarPreciosApi,
   crearCarroApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, iniciarViajeApi, terminarViajeApi,
+  historialConductorApi,
 } from '../../services/api';
-import { compressImage } from '../../utils';
+import { compressImage, getEstadoInfo, formatFecha } from '../../utils';
 
 // ── Modal base ────────────────────────────────────────────────────────────────
 
@@ -95,6 +97,7 @@ const Conductor = () => {
   const [reservas,      setReservas]      = useState([]);
   const [carros,        setCarros]        = useState([]);
   const [estados,       setEstados]       = useState([]);
+  const [rutas,         setRutas]         = useState([]);
   const [selectedCarro, setSelectedCarro] = useState(null);
   const [carroToDelete, setCarroToDelete] = useState(null);
 
@@ -106,11 +109,21 @@ const Conductor = () => {
   const [procesando,      setProcesando]      = useState(null);
   const [accionCarroId,   setAccionCarroId]   = useState(null);
 
+  // Dashboard
+  const [dashCarros,   setDashCarros]   = useState([]);
+  const [dashReservas, setDashReservas] = useState([]);
+  const [loadingDash,  setLoadingDash]  = useState(true);
+
+  // Historial
+  const [showHistorial,   setShowHistorial]   = useState(false);
+  const [historial,       setHistorial]       = useState([]);
+  const [loadingHistorial,setLoadingHistorial]= useState(false);
+
   // Formulario agregar carro
   const [carData, setCarData] = useState({
     Placa: '', Conductor: '', Imagencarro: null,
-    Asientos: '', Origen: '', Destino: '', Horasalida: '',
-    Fecha: '', Telefono: '', Estado: '',
+    Asientos: '', id_precioviaje: '',
+    Horasalida: '', Fecha: '', Telefono: '', Estado: '',
   });
   const [newEstado, setNewEstado] = useState('');
 
@@ -134,20 +147,55 @@ const Conductor = () => {
     setIsLoading(false);
   }, [navigate]);
 
-  // Cargar estados al abrir modal agregar carro o cambiar estado
+  // Cargar estados y rutas al abrir modal agregar carro
   useEffect(() => {
     if (showAddCar || showEstadoModal) fetchEstados();
-    if (showAddCar && userData) {
-      const nombre = userData.Nombre || userData.nombre || userData.name || '';
-      setCarData(p => ({ ...p, Conductor: nombre }));
+    if (showAddCar) {
+      fetchRutas();
+      if (userData) {
+        const nombre    = userData.Nombre    || userData.nombre    || userData.name     || '';
+        const telefono  = userData.Telefono  || userData.telefono  || userData.phone    || userData.tel || '';
+        setCarData(p => ({ ...p, Conductor: nombre, Telefono: telefono }));
+      }
     }
   }, [showAddCar, showEstadoModal, userData]);
 
+  // Cargar dashboard cuando userData esté listo
+  useEffect(() => {
+    if (userData) loadDashboard();
+  }, [userData]);
+
   // ── Cargar datos ─────────────────────────────────────────────────────────────
+  const loadDashboard = async () => {
+    setLoadingDash(true);
+    try {
+      const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
+      const allCarros   = Array.isArray(carsResp.data) ? carsResp.data : [];
+      const allReservas = Array.isArray(reservasResp)  ? reservasResp  : (reservasResp.data ?? []);
+
+      const nombreConductor = (userData?.Nombre || userData?.nombre || userData?.name || '').toLowerCase().trim();
+      const misCarros       = allCarros.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor);
+      const idsCarros       = new Set(misCarros.map(c => String(c.id_carros || c.id)));
+
+      setDashCarros(misCarros);
+      setDashReservas(allReservas.filter(r =>
+        idsCarros.has(String(r.id_carros || r.id_carro || r.carro_id))
+      ));
+    } catch { /* silencioso */ }
+    finally { setLoadingDash(false); }
+  };
+
   const fetchEstados = async () => {
     try {
       const { data } = await listarEstadosApi();
       setEstados(Array.isArray(data.data) ? data.data : []);
+    } catch { /* silencioso */ }
+  };
+
+  const fetchRutas = async () => {
+    try {
+      const { data } = await listarPreciosApi();
+      setRutas(Array.isArray(data.data) ? data.data : []);
     } catch { /* silencioso */ }
   };
 
@@ -159,7 +207,7 @@ const Conductor = () => {
       const allCarros   = Array.isArray(carsResp.data)  ? carsResp.data  : [];
       const allReservas = Array.isArray(reservasResp)   ? reservasResp   : (reservasResp.data ?? []);
 
-      const nombreConductor = (userData?.Nombre || userData?.nombre || '').toLowerCase().trim();
+      const nombreConductor = (userData?.Nombre || userData?.nombre || userData?.name || '').toLowerCase().trim();
       const misCarros       = allCarros.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor);
       const idsCarros       = misCarros.map(c => String(c.id_carros || c.id));
 
@@ -176,7 +224,7 @@ const Conductor = () => {
     try {
       const resp = await listarCarrosApi();
       const all  = Array.isArray(resp.data) ? resp.data : [];
-      const nombreConductor = (userData?.Nombre || userData?.nombre || '').toLowerCase().trim();
+      const nombreConductor = (userData?.Nombre || userData?.nombre || userData?.name || '').toLowerCase().trim();
       setCarros(all.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor));
     } catch { showToast('Error al cargar vehículos.', 'error'); }
     finally { setLoadingCarros(false); }
@@ -185,9 +233,9 @@ const Conductor = () => {
   // ── Agregar carro ─────────────────────────────────────────────────────────────
   const handleAddCar = async (e) => {
     e.preventDefault();
-    const { Conductor, Placa, Asientos, Origen, Destino, Horasalida, Fecha, Telefono, Estado, Imagencarro } = carData;
+    const { Conductor, Placa, Asientos, id_precioviaje, Horasalida, Fecha, Telefono, Estado, Imagencarro } = carData;
 
-    if (!Conductor || !Placa || !Asientos || !Origen || !Destino || !Horasalida || !Fecha || !Telefono || !Estado) {
+    if (!Conductor || !Placa || !Asientos || !id_precioviaje || !Horasalida || !Fecha || !Telefono || !Estado) {
       showToast('Completa todos los campos requeridos.', 'error'); return;
     }
 
@@ -202,16 +250,15 @@ const Conductor = () => {
     setIsSaving(true);
     try {
       const formData = new FormData();
-      formData.append('Conductor',  Conductor.trim());
-      formData.append('Telefono',   Telefono.trim());
-      formData.append('Placa',      Placa.trim());
-      formData.append('Asientos',   Asientos);
-      formData.append('Origen',     Origen.trim());
-      formData.append('Destino',    Destino.trim());
-      formData.append('Horasalida', Horasalida.trim());
-      formData.append('Fecha',      Fecha.trim());
-      formData.append('Estado',     Estado);
-      formData.append('Userid',     parseInt(userId));
+      formData.append('Conductor',       Conductor.trim());
+      formData.append('Telefono',        Telefono.trim());
+      formData.append('Placa',           Placa.trim());
+      formData.append('Asientos',        Asientos);
+      formData.append('Id_precioviaje',  id_precioviaje);
+      formData.append('Horasalida',      Horasalida.trim());
+      formData.append('Fecha',           Fecha.trim());
+      formData.append('Estado',          Estado);
+      formData.append('Userid',          parseInt(userId));
 
       if (Imagencarro) {
         const compressed = await compressImage(Imagencarro);
@@ -220,8 +267,9 @@ const Conductor = () => {
 
       await crearCarroApi(formData);
       showToast('Vehículo registrado exitosamente.', 'success');
-      setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', Origen: '', Destino: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
+      setCarData({ Placa: '', Conductor: '', Imagencarro: null, Asientos: '', id_precioviaje: '', Horasalida: '', Fecha: '', Telefono: '', Estado: '' });
       setShowAddCar(false);
+      await loadDashboard();
     } catch (err) {
       const errors = err.response?.data?.errors;
       const msg = errors
@@ -269,7 +317,7 @@ const Conductor = () => {
     try {
       await iniciarViajeApi(carroId);
       showToast('Viaje iniciado. Se notificó a los pasajeros por correo.', 'success');
-      await fetchCarros();
+      await loadDashboard();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error al iniciar el viaje.', 'error');
     } finally { setAccionCarroId(null); }
@@ -280,10 +328,21 @@ const Conductor = () => {
     try {
       await terminarViajeApi(carroId);
       showToast('Viaje finalizado correctamente.', 'success');
-      await fetchCarros();
+      await loadDashboard();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error al finalizar el viaje.', 'error');
     } finally { setAccionCarroId(null); }
+  };
+
+  // ── Historial de viajes ───────────────────────────────────────────────────────
+  const fetchHistorial = async () => {
+    setLoadingHistorial(true);
+    setShowHistorial(true);
+    try {
+      const { data } = await historialConductorApi();
+      setHistorial(Array.isArray(data.data) ? data.data : []);
+    } catch { showToast('Error al cargar el historial.', 'error'); }
+    finally { setLoadingHistorial(false); }
   };
 
   // ── Confirmar / rechazar reserva ──────────────────────────────────────────────
@@ -292,8 +351,16 @@ const Conductor = () => {
     setProcesando(id);
     try {
       await confirmarReservaApi(id, estado);
-      showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Reserva rechazada.', estado === 'Confirmada' ? 'success' : 'error');
-      await fetchReservas();
+      showToast(estado === 'Confirmada' ? 'Reserva confirmada exitosamente.' : 'Operación exitosa.', 'success');
+      await loadDashboard();
+      // Refrescar la lista del modal de reservas
+      const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
+      const allCarros   = Array.isArray(carsResp.data)  ? carsResp.data  : [];
+      const allReservas = Array.isArray(reservasResp)   ? reservasResp   : (reservasResp.data ?? []);
+      const nombreConductor = (userData?.Nombre || userData?.nombre || userData?.name || '').toLowerCase().trim();
+      const misCarros = allCarros.filter(c => (c.conductor || '').toLowerCase().trim() === nombreConductor);
+      const idsCarros = misCarros.map(c => String(c.id_carros || c.id));
+      setReservas(allReservas.filter(r => idsCarros.includes(String(r.id_carros || r.id_carro || r.carro_id))));
     } catch { showToast('Error al actualizar la reserva.', 'error'); }
     finally { setProcesando(null); }
   };
@@ -323,7 +390,7 @@ const Conductor = () => {
         </div>
 
         {/* Acciones */}
-        <div className="grid sm:grid-cols-3 gap-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+        <div className="grid sm:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
           <ActionCard
             icon={<FaPlus />}
             title="Agregar Vehículo"
@@ -348,6 +415,200 @@ const Conductor = () => {
             gradient="from-green-600 to-emerald-500"
             onClick={fetchCarros}
           />
+          <ActionCard
+            icon={<FaRoad />}
+            title="Historial"
+            desc="Consulta los viajes completados y sus pasajeros."
+            btnLabel="Ver historial"
+            gradient="from-orange-500 to-amber-500"
+            onClick={fetchHistorial}
+          />
+        </div>
+
+        {/* ── Panel de viaje activo ── */}
+        <div className="animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-xl font-extrabold text-white">Mis vehículos activos</h2>
+              <p className="text-blue-200 text-xs mt-0.5">Gestiona pasajeros e inicia o termina el viaje desde aquí</p>
+            </div>
+            <button
+              onClick={loadDashboard}
+              disabled={loadingDash}
+              className="flex items-center gap-2 px-3 py-1.5 bg-white/10 text-white text-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all disabled:opacity-50"
+            >
+              <FaSync className={`text-xs ${loadingDash ? 'animate-spin' : ''}`} />
+              Actualizar
+            </button>
+          </div>
+
+          {loadingDash ? (
+            <div className="bg-white/10 rounded-2xl p-10 flex flex-col items-center gap-3">
+              <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+              <p className="text-white/70 text-sm">Cargando tus vehículos...</p>
+            </div>
+          ) : dashCarros.length === 0 ? (
+            <div className="bg-white rounded-2xl p-10 text-center shadow-md">
+              <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
+                <FaCar className="text-violet-400 text-2xl" />
+              </div>
+              <h3 className="text-gray-800 font-bold mb-1">Sin vehículos registrados</h3>
+              <p className="text-gray-400 text-sm">Usa el botón de arriba para agregar tu primer vehículo.</p>
+            </div>
+          ) : (
+            <div className="space-y-5">
+              {dashCarros.map(carro => {
+                const id = carro.id_carros || carro.id;
+                const estadoNum = parseInt(carro.id_estados);
+                const estadoInfo = getEstadoInfo(carro.id_estados);
+
+                const reservasDelCarro = dashReservas
+                  .filter(r => String(r.id_carros || r.id_carro || r.carro_id) === String(id))
+                  .filter(r => {
+                    const est = r.estado?.toLowerCase();
+                    return est !== 'rechazada' && est !== 'cancelada';
+                  });
+
+                return (
+                  <div key={id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
+                    {/* Barra superior gradiente */}
+                    <div className="h-1.5 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
+
+                    <div className="p-5 space-y-5">
+
+                      {/* ── Info del vehículo ── */}
+                      <div className="flex items-start justify-between gap-4 flex-wrap">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-gray-800 bg-gray-100 px-3 py-1 rounded-lg text-sm tracking-wider">
+                              {carro.placa || '—'}
+                            </span>
+                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${estadoInfo.color}`}>
+                              {estadoInfo.label}
+                            </span>
+                          </div>
+                          <p className="text-gray-700 font-semibold text-base flex items-center gap-1.5">
+                            <FaMapMarkerAlt className="text-violet-500 text-sm" />
+                            {carro.precioviaje
+                              ? `${carro.precioviaje.origen} → ${carro.precioviaje.destino}`
+                              : 'Ruta no especificada'}
+                          </p>
+                          {carro.precioviaje?.precio && (
+                            <p className="text-violet-600 font-bold text-sm">
+                              ${Number(carro.precioviaje.precio).toLocaleString('es-CO')} por pasajero
+                            </p>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500 space-y-1 text-right">
+                          <p className="flex items-center gap-1.5 justify-end">
+                            <FaCalendarAlt className="text-violet-400 text-xs" />
+                            {formatFecha(carro.fecha)}
+                          </p>
+                          <p className="flex items-center gap-1.5 justify-end">
+                            <FaClock className="text-violet-400 text-xs" />
+                            {carro.horasalida || '—'}
+                          </p>
+                          <p className="flex items-center gap-1.5 justify-end">
+                            <FaCar className="text-violet-400 text-xs" />
+                            {carro.asientos} asientos
+                          </p>
+                          {carro.telefono && (
+                            <p className="flex items-center gap-1.5 justify-end">
+                              <FaPhone className="text-violet-400 text-xs" />
+                              {carro.telefono}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* ── Pasajeros ── */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+                            Pasajeros
+                          </p>
+                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
+                            reservasDelCarro.length >= parseInt(carro.asientos)
+                              ? 'bg-red-100 text-red-600'
+                              : 'bg-green-100 text-green-700'
+                          }`}>
+                            {reservasDelCarro.length} / {carro.asientos}
+                          </span>
+                        </div>
+
+                        {reservasDelCarro.length === 0 ? (
+                          <div className="flex items-center gap-2 py-4 px-3 bg-gray-50 rounded-xl text-gray-400 text-sm">
+                            <FaUser className="text-gray-300" />
+                            Sin reservas todavía
+                          </div>
+                        ) : (
+                          <div className="space-y-2">
+                            {reservasDelCarro.map((r, idx) => {
+                              const resId = r.id_reservarviajes || r.id;
+                              const estRes = r.estado?.toLowerCase();
+                              const enProceso = procesando === resId;
+                              const statusCls =
+                                estRes === 'confirmada' ? 'bg-green-100 text-green-700 border-green-200' :
+                                estRes === 'completada' ? 'bg-blue-100 text-blue-700 border-blue-200' :
+                                'bg-yellow-100 text-yellow-700 border-yellow-200';
+
+                              return (
+                                <div key={resId ?? idx} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                                      {(r.nombre || r.name || '?')[0]?.toUpperCase()}
+                                    </div>
+                                    <div className="min-w-0">
+                                      <p className="text-sm font-semibold text-gray-800 truncate">{r.nombre || r.name || '—'}</p>
+                                      <p className="text-xs text-gray-400">Asiento {r.asiento || r.Asiento || '—'}</p>
+                                    </div>
+                                  </div>
+
+                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusCls}`}>
+                                    {r.estado || 'Pendiente'}
+                                  </span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* ── Botón de acción del viaje ── */}
+                      {(estadoNum === 1 || estadoNum === 2) && (
+                        <div className="pt-1 border-t border-gray-100">
+                          {estadoNum === 1 && (
+                            <button
+                              onClick={() => handleIniciarViaje(id)}
+                              disabled={accionCarroId === id}
+                              className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-green-200 transition-all active:scale-95 disabled:opacity-50 text-sm"
+                            >
+                              {accionCarroId === id
+                                ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                : <FaPlay className="text-xs" />}
+                              Iniciar viaje
+                            </button>
+                          )}
+                          {estadoNum === 2 && (
+                            <button
+                              onClick={() => handleTerminarViaje(id)}
+                              disabled={accionCarroId === id}
+                              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-violet-200 transition-all active:scale-95 disabled:opacity-50 text-sm"
+                            >
+                              {accionCarroId === id
+                                ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                                : <FaFlagCheckered className="text-xs" />}
+                              Terminar viaje
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
 
@@ -391,22 +652,33 @@ const Conductor = () => {
                 placeholder="Ej. 4"
                 required
               />
-              <FormInput
-                label="Origen"
-                icon={<FaMapMarkerAlt />}
-                value={carData.Origen}
-                onChange={e => setCarData(p => ({ ...p, Origen: e.target.value }))}
-                placeholder="Zaragoza"
-                required
-              />
-              <FormInput
-                label="Destino"
-                icon={<FaMapMarkerAlt />}
-                value={carData.Destino}
-                onChange={e => setCarData(p => ({ ...p, Destino: e.target.value }))}
-                placeholder="Medellín"
-                required
-              />
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
+                  Ruta del viaje
+                </label>
+                <div className="relative">
+                  <FaMapMarkerAlt className="absolute left-3 top-3 text-violet-400 text-sm pointer-events-none" />
+                  <select
+                    value={carData.id_precioviaje}
+                    onChange={e => setCarData(p => ({ ...p, id_precioviaje: e.target.value }))}
+                    required
+                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400"
+                  >
+                    <option value="">Seleccionar ruta</option>
+                    {rutas.length === 0 && (
+                      <option disabled>No hay rutas disponibles — el admin debe agregarlas</option>
+                    )}
+                    {rutas.map(r => {
+                      const id = r.id_precioviajes || r.id;
+                      return (
+                        <option key={id} value={id}>
+                          {r.origen} → {r.destino} (${Number(r.precio).toLocaleString('es-CO')})
+                        </option>
+                      );
+                    })}
+                  </select>
+                </div>
+              </div>
               <FormInput
                 label="Hora de salida"
                 icon={<FaClock />}
@@ -576,44 +848,13 @@ const Conductor = () => {
                       </span>
                     </div>
                     <div className="grid grid-cols-2 gap-2">
-                      {(carro.origen || carro.Origen) && (
-                        <InfoRow icon={<FaMapMarkerAlt />} label="Origen" value={carro.origen || carro.Origen} />
+                      {carro.precioviaje && (
+                        <InfoRow icon={<FaMapMarkerAlt />} label="Ruta" value={`${carro.precioviaje.origen} → ${carro.precioviaje.destino}`} />
                       )}
-                      <InfoRow icon={<FaMapMarkerAlt />} label="Destino"    value={carro.destino} />
                       <InfoRow icon={<FaClock />}        label="Hora"       value={carro.horasalida} />
                       <InfoRow icon={<FaCalendarAlt />}  label="Fecha"      value={carro.fecha} />
                       <InfoRow icon={<FaPhone />}        label="Teléfono"   value={carro.telefono} />
                     </div>
-                    {/* Acciones de viaje */}
-                    {(parseInt(carro.id_estados) === 1 || parseInt(carro.id_estados) === 2) && (
-                      <div className="flex gap-2 pt-2">
-                        {parseInt(carro.id_estados) === 1 && (
-                          <button
-                            onClick={() => handleIniciarViaje(id)}
-                            disabled={accionCarroId === id}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50"
-                          >
-                            {accionCarroId === id
-                              ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                              : <FaPlay className="text-[10px]" />}
-                            Iniciar viaje
-                          </button>
-                        )}
-                        {parseInt(carro.id_estados) === 2 && (
-                          <button
-                            onClick={() => handleTerminarViaje(id)}
-                            disabled={accionCarroId === id}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 transition-all active:scale-95 disabled:opacity-50"
-                          >
-                            {accionCarroId === id
-                              ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                              : <FaFlagCheckered className="text-[10px]" />}
-                            Terminar viaje
-                          </button>
-                        )}
-                      </div>
-                    )}
-
                     <div className="flex gap-2 pt-2 border-t border-gray-100">
                       <button
                         onClick={() => { setSelectedCarro(carro); setNewEstado(''); setShowEstadoModal(true); }}
@@ -667,6 +908,89 @@ const Conductor = () => {
               </button>
             </div>
           </form>
+        </Modal>
+      )}
+
+      {/* ── Modal: Historial de viajes ── */}
+      {showHistorial && (
+        <Modal title="Historial de viajes" accent="violet" onClose={() => setShowHistorial(false)}>
+          {loadingHistorial ? (
+            <div className="flex flex-col items-center py-10 gap-3">
+              <div className="w-8 h-8 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
+              <p className="text-sm text-gray-400">Cargando historial...</p>
+            </div>
+          ) : historial.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center mx-auto mb-3">
+                <FaRoad className="text-orange-300 text-xl" />
+              </div>
+              <p className="text-gray-500 text-sm">Aún no tienes viajes completados.</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {historial.map((carro, idx) => {
+                const ruta       = carro.precioviaje ? `${carro.precioviaje.origen} → ${carro.precioviaje.destino}` : 'Ruta no especificada';
+                const pasajeros  = carro.reservas ?? [];
+                const ingresos   = pasajeros.length * (parseFloat(carro.precioviaje?.precio ?? 0));
+                const calificaciones = pasajeros.filter(p => p.calificacion != null);
+                const promedio   = calificaciones.length
+                  ? (calificaciones.reduce((s, p) => s + p.calificacion, 0) / calificaciones.length).toFixed(1)
+                  : null;
+
+                return (
+                  <div key={carro.id_carros ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                    <div className="flex items-center justify-between flex-wrap gap-2">
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                          <FaRoad className="text-orange-400 text-xs" /> {ruta}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {carro.placa} · {carro.fecha ? new Date(carro.fecha).toLocaleDateString('es-ES') : '—'} · {carro.horasalida}
+                        </p>
+                      </div>
+                      {promedio && (
+                        <div className="flex items-center gap-1">
+                          <FaStar className="text-yellow-400 text-xs" />
+                          <span className="text-xs font-bold text-gray-700">{promedio}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                      <span>{pasajeros.length} pasajero{pasajeros.length !== 1 ? 's' : ''}</span>
+                      {ingresos > 0 && (
+                        <span className="font-bold text-green-600">
+                          +${ingresos.toLocaleString('es-CO')}
+                        </span>
+                      )}
+                    </div>
+
+                    {pasajeros.length > 0 && (
+                      <div className="space-y-1.5">
+                        {pasajeros.map((p, i) => (
+                          <div key={p.id_reservarviajes ?? i} className="flex items-center justify-between text-xs">
+                            <div className="flex items-center gap-2">
+                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold shrink-0">
+                                {(p.nombre || '?')[0]?.toUpperCase()}
+                              </div>
+                              <span className="text-gray-700 font-medium">{p.nombre || '—'}</span>
+                            </div>
+                            {p.calificacion != null && (
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(n => (
+                                  <FaStar key={n} className={`text-[10px] ${n <= p.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </Modal>
       )}
 

@@ -15,7 +15,7 @@ import CarImage          from '../components/ui/CarImage';
 import UserAvatar        from '../components/ui/UserAvatar';
 import ToastNotification from '../components/ui/ToastNotification';
 import { useToast }      from '../hooks/useToast';
-import { crearReservaApi, listarCarrosApi, listarPreciosApi, listarReservasApi, getConductorPerfilApi } from '../services/api';
+import { crearReservaApi, listarCarrosApi, listarReservasApi, getConductorPerfilApi } from '../services/api';
 import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
 
 const MAX_SEATS = 5;
@@ -296,7 +296,6 @@ const VerDetalles = () => {
   const [pickupLocation,    setPickupLocation]    = useState('');
   const [nombre,            setNombre]            = useState('');
   const [telefono,          setTelefono]          = useState('');
-  const [precios,           setPrecios]           = useState(null);
   const [asientosOcupados,  setAsientosOcupados]  = useState([]);
   const [showConfirmation,  setShowConfirmation]  = useState(false);
   const [isReserving,       setIsReserving]       = useState(false);
@@ -324,26 +323,14 @@ const VerDetalles = () => {
 
     const loadAll = async () => {
       try {
-        const [carrosData, preciosResp, reservasData] = await Promise.all([
+        const [carrosData, reservasData] = await Promise.all([
           listarCarrosApi(),
-          listarPreciosApi().catch(() => null),
           listarReservasApi(),
         ]);
 
         const carrosArray = Array.isArray(carrosData) ? carrosData : (carrosData?.data ?? []);
         const car = carrosArray.find(c => (c.id_carros || c.id || c.ID) == carId);
         if (!car) { setIsLoading(false); return; }
-
-        if (preciosResp) {
-          const pa = Array.isArray(preciosResp.data) ? preciosResp.data : (preciosResp.data?.data ?? []);
-          if (pa.length > 0) {
-            setPrecios({
-              zaraMede:  pa[0]['zara-mede']  ?? 120000,
-              zaraCauca: pa[0]['zara-cauca'] ?? 30000,
-              caucaMede: pa[0]['cauca-mede'] ?? 100000,
-            });
-          }
-        }
 
         const ra = Array.isArray(reservasData) ? reservasData : (reservasData?.data ?? []);
         const ocupados = ra
@@ -358,8 +345,9 @@ const VerDetalles = () => {
           conductor:   car.conductor  || car.Conductor,
           placa:       car.placa      || car.Placa,
           asientos:    parseInt(car.asientos || car.Asientos) || 4,
-          origen:      car.origen     || car.Origen     || '',
-          destino:     car.destino    || car.Destino,
+          origen:      car.precioviaje?.origen  || '',
+          destino:     car.precioviaje?.destino || '',
+          precio:      car.precioviaje?.precio  ?? null,
           horasalida:  car.horasalida || car.Horasalida,
           fecha:       car.fecha      || car.Fecha,
           imagencarro: car.imagencarro || car.Imagencarro,
@@ -478,7 +466,8 @@ const VerDetalles = () => {
   const totalAsientos  = carDetails.asientos;
   const disponibles    = totalAsientos - asientosOcupados.length;
   const estadoInfo     = getEstadoInfo(carDetails.id_estados);
-  const isFormComplete = selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
+  const enViaje        = parseInt(carDetails.id_estados) === 2;
+  const isFormComplete = !enViaje && selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
 
   return (
     <PageBg>
@@ -631,25 +620,35 @@ const VerDetalles = () => {
               </div>
             </SectionCard>
 
-            {/* Precios */}
-            <SectionCard title="Precios por ruta" accent="orange">
-              <div className="divide-y divide-gray-50">
-                {[
-                  { ruta: 'Zaragoza → Medellín', precio: precios?.zaraMede  ?? 120000 },
-                  { ruta: 'Zaragoza → Caucasia', precio: precios?.zaraCauca ?? 30000  },
-                  { ruta: 'Caucasia → Medellín', precio: precios?.caucaMede ?? 100000 },
-                ].map(({ ruta, precio }) => (
-                  <div key={ruta} className="flex justify-between items-center py-2.5">
-                    <span className="text-sm text-gray-600">{ruta}</span>
-                    <span className="text-sm font-bold text-green-600">${precio.toLocaleString('es-CO')}</span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
+            {/* Precio del viaje */}
+            {carDetails.precio !== null && (
+              <SectionCard title="Precio del viaje" accent="orange">
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-sm text-gray-600">
+                    {carDetails.origen} → {carDetails.destino}
+                  </span>
+                  <span className="text-xl font-extrabold text-green-600">
+                    ${Number(carDetails.precio).toLocaleString('es-CO')}
+                  </span>
+                </div>
+                <p className="text-xs text-gray-400 mt-1">Precio por pasajero</p>
+              </SectionCard>
+            )}
           </div>
 
           {/* ── Columna derecha: reserva ── */}
           <div className="lg:col-span-2 space-y-5">
+
+            {/* Banner viaje en curso */}
+            {enViaje && (
+              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
+                <FaRoad className="text-blue-500 text-lg mt-0.5 shrink-0 animate-pulse" />
+                <div>
+                  <p className="font-bold text-blue-800 text-sm">Viaje en curso</p>
+                  <p className="text-blue-600 text-xs mt-0.5">Este vehículo ya inició su recorrido. No es posible hacer nuevas reservas.</p>
+                </div>
+              </div>
+            )}
 
             {/* Selección de asiento */}
             <SectionCard title="Selecciona tu asiento" accent="violet">
