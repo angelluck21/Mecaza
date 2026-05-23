@@ -4,6 +4,7 @@ import {
   FaCar, FaPlus, FaUsers, FaCog, FaSync, FaTicketAlt,
   FaTrash, FaCheck, FaTimes, FaMapMarkerAlt, FaClock,
   FaCalendarAlt, FaPhone, FaUser, FaEnvelope, FaFileInvoice, FaEdit,
+  FaDownload, FaFileArchive,
 } from 'react-icons/fa';
 
 import PageBg            from '../../components/ui/PageBg';
@@ -16,12 +17,13 @@ import { useToast }      from '../../hooks/useToast';
 import { getEstadoInfo, formatFecha } from '../../utils';
 
 import {
-  listarCarrosApi, listarReservasApi, listarEstadosApi,
+  listarCarrosApi, listarCarrosAdminApi, listarReservasApi, listarEstadosApi,
   listarUsuariosApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, eliminarReservaApi,
   agregarPrecioApi, eliminarPrecioApi, actualizarPrecioApi,
   agregarEstadoApi, eliminarEstadoApi,
   invitarConductorApi, listarFacturasApi, listarPreciosApi,
+  descargarFacturaApi, descargarTodasFacturasApi,
 } from '../../services/api';
 
 // ── Constantes ────────────────────────────────────────────────────────────────
@@ -31,6 +33,7 @@ const ESTADOS_LABELS = [
   { id: 2, label: 'En viaje',            color: 'bg-yellow-100 text-yellow-700 border-yellow-200' },
   { id: 3, label: 'En mantenimiento',    color: 'bg-orange-100 text-orange-700 border-orange-200' },
   { id: 4, label: 'Fuera de servicio',   color: 'bg-red-100 text-red-700 border-red-200' },
+  { id: 5, label: 'Viaje terminado',     color: 'bg-gray-100 text-gray-600 border-gray-200' },
 ];
 
 // ── Sub-componentes ────────────────────────────────────────────────────────────
@@ -121,9 +124,11 @@ const IndexAdmin = () => {
   const [isDeleting,      setIsDeleting]      = useState(false);
 
   // Modal facturas
-  const [showFacturasModal, setShowFacturasModal] = useState(false);
-  const [facturasList,      setFacturasList]      = useState([]);
-  const [loadingFacturas,   setLoadingFacturas]   = useState(false);
+  const [showFacturasModal,  setShowFacturasModal]  = useState(false);
+  const [facturasList,       setFacturasList]       = useState([]);
+  const [loadingFacturas,    setLoadingFacturas]    = useState(false);
+  const [downloadingId,      setDownloadingId]      = useState(null);
+  const [downloadingAll,     setDownloadingAll]     = useState(false);
 
   // Modal invitar conductor
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -150,11 +155,11 @@ const IndexAdmin = () => {
     setIsLoadingStats(true);
     try {
       const [vRes, rRes, uRes] = await Promise.all([
-        listarCarrosApi(),
+        listarCarrosAdminApi(),
         listarReservasApi(),
         listarUsuariosApi(),
       ]);
-      const vehiculos  = Array.isArray(vRes.data) ? vRes.data : [];
+      const vehiculos  = Array.isArray(vRes.data?.data) ? vRes.data.data : [];
       const reservas   = Array.isArray(rRes) ? rRes : (rRes.data ?? []);
       const usuarios   = Array.isArray(uRes.data?.data) ? uRes.data.data : [];
       const fechaHoy   = new Date().toISOString().split('T')[0];
@@ -260,8 +265,8 @@ const IndexAdmin = () => {
     setLoadingCarros(true);
     setShowCarrosModal(true);
     try {
-      const [cRes, eRes] = await Promise.all([listarCarrosApi(), listarEstadosApi()]);
-      const cars   = Array.isArray(cRes.data) ? cRes.data : [];
+      const [cRes, eRes] = await Promise.all([listarCarrosAdminApi(), listarEstadosApi()]);
+      const cars   = Array.isArray(cRes.data?.data) ? cRes.data.data : [];
       const estados = Array.isArray(eRes.data?.data) ? eRes.data.data : [];
       setCarrosList(cars);
       setEstadosList(estados);
@@ -337,6 +342,35 @@ const IndexAdmin = () => {
       setFacturasList(list);
     } catch { showToast('Error al cargar facturas.', 'error'); }
     finally { setLoadingFacturas(false); }
+  };
+
+  const triggerDownload = (blob, filename) => {
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href     = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
+  };
+
+  const handleDescargarFactura = async (factura) => {
+    setDownloadingId(factura.id_factura);
+    try {
+      const { data } = await descargarFacturaApi(factura.id_factura);
+      triggerDownload(new Blob([data], { type: 'application/pdf' }), `${factura.numero_factura}.pdf`);
+    } catch { showToast('Error al descargar la factura.', 'error'); }
+    finally { setDownloadingId(null); }
+  };
+
+  const handleDescargarTodas = async () => {
+    setDownloadingAll(true);
+    try {
+      const { data } = await descargarTodasFacturasApi();
+      triggerDownload(new Blob([data], { type: 'application/zip' }), `facturas_mecaza_${new Date().toISOString().slice(0,10)}.zip`);
+    } catch { showToast('Error al descargar el ZIP de facturas.', 'error'); }
+    finally { setDownloadingAll(false); }
   };
 
   // ── Invitar conductor ─────────────────────────────────────────────────────
@@ -871,41 +905,81 @@ const IndexAdmin = () => {
               <p className="text-gray-400 text-sm">No hay facturas registradas.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {facturasList.map((f, idx) => (
-                <div key={f.id_factura ?? idx} className="border border-gray-100 rounded-xl p-4">
-                  <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
-                    <div>
-                      <p className="font-bold text-gray-800 text-sm font-mono">{f.numero_factura || `#${f.id_factura}`}</p>
-                      <p className="text-xs text-gray-400">
-                        {f.created_at ? new Date(f.created_at).toLocaleDateString('es-ES') : '—'}
-                      </p>
+            <>
+              {/* Botón descargar todas */}
+              <div className="flex justify-end mb-4">
+                <button
+                  onClick={handleDescargarTodas}
+                  disabled={downloadingAll}
+                  className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50"
+                >
+                  {downloadingAll
+                    ? <><div className="w-3.5 h-3.5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Generando ZIP...</>
+                    : <><FaFileArchive className="text-xs" /> Descargar todas (.zip)</>}
+                </button>
+              </div>
+              <div className="space-y-3">
+                {facturasList.map((f, idx) => (
+                  <div key={f.id_factura ?? idx} className="border border-gray-100 rounded-xl p-4">
+                    <div className="flex items-center justify-between gap-2 flex-wrap mb-3">
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm font-mono">{f.numero_factura || `#${f.id_factura}`}</p>
+                        <p className="text-xs text-gray-400">
+                          {f.created_at ? new Date(f.created_at).toLocaleDateString('es-ES') : '—'}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200">
+                          <FaCheck className="text-[10px]" /> Confirmada
+                        </span>
+                        <button
+                          onClick={() => handleDescargarFactura(f)}
+                          disabled={downloadingId === f.id_factura}
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-violet-100 text-violet-700 text-xs font-bold border border-violet-200 hover:bg-violet-200 transition-all disabled:opacity-50"
+                        >
+                          {downloadingId === f.id_factura
+                            ? <div className="w-3 h-3 border-2 border-violet-400 border-t-transparent rounded-full animate-spin" />
+                            : <FaDownload className="text-[10px]" />}
+                          PDF
+                        </button>
+                      </div>
                     </div>
-                    <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold border border-green-200">
-                      <FaCheck className="text-[10px]" /> Confirmada
-                    </span>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs text-gray-600 mb-2">
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Pasajero</p>
+                        <p className="font-medium">{f.usuario?.name || f.usuario?.Nombre || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Conductor</p>
+                        <p className="font-medium">{f.carro?.conductor || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Placa</p>
+                        <p className="font-mono font-medium">{f.carro?.placa || '—'}</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-gray-600">
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Origen</p>
+                        <p className="font-medium">{f.origen || f.carro?.precioviaje?.origen || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Destino</p>
+                        <p className="font-medium">{f.destino || f.carro?.precioviaje?.destino || '—'}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Subtotal</p>
+                        <p className="font-medium">${(f.subtotal ?? 0).toLocaleString('es-CO')}</p>
+                      </div>
+                      <div>
+                        <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Total</p>
+                        <p className="font-bold text-violet-600 text-sm">${(f.total ?? 0).toLocaleString('es-CO')}</p>
+                      </div>
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs text-gray-600">
-                    <div>
-                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Usuario</p>
-                      <p className="font-medium">{f.nombre || f.name || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Destino</p>
-                      <p className="font-medium">{f.destino || '—'}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Subtotal</p>
-                      <p className="font-medium">${(f.subtotal ?? 0).toLocaleString('es-CO')}</p>
-                    </div>
-                    <div>
-                      <p className="text-gray-400 font-semibold uppercase tracking-wide mb-0.5">Total</p>
-                      <p className="font-bold text-violet-600 text-sm">${(f.total ?? 0).toLocaleString('es-CO')}</p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            </>
           )}
         </Modal>
       )}

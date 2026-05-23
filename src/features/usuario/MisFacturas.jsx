@@ -208,12 +208,12 @@ const MisFacturas = () => {
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <p className="text-xs text-gray-400 font-semibold uppercase">Subtotal</p>
+                  <p className="text-xs text-gray-400 font-semibold uppercase">Precio base</p>
                   <p className="font-bold text-gray-800">${selectedFactura.subtotal?.toLocaleString('es-CO') || '0'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-gray-400 font-semibold uppercase">IVA (19%)</p>
-                  <p className="font-bold text-gray-800">${selectedFactura.impuesto?.toLocaleString('es-CO') || '0'}</p>
+                  <p className="text-xs text-green-600 font-semibold uppercase">Descuento web (10%)</p>
+                  <p className="font-bold text-green-600">- ${selectedFactura.impuesto?.toLocaleString('es-CO') || '0'}</p>
                 </div>
               </div>
 

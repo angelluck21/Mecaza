@@ -9,6 +9,7 @@ const CarCard = ({ car, onVerDetalles, userData }) => {
   const asientosOcupados = (car.asientos || 0) - asientosDisp;
   const hayOcupados      = car.asientos_disponibles !== undefined && asientosOcupados > 0;
   const sinAsientos      = asientosDisp === 0;
+  const enViaje          = parseInt(car.id_estados ?? car.estado ?? car.Estado ?? 0) === 2;
 
   return (
     <div className="group relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:shadow-violet-200/50 overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1">
@@ -105,17 +106,24 @@ const CarCard = ({ car, onVerDetalles, userData }) => {
         </div>
 
         {/* Botón */}
-        <button
-          onClick={() => onVerDetalles(car.id_carros)}
-          disabled={sinAsientos}
-          className={`mt-4 w-full py-2.5 px-4 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 ${
-            sinAsientos
-              ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-              : 'bg-gradient-to-r from-blue-700 to-violet-600 text-white hover:from-blue-800 hover:to-violet-700 shadow-md hover:shadow-violet-300/50 hover:shadow-lg hover:scale-[1.02]'
-          }`}
-        >
-          {sinAsientos ? 'Sin lugares disponibles' : userData ? 'Reservar Viaje' : 'Ver Detalles'}
-        </button>
+        {enViaje ? (
+          <div className="mt-4 w-full py-2.5 px-4 rounded-xl font-semibold text-sm text-center bg-yellow-50 text-yellow-600 border border-yellow-200 flex items-center justify-center gap-2">
+            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
+            En viaje
+          </div>
+        ) : (
+          <button
+            onClick={() => onVerDetalles(car.id_carros)}
+            disabled={sinAsientos}
+            className={`mt-4 w-full py-2.5 px-4 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 ${
+              sinAsientos
+                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                : 'bg-gradient-to-r from-blue-700 to-violet-600 text-white hover:from-blue-800 hover:to-violet-700 shadow-md hover:shadow-violet-300/50 hover:shadow-lg hover:scale-[1.02]'
+            }`}
+          >
+            {sinAsientos ? 'Sin lugares disponibles' : userData ? 'Reservar Viaje' : 'Ver Detalles'}
+          </button>
+        )}
       </div>
     </div>
   );

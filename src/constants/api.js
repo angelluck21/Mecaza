@@ -10,7 +10,8 @@ export const ENDPOINTS = {
   GOOGLE_AUTH: `${API_BASE_URL}/auth/google`,
 
   // Carros
-  LISTAR_CARROS: `${API_BASE_URL}/listarcarro`,
+  LISTAR_CARROS:       `${API_BASE_URL}/listarcarro`,
+  LISTAR_CARROS_ADMIN: `${API_BASE_URL}/listarcarros-admin`,
   CREAR_CARRO: `${API_BASE_URL}/crearcarro`,
   ELIMINAR_CARRO: (id) => `${API_BASE_URL}/eliminarcarro/${id}`,
   ACTUALIZAR_ESTADO_CARRO: (id) => `${API_BASE_URL}/actualizarestado/${id}`,
@@ -52,6 +53,8 @@ export const ENDPOINTS = {
   // Viaje
   INICIAR_VIAJE:       (id) => `${API_BASE_URL}/iniciarviajenotify/${id}`,
   TERMINAR_VIAJE:      (id) => `${API_BASE_URL}/terminarviaje/${id}`,
+  ASIGNAR_VIAJE:       (id) => `${API_BASE_URL}/asignarviaje/${id}`,
+  MIS_CARROS:          `${API_BASE_URL}/mis-carros`,
   HISTORIAL_CONDUCTOR: `${API_BASE_URL}/historial-conductor`,
   COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
   CALIFICAR_RESERVA:   (id) => `${API_BASE_URL}/calificarreserva/${id}`,
@@ -62,5 +65,6 @@ export const ENDPOINTS = {
   OBTENER_FACTURA:  (id) => `${API_BASE_URL}/facturaReserva/${id}`,
   MIS_FACTURAS:     `${API_BASE_URL}/misFacturas`,
   LISTAR_FACTURAS:  `${API_BASE_URL}/listarFacturas`,
-  DESCARGAR_FACTURA: (id) => `${API_BASE_URL}/descargarFactura/${id}`,
+  DESCARGAR_FACTURA:       (id) => `${API_BASE_URL}/descargarFactura/${id}`,
+  DESCARGAR_TODAS_FACTURAS: `${API_BASE_URL}/descargarTodasFacturas`,
 };

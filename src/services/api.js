@@ -20,6 +20,9 @@ export const googleAuthApi = (credential) =>
 export const listarCarrosApi = () =>
   fetch(ENDPOINTS.LISTAR_CARROS).then((r) => r.json());
 
+export const listarCarrosAdminApi = () =>
+  axios.get(ENDPOINTS.LISTAR_CARROS_ADMIN, authHeaders());
+
 export const crearCarroApi = (formData) =>
   axios.post(ENDPOINTS.CREAR_CARRO, formData, {
     headers: {
@@ -51,8 +54,8 @@ export const eliminarReservaApi = (id) =>
 export const actualizarReservaApi = (id, data) =>
   axios.put(ENDPOINTS.ACTUALIZAR_RESERVA(id), data, authHeaders());
 
-export const confirmarReservaApi = (id, estado) =>
-  axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado }, authHeaders());
+export const confirmarReservaApi = (id, estado, motivo = null) =>
+  axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado, ...(motivo ? { motivo } : {}) }, authHeaders());
 
 export const historialConductorApi = () =>
   axios.get(ENDPOINTS.HISTORIAL_CONDUCTOR, authHeaders());
@@ -62,6 +65,12 @@ export const iniciarViajeApi = (id) =>
 
 export const terminarViajeApi = (id) =>
   axios.post(ENDPOINTS.TERMINAR_VIAJE(id), {}, authHeaders());
+
+export const asignarViajeApi = (id, data) =>
+  axios.put(ENDPOINTS.ASIGNAR_VIAJE(id), data, authHeaders());
+
+export const misCarrosApi = () =>
+  axios.get(ENDPOINTS.MIS_CARROS, authHeaders());
 
 export const completarReservaApi = (id) =>
   axios.put(ENDPOINTS.COMPLETAR_RESERVA(id), {}, authHeaders());
@@ -156,6 +165,9 @@ export const listarFacturasApi = () =>
 
 export const descargarFacturaApi = (id) =>
   axios.get(ENDPOINTS.DESCARGAR_FACTURA(id), { ...authHeaders(), responseType: 'blob' });
+
+export const descargarTodasFacturasApi = () =>
+  axios.get(ENDPOINTS.DESCARGAR_TODAS_FACTURAS, { ...authHeaders(), responseType: 'blob' });
 
 // ── Perfil conductor (público) ───────────────────────────────────────────────
 

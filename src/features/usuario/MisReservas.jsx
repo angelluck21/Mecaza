@@ -14,8 +14,7 @@ import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
 import {
   listarCarrosApi, listarReservasApi,
-  eliminarReservaApi, guardarMotivoCancelacionApi,
-  calificarReservaApi,
+  confirmarReservaApi, calificarReservaApi,
 } from '../../services/api';
 import { getCarImageUrl } from '../../utils';
 
@@ -86,7 +85,10 @@ const MisReservas = () => {
   const navigate = useNavigate();
 
   const getCarInfo = (r) => {
-    const id = r.id_carros || r.id_carro || r.carro_id || r.carroId || r.carro;
+    // Usar datos embebidos en la reserva (persisten aunque el carro esté inactivo)
+    if (r.carro && typeof r.carro === 'object') return r.carro;
+    // Fallback: buscar en la lista de carros activos
+    const id = r.id_carros || r.id_carro || r.carro_id;
     if (!id) return null;
     return cars.find(c =>
       String(c.id_carros) === String(id) ||
@@ -173,10 +175,7 @@ const MisReservas = () => {
     if (!id) { showToast('No se pudo identificar la reserva.', 'error'); return; }
     setIsDeleting(true);
     try {
-      await eliminarReservaApi(id);
-      if (motivoCancelacion.trim()) {
-        try { await guardarMotivoCancelacionApi(id, motivoCancelacion.trim(), 'usuario'); } catch { /* no bloqueante */ }
-      }
+      await confirmarReservaApi(id, 'cancelada', motivoCancelacion.trim() || null);
       showToast('Reserva cancelada.', 'success');
       setShowDeleteModal(false);
       setReservationToDelete(null);

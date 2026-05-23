@@ -74,7 +74,8 @@ export const calcularAsientosDisponibles = (carsData, reservasArray) =>
     const carroId          = car.id_carros || car.id || car.ID;
     const reservasDelCarro = reservasArray.filter((r) => {
       const rId = r.id_carros || r.id_carro || r.carro_id || r.carroId;
-      return rId == carroId && r.estado !== 'cancelada' && r.estado !== 'rechazada';
+      const est = (r.estado || '').toLowerCase();
+      return rId == carroId && (est === 'pendiente' || est === 'confirmada');
     });
     return { ...car, asientos_disponibles: Math.max(0, (car.asientos || 4) - reservasDelCarro.length) };
   });

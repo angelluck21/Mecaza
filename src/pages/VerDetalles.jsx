@@ -333,8 +333,9 @@ const VerDetalles = () => {
         if (!car) { setIsLoading(false); return; }
 
         const ra = Array.isArray(reservasData) ? reservasData : (reservasData?.data ?? []);
+        const ESTADOS_ACTIVOS = ['pendiente', 'confirmada'];
         const ocupados = ra
-          .filter(r => r.id_carros == carId && r.estado !== 'cancelada' && r.estado !== 'rechazada')
+          .filter(r => r.id_carros == carId && ESTADOS_ACTIVOS.includes((r.estado || '').toLowerCase()))
           .map(r => parseInt(r.Asiento || r.asiento || 0))
           .filter(n => n > 0);
         setAsientosOcupados(ocupados);
@@ -467,7 +468,8 @@ const VerDetalles = () => {
   const disponibles    = totalAsientos - asientosOcupados.length;
   const estadoInfo     = getEstadoInfo(carDetails.id_estados);
   const enViaje        = parseInt(carDetails.id_estados) === 2;
-  const isFormComplete = !enViaje && selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
+  const viajeTerminado = parseInt(carDetails.id_estados) === 5;
+  const isFormComplete = !enViaje && !viajeTerminado && selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
 
   return (
     <PageBg>
@@ -646,6 +648,17 @@ const VerDetalles = () => {
                 <div>
                   <p className="font-bold text-blue-800 text-sm">Viaje en curso</p>
                   <p className="text-blue-600 text-xs mt-0.5">Este vehículo ya inició su recorrido. No es posible hacer nuevas reservas.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Banner viaje terminado */}
+            {viajeTerminado && (
+              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
+                <FaRoad className="text-gray-400 text-lg mt-0.5 shrink-0" />
+                <div>
+                  <p className="font-bold text-gray-700 text-sm">Viaje terminado</p>
+                  <p className="text-gray-500 text-xs mt-0.5">Este viaje ya finalizó y no acepta reservas.</p>
                 </div>
               </div>
             )}
