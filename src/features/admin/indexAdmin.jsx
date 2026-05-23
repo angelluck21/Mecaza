@@ -13,11 +13,12 @@ import LoadingScreen     from '../../components/ui/LoadingScreen';
 import StatCard          from '../../components/ui/StatCard';
 import SectionCard       from '../../components/ui/SectionCard';
 import ToastNotification from '../../components/ui/ToastNotification';
+import Pagination        from '../../components/ui/Pagination';
 import { useToast }      from '../../hooks/useToast';
 import { getEstadoInfo, formatFecha } from '../../utils';
 
 import {
-  listarCarrosApi, listarCarrosAdminApi, listarReservasApi, listarEstadosApi,
+  listarCarrosAdminApi, listarReservasApi, listarEstadosApi,
   listarUsuariosApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, eliminarReservaApi,
   agregarPrecioApi, eliminarPrecioApi, actualizarPrecioApi,
@@ -112,15 +113,19 @@ const IndexAdmin = () => {
   const [estadosList,     setEstadosList]     = useState([]);
   const [carroEstados,    setCarroEstados]    = useState({});
   const [savingCarroId,   setSavingCarroId]   = useState(null);
+  const [pageCarros,      setPageCarros]      = useState(1);
+  const [lastPageCarros,  setLastPageCarros]  = useState(1);
 
   // Modal reservas
   const [showReservasModal, setShowReservasModal] = useState(false);
   const [reservasList,      setReservasList]      = useState([]);
   const [loadingReservas,   setLoadingReservas]   = useState(false);
   const [procesandoResId,   setProcesandoResId]   = useState(null);
+  const [pageReservas,      setPageReservas]      = useState(1);
+  const [lastPageReservas,  setLastPageReservas]  = useState(1);
 
   // Confirmación eliminación compartida
-  const [deleteTarget,    setDeleteTarget]    = useState(null); // { tipo, id, label }
+  const [deleteTarget,    setDeleteTarget]    = useState(null);
   const [isDeleting,      setIsDeleting]      = useState(false);
 
   // Modal facturas
@@ -129,6 +134,8 @@ const IndexAdmin = () => {
   const [loadingFacturas,    setLoadingFacturas]    = useState(false);
   const [downloadingId,      setDownloadingId]      = useState(null);
   const [downloadingAll,     setDownloadingAll]     = useState(false);
+  const [pageFacturas,       setPageFacturas]       = useState(1);
+  const [lastPageFacturas,   setLastPageFacturas]   = useState(1);
 
   // Modal invitar conductor
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -159,12 +166,13 @@ const IndexAdmin = () => {
         listarReservasApi(),
         listarUsuariosApi(),
       ]);
-      const vehiculos  = Array.isArray(vRes.data?.data) ? vRes.data.data : [];
-      const reservas   = Array.isArray(rRes) ? rRes : (rRes.data ?? []);
-      const usuarios   = Array.isArray(uRes.data?.data) ? uRes.data.data : [];
-      const fechaHoy   = new Date().toISOString().split('T')[0];
-      const hoy        = reservas.filter(r => r.created_at?.startsWith(fechaHoy)).length;
-      setStats({ totalVehiculos: vehiculos.length, totalReservas: reservas.length, reservasHoy: hoy, totalUsuarios: usuarios.length });
+      const totalVehiculos = vRes.data?.total ?? (Array.isArray(vRes.data?.data) ? vRes.data.data.length : 0);
+      const totalUsuarios  = uRes.data?.total ?? (Array.isArray(uRes.data?.data) ? uRes.data.data.length : 0);
+      const reservasArr    = Array.isArray(rRes.data) ? rRes.data : (Array.isArray(rRes) ? rRes : []);
+      const totalReservas  = rRes.total ?? reservasArr.length;
+      const fechaHoy       = new Date().toISOString().split('T')[0];
+      const hoy            = reservasArr.filter(r => r.created_at?.startsWith(fechaHoy)).length;
+      setStats({ totalVehiculos, totalReservas, reservasHoy: hoy, totalUsuarios });
     } catch {
       /* silencioso */
     } finally { setIsLoadingStats(false); }
@@ -261,15 +269,17 @@ const IndexAdmin = () => {
   };
 
   // ── Carros ────────────────────────────────────────────────────────────────
-  const fetchCarros = async () => {
+  const fetchCarros = async (page = 1) => {
     setLoadingCarros(true);
     setShowCarrosModal(true);
     try {
-      const [cRes, eRes] = await Promise.all([listarCarrosAdminApi(), listarEstadosApi()]);
-      const cars   = Array.isArray(cRes.data?.data) ? cRes.data.data : [];
+      const [cRes, eRes] = await Promise.all([listarCarrosAdminApi(page), listarEstadosApi()]);
+      const cars    = Array.isArray(cRes.data?.data) ? cRes.data.data : [];
       const estados = Array.isArray(eRes.data?.data) ? eRes.data.data : [];
       setCarrosList(cars);
       setEstadosList(estados);
+      setPageCarros(cRes.data?.current_page ?? 1);
+      setLastPageCarros(cRes.data?.last_page ?? 1);
       const initial = {};
       cars.forEach(c => { initial[c.id_carros || c.id] = c.id_estados || ''; });
       setCarroEstados(initial);
@@ -284,19 +294,21 @@ const IndexAdmin = () => {
     try {
       await actualizarEstadoCarroApi(carId, parseInt(estadoId));
       showToast('Estado actualizado.', 'success');
-      await fetchCarros();
+      await fetchCarros(pageCarros);
     } catch { showToast('Error al actualizar el estado.', 'error'); }
     finally { setSavingCarroId(null); }
   };
 
   // ── Reservas ──────────────────────────────────────────────────────────────
-  const fetchReservas = async () => {
+  const fetchReservas = async (page = 1) => {
     setLoadingReservas(true);
     setShowReservasModal(true);
     try {
-      const data = await listarReservasApi();
-      const list = Array.isArray(data) ? data : (data.data ?? []);
+      const data = await listarReservasApi(page);
+      const list = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       setReservasList(list);
+      setPageReservas(data.current_page ?? 1);
+      setLastPageReservas(data.last_page ?? 1);
     } catch { showToast('Error al cargar reservas.', 'error'); }
     finally { setLoadingReservas(false); }
   };
@@ -307,7 +319,7 @@ const IndexAdmin = () => {
     try {
       await confirmarReservaApi(id, estado);
       showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Reserva rechazada.', estado === 'Confirmada' ? 'success' : 'error');
-      await fetchReservas();
+      await fetchReservas(pageReservas);
     } catch { showToast('Error al actualizar la reserva.', 'error'); }
     finally { setProcesandoResId(null); }
   };
@@ -321,25 +333,27 @@ const IndexAdmin = () => {
         await eliminarCarroApi(deleteTarget.id);
         showToast('Vehículo eliminado.', 'success');
         setDeleteTarget(null);
-        await fetchCarros();
+        await fetchCarros(pageCarros);
       } else if (deleteTarget.tipo === 'reserva') {
         await eliminarReservaApi(deleteTarget.id);
         showToast('Reserva eliminada.', 'success');
         setDeleteTarget(null);
-        await fetchReservas();
+        await fetchReservas(pageReservas);
       }
     } catch { showToast('Error al eliminar.', 'error'); }
     finally { setIsDeleting(false); }
   };
 
   // ── Facturas ──────────────────────────────────────────────────────────────
-  const fetchFacturas = async () => {
+  const fetchFacturas = async (page = 1) => {
     setLoadingFacturas(true);
     setShowFacturasModal(true);
     try {
-      const { data } = await listarFacturasApi();
+      const { data } = await listarFacturasApi(page);
       const list = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       setFacturasList(list);
+      setPageFacturas(data.current_page ?? 1);
+      setLastPageFacturas(data.last_page ?? 1);
     } catch { showToast('Error al cargar facturas.', 'error'); }
     finally { setLoadingFacturas(false); }
   };
@@ -466,7 +480,7 @@ const IndexAdmin = () => {
               desc="Administra todos los vehículos registrados: estado y eliminación."
               btnLabel="Ver vehículos"
               btnColor="teal"
-              onClick={fetchCarros}
+              onClick={() => fetchCarros(1)}
             />
             <ActionCard
               icon={<FaTicketAlt />}
@@ -474,7 +488,7 @@ const IndexAdmin = () => {
               desc="Gestiona todas las reservas: confirma, rechaza o elimina."
               btnLabel="Ver reservas"
               btnColor="orange"
-              onClick={fetchReservas}
+              onClick={() => fetchReservas(1)}
             />
             <ActionCard
               icon={<FaFileInvoice />}
@@ -482,7 +496,7 @@ const IndexAdmin = () => {
               desc="Consulta todas las facturas generadas del sistema."
               btnLabel="Ver facturas"
               btnColor="blue"
-              onClick={fetchFacturas}
+              onClick={() => fetchFacturas(1)}
             />
             <ActionCard
               icon={<FaEnvelope />}
@@ -744,73 +758,83 @@ const IndexAdmin = () => {
               <p className="text-gray-400 text-sm">No hay vehículos registrados.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {carrosList.map((car, idx) => {
-                const carId    = car.id_carros || car.id;
-                const estadoInfo = getEstadoInfo(car.id_estados);
-                const saving   = savingCarroId === carId;
-                return (
-                  <div key={carId ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2 flex-wrap">
-                      <div>
-                        <p className="font-bold text-gray-800 text-sm">{car.placa || 'Sin placa'}</p>
-                        <p className="text-xs text-gray-400">{car.conductor}</p>
+            <>
+              <div className="space-y-4">
+                {carrosList.map((car, idx) => {
+                  const carId    = car.id_carros || car.id;
+                  const estadoInfo = getEstadoInfo(car.id_estados);
+                  const saving   = savingCarroId === carId;
+                  return (
+                    <div key={carId ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                      <div className="flex items-start justify-between gap-2 flex-wrap">
+                        <div>
+                          <p className="font-bold text-gray-800 text-sm">{car.placa || 'Sin placa'}</p>
+                          <p className="text-xs text-gray-400">{car.conductor}</p>
+                        </div>
+                        <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${estadoInfo.color}`}>
+                          {estadoInfo.label}
+                        </span>
                       </div>
-                      <span className={`text-xs px-2.5 py-1 rounded-full font-semibold border ${estadoInfo.color}`}>
-                        {estadoInfo.label}
-                      </span>
-                    </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600">
-                      <span className="flex items-center gap-1">
-                        <FaMapMarkerAlt className="text-violet-400 shrink-0" />
-                        {car.precioviaje
-                          ? `${car.precioviaje.origen} → ${car.precioviaje.destino}`
-                          : '—'}
-                      </span>
-                      <span className="flex items-center gap-1"><FaClock className="text-violet-400 shrink-0" />{car.horasalida || '—'}</span>
-                      <span className="flex items-center gap-1"><FaCalendarAlt className="text-violet-400 shrink-0" />{formatFecha(car.fecha)}</span>
-                      <span className="flex items-center gap-1"><FaPhone className="text-violet-400 shrink-0" />{car.telefono || '—'}</span>
-                    </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs text-gray-600">
+                        <span className="flex items-center gap-1">
+                          <FaMapMarkerAlt className="text-violet-400 shrink-0" />
+                          {car.precioviaje
+                            ? `${car.precioviaje.origen} → ${car.precioviaje.destino}`
+                            : '—'}
+                        </span>
+                        <span className="flex items-center gap-1"><FaClock className="text-violet-400 shrink-0" />{car.horasalida || '—'}</span>
+                        <span className="flex items-center gap-1"><FaCalendarAlt className="text-violet-400 shrink-0" />{formatFecha(car.fecha)}</span>
+                        <span className="flex items-center gap-1"><FaPhone className="text-violet-400 shrink-0" />{car.telefono || '—'}</span>
+                      </div>
 
-                    <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-50">
-                      <select
-                        value={carroEstados[carId] ?? ''}
-                        onChange={e => setCarroEstados(p => ({ ...p, [carId]: e.target.value }))}
-                        className="flex-1 min-w-[140px] py-1.5 px-3 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
-                      >
-                        <option value="">Cambiar estado...</option>
-                        {estadosList.length > 0
-                          ? estadosList.map(e => (
-                              <option key={e.id_estados || e.id} value={e.id_estados || e.id}>
-                                {e.estados || e.nombre || `Estado ${e.id_estados || e.id}`}
-                              </option>
-                            ))
-                          : ESTADOS_LABELS.map(e => (
-                              <option key={e.id} value={e.id}>{e.label}</option>
-                            ))
-                        }
-                      </select>
-                      <button
-                        onClick={() => handleUpdateCarroEstado(carId)}
-                        disabled={saving || !carroEstados[carId]}
-                        className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center gap-1"
-                      >
-                        {saving ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
-                        Actualizar
-                      </button>
-                      <button
-                        onClick={() => setDeleteTarget({ tipo: 'carro', id: carId, label: car.placa || `Vehículo #${carId}` })}
-                        className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Eliminar vehículo"
-                      >
-                        <FaTrash className="text-xs" />
-                      </button>
+                      <div className="flex items-center gap-2 flex-wrap pt-1 border-t border-gray-50">
+                        <select
+                          value={carroEstados[carId] ?? ''}
+                          onChange={e => setCarroEstados(p => ({ ...p, [carId]: e.target.value }))}
+                          className="flex-1 min-w-[140px] py-1.5 px-3 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
+                        >
+                          <option value="">Cambiar estado...</option>
+                          {estadosList.length > 0
+                            ? estadosList.map(e => (
+                                <option key={e.id_estados || e.id} value={e.id_estados || e.id}>
+                                  {e.estados || e.nombre || `Estado ${e.id_estados || e.id}`}
+                                </option>
+                              ))
+                            : ESTADOS_LABELS.map(e => (
+                                <option key={e.id} value={e.id}>{e.label}</option>
+                              ))
+                          }
+                        </select>
+                        <button
+                          onClick={() => handleUpdateCarroEstado(carId)}
+                          disabled={saving || !carroEstados[carId]}
+                          className="px-3 py-1.5 bg-blue-500 text-white text-xs font-bold rounded-lg hover:bg-blue-600 transition-all disabled:opacity-50 flex items-center gap-1"
+                        >
+                          {saving ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
+                          Actualizar
+                        </button>
+                        <button
+                          onClick={() => setDeleteTarget({ tipo: 'carro', id: carId, label: car.placa || `Vehículo #${carId}` })}
+                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Eliminar vehículo"
+                        >
+                          <FaTrash className="text-xs" />
+                        </button>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6">
+                <Pagination
+                  currentPage={pageCarros}
+                  lastPage={lastPageCarros}
+                  onPageChange={p => fetchCarros(p)}
+                  loading={loadingCarros}
+                />
+              </div>
+            </>
           )}
         </Modal>
       )}
@@ -829,64 +853,74 @@ const IndexAdmin = () => {
               <p className="text-gray-400 text-sm">No hay reservas registradas.</p>
             </div>
           ) : (
-            <div className="space-y-3">
-              {reservasList.map((r, idx) => {
-                const id       = r.id_reservarviajes || r.id_reservarviaje || r.id;
-                const estado   = r.estado?.toLowerCase();
-                const pendiente = !estado || estado === 'pendiente';
-                const procesando = procesandoResId === id;
-                const statusCls =
-                  estado === 'confirmada'                        ? 'bg-green-100 text-green-700 border-green-200' :
-                  estado === 'rechazada' || estado === 'cancelada' ? 'bg-red-100 text-red-700 border-red-200' :
-                  'bg-yellow-100 text-yellow-700 border-yellow-200';
+            <>
+              <div className="space-y-3">
+                {reservasList.map((r, idx) => {
+                  const id       = r.id_reservarviajes || r.id_reservarviaje || r.id;
+                  const estado   = r.estado?.toLowerCase();
+                  const pendiente = !estado || estado === 'pendiente';
+                  const procesando = procesandoResId === id;
+                  const statusCls =
+                    estado === 'confirmada'                        ? 'bg-green-100 text-green-700 border-green-200' :
+                    estado === 'rechazada' || estado === 'cancelada' ? 'bg-red-100 text-red-700 border-red-200' :
+                    'bg-yellow-100 text-yellow-700 border-yellow-200';
 
-                return (
-                  <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-2">
-                    <div className="flex items-center justify-between gap-2 flex-wrap">
-                      <p className="font-bold text-gray-800 text-sm">Reserva #{id} · Carro #{r.id_carros}</p>
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
-                        {r.estado || 'Pendiente'}
-                      </span>
+                  return (
+                    <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-2">
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <p className="font-bold text-gray-800 text-sm">Reserva #{id} · Carro #{r.id_carros}</p>
+                        <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
+                          {r.estado || 'Pendiente'}
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                        <span className="flex items-center gap-1"><FaUser className="text-violet-400 shrink-0" />{r.nombre || '—'}</span>
+                        <span className="flex items-center gap-1"><FaPhone className="text-violet-400 shrink-0" />{r.tel || r.telefono || '—'}</span>
+                        <span className="flex items-center gap-1"><FaMapMarkerAlt className="text-violet-400 shrink-0" />{r.ubicacion || '—'}</span>
+                        <span className="flex items-center gap-1"><FaCar className="text-violet-400 shrink-0" />Asiento {r.asiento || r.Asiento || '—'}</span>
+                      </div>
+                      <div className="flex gap-2 pt-1 border-t border-gray-50 flex-wrap">
+                        {pendiente && (
+                          <>
+                            <button
+                              onClick={() => handleReservaEstado(r, 'Confirmada')}
+                              disabled={procesando}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
+                            >
+                              {procesando ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
+                              Confirmar
+                            </button>
+                            <button
+                              onClick={() => handleReservaEstado(r, 'rechazada')}
+                              disabled={procesando}
+                              className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50"
+                            >
+                              {procesando ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
+                              Rechazar
+                            </button>
+                          </>
+                        )}
+                        <button
+                          onClick={() => setDeleteTarget({ tipo: 'reserva', id, label: `Reserva #${id}` })}
+                          className="ml-auto p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
+                          title="Eliminar reserva"
+                        >
+                          <FaTrash className="text-xs" />
+                        </button>
+                      </div>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                      <span className="flex items-center gap-1"><FaUser className="text-violet-400 shrink-0" />{r.nombre || '—'}</span>
-                      <span className="flex items-center gap-1"><FaPhone className="text-violet-400 shrink-0" />{r.tel || r.telefono || '—'}</span>
-                      <span className="flex items-center gap-1"><FaMapMarkerAlt className="text-violet-400 shrink-0" />{r.ubicacion || '—'}</span>
-                      <span className="flex items-center gap-1"><FaCar className="text-violet-400 shrink-0" />Asiento {r.asiento || r.Asiento || '—'}</span>
-                    </div>
-                    <div className="flex gap-2 pt-1 border-t border-gray-50 flex-wrap">
-                      {pendiente && (
-                        <>
-                          <button
-                            onClick={() => handleReservaEstado(r, 'Confirmada')}
-                            disabled={procesando}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
-                          >
-                            {procesando ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
-                            Confirmar
-                          </button>
-                          <button
-                            onClick={() => handleReservaEstado(r, 'rechazada')}
-                            disabled={procesando}
-                            className="flex items-center gap-1 px-3 py-1.5 bg-orange-500 text-white text-xs font-bold rounded-lg hover:bg-orange-600 transition-all disabled:opacity-50"
-                          >
-                            {procesando ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
-                            Rechazar
-                          </button>
-                        </>
-                      )}
-                      <button
-                        onClick={() => setDeleteTarget({ tipo: 'reserva', id, label: `Reserva #${id}` })}
-                        className="ml-auto p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all"
-                        title="Eliminar reserva"
-                      >
-                        <FaTrash className="text-xs" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6">
+                <Pagination
+                  currentPage={pageReservas}
+                  lastPage={lastPageReservas}
+                  onPageChange={p => fetchReservas(p)}
+                  loading={loadingReservas}
+                />
+              </div>
+            </>
           )}
         </Modal>
       )}
@@ -978,6 +1012,14 @@ const IndexAdmin = () => {
                     </div>
                   </div>
                 ))}
+              </div>
+              <div className="mt-6">
+                <Pagination
+                  currentPage={pageFacturas}
+                  lastPage={lastPageFacturas}
+                  onPageChange={p => fetchFacturas(p)}
+                  loading={loadingFacturas}
+                />
               </div>
             </>
           )}

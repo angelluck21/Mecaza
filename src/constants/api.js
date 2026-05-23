@@ -55,6 +55,7 @@ export const ENDPOINTS = {
   TERMINAR_VIAJE:      (id) => `${API_BASE_URL}/terminarviaje/${id}`,
   ASIGNAR_VIAJE:       (id) => `${API_BASE_URL}/asignarviaje/${id}`,
   MIS_CARROS:          `${API_BASE_URL}/mis-carros`,
+  MIS_RESERVAS:        `${API_BASE_URL}/mis-reservas`,
   HISTORIAL_CONDUCTOR: `${API_BASE_URL}/historial-conductor`,
   COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
   CALIFICAR_RESERVA:   (id) => `${API_BASE_URL}/calificarreserva/${id}`,

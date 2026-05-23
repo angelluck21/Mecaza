@@ -129,6 +129,7 @@ const AjustesPerfil = () => {
       setForm(f => ({ ...f, contrasena: '', confirmar: '' }));
       setProfileImage(null);
       showToast('Perfil actualizado correctamente.', 'success');
+      setTimeout(() => navigate(-1), 1200);
 
     } catch (err) {
       const status = err.response?.status;
@@ -227,6 +228,7 @@ const AjustesPerfil = () => {
                 value={form.contrasena}
                 onChange={set('contrasena')}
                 placeholder="Deja vacío para no cambiar"
+                autoComplete="new-password"
                 right={
                   <button type="button" onClick={() => setShowPass(p => !p)} className="text-gray-400 hover:text-violet-500 transition-colors">
                     {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
@@ -241,6 +243,7 @@ const AjustesPerfil = () => {
                   value={form.confirmar}
                   onChange={set('confirmar')}
                   placeholder="Repite la nueva contraseña"
+                  autoComplete="new-password"
                   required
                 />
               )}

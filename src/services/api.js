@@ -17,11 +17,14 @@ export const googleAuthApi = (credential) =>
 
 // ── Carros ───────────────────────────────────────────────────────────────────
 
-export const listarCarrosApi = () =>
-  fetch(ENDPOINTS.LISTAR_CARROS).then((r) => r.json());
+export const listarCarrosApi = (params = {}) => {
+  const url = new URL(ENDPOINTS.LISTAR_CARROS);
+  Object.entries(params).forEach(([k, v]) => { if (v != null && v !== '') url.searchParams.set(k, String(v)); });
+  return fetch(url.toString()).then(r => r.json());
+};
 
-export const listarCarrosAdminApi = () =>
-  axios.get(ENDPOINTS.LISTAR_CARROS_ADMIN, authHeaders());
+export const listarCarrosAdminApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.LISTAR_CARROS_ADMIN}?page=${page}`, authHeaders());
 
 export const crearCarroApi = (formData) =>
   axios.post(ENDPOINTS.CREAR_CARRO, formData, {
@@ -39,11 +42,14 @@ export const actualizarEstadoCarroApi = (id, estadoId) =>
 
 // ── Reservas ─────────────────────────────────────────────────────────────────
 
-export const listarReservasApi = () =>
-  fetch(ENDPOINTS.LISTAR_RESERVAS).then((r) => r.json());
+export const listarReservasApi = (page = 1) =>
+  fetch(`${ENDPOINTS.LISTAR_RESERVAS}?page=${page}`).then(r => r.json());
 
-export const listarReservasAuthApi = () =>
-  axios.get(ENDPOINTS.LISTAR_RESERVAS, authHeaders());
+export const listarReservasAuthApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.LISTAR_RESERVAS}?page=${page}`, authHeaders());
+
+export const misReservasApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.MIS_RESERVAS}?page=${page}`, authHeaders());
 
 export const crearReservaApi = (data) =>
   axios.post(ENDPOINTS.CREAR_RESERVA, data, authHeaders());
@@ -57,8 +63,8 @@ export const actualizarReservaApi = (id, data) =>
 export const confirmarReservaApi = (id, estado, motivo = null) =>
   axios.put(ENDPOINTS.CONFIRMAR_RESERVA(id), { estado, ...(motivo ? { motivo } : {}) }, authHeaders());
 
-export const historialConductorApi = () =>
-  axios.get(ENDPOINTS.HISTORIAL_CONDUCTOR, authHeaders());
+export const historialConductorApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.HISTORIAL_CONDUCTOR}?page=${page}`, authHeaders());
 
 export const iniciarViajeApi = (id) =>
   axios.post(ENDPOINTS.INICIAR_VIAJE(id), {}, authHeaders());
@@ -85,8 +91,8 @@ export const listarEstadosApi = () =>
 
 // ── Usuarios ─────────────────────────────────────────────────────────────────
 
-export const listarUsuariosApi = () =>
-  axios.get(ENDPOINTS.LISTAR_USUARIOS, authHeaders());
+export const listarUsuariosApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.LISTAR_USUARIOS}?page=${page}`, authHeaders());
 
 export const verUsuarioApi = (id) =>
   axios.get(ENDPOINTS.VER_USUARIO(id), authHeaders());
@@ -160,8 +166,8 @@ export const obtenerFacturaApi = (id_reservarviajes) =>
 export const obtenerMisFacturasApi = () =>
   axios.get(ENDPOINTS.MIS_FACTURAS, authHeaders());
 
-export const listarFacturasApi = () =>
-  axios.get(ENDPOINTS.LISTAR_FACTURAS, authHeaders());
+export const listarFacturasApi = (page = 1) =>
+  axios.get(`${ENDPOINTS.LISTAR_FACTURAS}?page=${page}`, authHeaders());
 
 export const descargarFacturaApi = (id) =>
   axios.get(ENDPOINTS.DESCARGAR_FACTURA(id), { ...authHeaders(), responseType: 'blob' });

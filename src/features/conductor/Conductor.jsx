@@ -12,10 +12,11 @@ import InnerNavbar       from '../../components/layout/InnerNavbar';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
 import FormInput         from '../../components/ui/FormInput';
 import ToastNotification from '../../components/ui/ToastNotification';
+import Pagination        from '../../components/ui/Pagination';
 import { useToast }      from '../../hooks/useToast';
 
 import {
-  listarReservasApi, listarEstadosApi, listarPreciosApi,
+  misReservasApi, listarEstadosApi, listarPreciosApi,
   crearCarroApi, eliminarCarroApi,
   confirmarReservaApi, iniciarViajeApi, terminarViajeApi,
   historialConductorApi, asignarViajeApi, misCarrosApi,
@@ -113,7 +114,15 @@ const Conductor = () => {
   const [procesando,       setProcesando]       = useState(null);
   const [accionCarroId,    setAccionCarroId]    = useState(null);
 
-  // Formulario nuevo vehículo (solo datos del carro)
+  // Paginación reservas
+  const [pageReservas,      setPageReservas]      = useState(1);
+  const [lastPageReservas,  setLastPageReservas]  = useState(1);
+
+  // Paginación historial
+  const [pageHistorial,     setPageHistorial]     = useState(1);
+  const [lastPageHistorial, setLastPageHistorial] = useState(1);
+
+  // Formulario nuevo vehículo
   const [carData, setCarData] = useState({
     Conductor: '', Placa: '', Telefono: '', Asientos: '', Imagencarro: null,
   });
@@ -143,19 +152,15 @@ const Conductor = () => {
 
   useEffect(() => { if (userData) loadDashboard(); }, [userData]);
 
-  // ── Cargar dashboard (usa endpoint protegido mis-carros) ───────────────────────
+  // ── Cargar dashboard ───────────────────────────────────────────────────────────
   const loadDashboard = async () => {
     setLoadingDash(true);
     try {
-      const [carsResp, reservasResp] = await Promise.all([misCarrosApi(), listarReservasApi()]);
-      const misCarros   = Array.isArray(carsResp.data?.data) ? carsResp.data.data : [];
-      const allReservas = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
-      const idsCarros   = new Set(misCarros.map(c => String(c.id_carros || c.id)));
-
+      const [carsResp, resResp] = await Promise.all([misCarrosApi(), misReservasApi(1)]);
+      const misCarros = Array.isArray(carsResp.data?.data) ? carsResp.data.data : [];
+      const activeRes = Array.isArray(resResp.data?.data) ? resResp.data.data : [];
       setDashCarros(misCarros);
-      setDashReservas(allReservas.filter(r =>
-        idsCarros.has(String(r.id_carros || r.id_carro || r.carro_id))
-      ));
+      setDashReservas(activeRes);
     } catch { /* silencioso */ }
     finally { setLoadingDash(false); }
   };
@@ -176,15 +181,14 @@ const Conductor = () => {
     } catch { /* silencioso */ }
   };
 
-  const fetchReservas = async () => {
+  const fetchReservas = async (page = 1) => {
     setLoadingReservas(true);
     setShowReservas(true);
     try {
-      const [carsResp, reservasResp] = await Promise.all([misCarrosApi(), listarReservasApi()]);
-      const misCarros   = Array.isArray(carsResp.data?.data) ? carsResp.data.data : [];
-      const allReservas = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
-      const idsCarros   = misCarros.map(c => String(c.id_carros || c.id));
-      setReservas(allReservas.filter(r => idsCarros.includes(String(r.id_carros || r.id_carro || r.carro_id))));
+      const { data } = await misReservasApi(page);
+      setReservas(Array.isArray(data.data) ? data.data : []);
+      setPageReservas(data.current_page ?? 1);
+      setLastPageReservas(data.last_page ?? 1);
     } catch { showToast('Error al cargar reservas.', 'error'); }
     finally { setLoadingReservas(false); }
   };
@@ -199,17 +203,19 @@ const Conductor = () => {
     finally { setLoadingCarros(false); }
   };
 
-  const fetchHistorial = async () => {
+  const fetchHistorial = async (page = 1) => {
     setLoadingHistorial(true);
     setShowHistorial(true);
     try {
-      const { data } = await historialConductorApi();
+      const { data } = await historialConductorApi(page);
       setHistorial(Array.isArray(data.data) ? data.data : []);
+      setPageHistorial(data.current_page ?? 1);
+      setLastPageHistorial(data.last_page ?? 1);
     } catch { showToast('Error al cargar el historial.', 'error'); }
     finally { setLoadingHistorial(false); }
   };
 
-  // ── Crear vehículo (solo datos básicos) ───────────────────────────────────────
+  // ── Crear vehículo ────────────────────────────────────────────────────────────
   const handleAddCar = async (e) => {
     e.preventDefault();
     const { Conductor, Placa, Asientos, Telefono, Imagencarro } = carData;
@@ -247,7 +253,7 @@ const Conductor = () => {
     } finally { setIsSaving(false); }
   };
 
-  // ── Asignar viaje a un carro inactivo ─────────────────────────────────────────
+  // ── Asignar viaje ─────────────────────────────────────────────────────────────
   const handleAsignarViaje = async (e) => {
     e.preventDefault();
     if (!carroAAsignar || !viajeData.id_precioviaje || !viajeData.horasalida || !viajeData.fecha) {
@@ -318,11 +324,7 @@ const Conductor = () => {
       await confirmarReservaApi(id, estado);
       showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Operación exitosa.', 'success');
       await loadDashboard();
-      const [carsResp, reservasResp] = await Promise.all([misCarrosApi(), listarReservasApi()]);
-      const misCarros   = Array.isArray(carsResp.data?.data) ? carsResp.data.data : [];
-      const allReservas = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
-      const idsCarros   = misCarros.map(c => String(c.id_carros || c.id));
-      setReservas(allReservas.filter(r => idsCarros.includes(String(r.id_carros || r.id_carro || r.carro_id))));
+      await fetchReservas(pageReservas);
     } catch { showToast('Error al actualizar la reserva.', 'error'); }
     finally { setProcesando(null); }
   };
@@ -373,7 +375,7 @@ const Conductor = () => {
             desc="Consulta y gestiona las reservas de tus vehículos."
             btnLabel="Ver reservas"
             gradient="from-blue-600 to-cyan-500"
-            onClick={fetchReservas}
+            onClick={() => fetchReservas(1)}
           />
           <ActionCard
             icon={<FaCar />}
@@ -389,7 +391,7 @@ const Conductor = () => {
             desc="Consulta los viajes completados y sus pasajeros."
             btnLabel="Ver historial"
             gradient="from-orange-500 to-amber-500"
-            onClick={fetchHistorial}
+            onClick={() => fetchHistorial(1)}
           />
         </div>
 
@@ -565,10 +567,8 @@ const Conductor = () => {
                 return (
                   <div key={id} className="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
 
-                    {/* Franja superior con gradiente según estado */}
                     <div className={`h-1.5 ${esTerminado ? 'bg-gradient-to-r from-gray-400 to-slate-500' : 'bg-gradient-to-r from-red-400 to-rose-500'}`} />
 
-                    {/* Imagen o placeholder */}
                     <div className="relative h-32 bg-gradient-to-br from-slate-100 to-gray-200 overflow-hidden">
                       {carro.imagencarro ? (
                         <img
@@ -581,13 +581,11 @@ const Conductor = () => {
                           <FaCar className="text-gray-300 text-5xl" />
                         </div>
                       )}
-                      {/* Badge de estado sobre la imagen */}
                       <div className="absolute top-3 right-3">
                         <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shadow-sm ${estadoInfo.color}`}>
                           {estadoInfo.label}
                         </span>
                       </div>
-                      {/* Placa sobre la imagen */}
                       <div className="absolute bottom-3 left-3">
                         <span className="font-mono font-extrabold text-white text-sm tracking-widest bg-black/50 backdrop-blur-sm px-3 py-1 rounded-lg">
                           {carro.placa || '—'}
@@ -595,7 +593,6 @@ const Conductor = () => {
                       </div>
                     </div>
 
-                    {/* Info */}
                     <div className="p-4 flex-1 space-y-3">
                       <div className="space-y-1.5">
                         <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
@@ -632,7 +629,6 @@ const Conductor = () => {
                       </div>
                     </div>
 
-                    {/* Botón */}
                     <div className="px-4 pb-4">
                       <button
                         onClick={() => {
@@ -778,48 +774,58 @@ const Conductor = () => {
               <p className="text-gray-500 text-sm">No hay reservas para tus vehículos.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {reservas.map((r, idx) => {
-                const id = r.id_reservarviajes || r.id_reservarviaje || r.id || r.ID;
-                const enProceso = procesando === id;
-                const estado    = r.estado?.toLowerCase();
-                const statusCls = estado === 'confirmada'
-                  ? 'bg-green-50 text-green-700 border-green-200'
-                  : estado === 'rechazada' || estado === 'cancelada'
-                    ? 'bg-red-50 text-red-700 border-red-200'
-                    : 'bg-yellow-50 text-yellow-700 border-yellow-200';
-                return (
-                  <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-gray-800 text-sm">Reserva #{id}</p>
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
-                        {r.estado || 'Pendiente'}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <InfoRow icon={<FaMapMarkerAlt />} label="Ubicación" value={r.ubicacion} />
-                      <InfoRow icon={<FaCar />}          label="Asiento"   value={r.asiento} />
-                      <InfoRow icon={<FaUser />}         label="Pasajero"  value={r.nombre} />
-                      <InfoRow icon={<FaPhone />}        label="Teléfono"  value={r.tel} />
-                    </div>
-                    {(!estado || estado === 'pendiente') && (
-                      <div className="flex gap-2 pt-2 border-t border-gray-100">
-                        <button onClick={() => cambiarEstadoReserva(r, 'Confirmada')} disabled={enProceso}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50">
-                          {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
-                          Confirmar
-                        </button>
-                        <button onClick={() => cambiarEstadoReserva(r, 'rechazada')} disabled={enProceso}
-                          className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50">
-                          {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
-                          Rechazar
-                        </button>
+            <>
+              <div className="space-y-4">
+                {reservas.map((r, idx) => {
+                  const id = r.id_reservarviajes || r.id_reservarviaje || r.id || r.ID;
+                  const enProceso = procesando === id;
+                  const estado    = r.estado?.toLowerCase();
+                  const statusCls = estado === 'confirmada'
+                    ? 'bg-green-50 text-green-700 border-green-200'
+                    : estado === 'rechazada' || estado === 'cancelada'
+                      ? 'bg-red-50 text-red-700 border-red-200'
+                      : 'bg-yellow-50 text-yellow-700 border-yellow-200';
+                  return (
+                    <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="font-bold text-gray-800 text-sm">Reserva #{id}</p>
+                        <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
+                          {r.estado || 'Pendiente'}
+                        </span>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <InfoRow icon={<FaMapMarkerAlt />} label="Ubicación" value={r.ubicacion} />
+                        <InfoRow icon={<FaCar />}          label="Asiento"   value={r.asiento} />
+                        <InfoRow icon={<FaUser />}         label="Pasajero"  value={r.nombre} />
+                        <InfoRow icon={<FaPhone />}        label="Teléfono"  value={r.tel} />
+                      </div>
+                      {(!estado || estado === 'pendiente') && (
+                        <div className="flex gap-2 pt-2 border-t border-gray-100">
+                          <button onClick={() => cambiarEstadoReserva(r, 'Confirmada')} disabled={enProceso}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50">
+                            {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
+                            Confirmar
+                          </button>
+                          <button onClick={() => cambiarEstadoReserva(r, 'rechazada')} disabled={enProceso}
+                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50">
+                            {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
+                            Rechazar
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6">
+                <Pagination
+                  currentPage={pageReservas}
+                  lastPage={lastPageReservas}
+                  onPageChange={p => fetchReservas(p)}
+                  loading={loadingReservas}
+                />
+              </div>
+            </>
           )}
         </Modal>
       )}
@@ -888,68 +894,78 @@ const Conductor = () => {
               <p className="text-gray-500 text-sm">Aún no tienes viajes completados.</p>
             </div>
           ) : (
-            <div className="space-y-4">
-              {historial.map((viaje, idx) => {
-                const ruta      = viaje.precioviaje ? `${viaje.precioviaje.origen} → ${viaje.precioviaje.destino}` : 'Ruta no especificada';
-                const pasajeros = viaje.reservas ?? [];
-                const ingresos  = pasajeros.length * parseFloat(viaje.precioviaje?.precio ?? 0);
-                const califs    = pasajeros.filter(p => p.calificacion != null);
-                const promedio  = califs.length
-                  ? (califs.reduce((s, p) => s + p.calificacion, 0) / califs.length).toFixed(1)
-                  : null;
-                const claveUnica = `${viaje.id_carros}_${viaje.viaje_numero ?? idx}_${viaje.fecha ?? idx}`;
-                return (
-                  <div key={claveUnica} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between flex-wrap gap-2">
-                      <div>
-                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-                          <FaRoad className="text-orange-400 text-xs" /> {ruta}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {viaje.placa} · {formatFecha(viaje.fecha)} · {viaje.horasalida}
-                          {viaje.viaje_numero > 1 && (
-                            <span className="ml-2 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
-                              Viaje #{viaje.viaje_numero}
-                            </span>
-                          )}
-                        </p>
+            <>
+              <div className="space-y-4">
+                {historial.map((viaje, idx) => {
+                  const ruta      = viaje.precioviaje ? `${viaje.precioviaje.origen} → ${viaje.precioviaje.destino}` : 'Ruta no especificada';
+                  const pasajeros = viaje.reservas ?? [];
+                  const ingresos  = pasajeros.length * parseFloat(viaje.precioviaje?.precio ?? 0);
+                  const califs    = pasajeros.filter(p => p.calificacion != null);
+                  const promedio  = califs.length
+                    ? (califs.reduce((s, p) => s + p.calificacion, 0) / califs.length).toFixed(1)
+                    : null;
+                  const claveUnica = `${viaje.id_carros}_${viaje.viaje_numero ?? idx}_${viaje.fecha ?? idx}`;
+                  return (
+                    <div key={claveUnica} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                      <div className="flex items-center justify-between flex-wrap gap-2">
+                        <div>
+                          <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                            <FaRoad className="text-orange-400 text-xs" /> {ruta}
+                          </p>
+                          <p className="text-xs text-gray-400 mt-0.5">
+                            {viaje.placa} · {formatFecha(viaje.fecha)} · {viaje.horasalida}
+                            {viaje.viaje_numero > 1 && (
+                              <span className="ml-2 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
+                                Viaje #{viaje.viaje_numero}
+                              </span>
+                            )}
+                          </p>
+                        </div>
+                        {promedio && (
+                          <div className="flex items-center gap-1">
+                            <FaStar className="text-yellow-400 text-xs" />
+                            <span className="text-xs font-bold text-gray-700">{promedio}</span>
+                          </div>
+                        )}
                       </div>
-                      {promedio && (
-                        <div className="flex items-center gap-1">
-                          <FaStar className="text-yellow-400 text-xs" />
-                          <span className="text-xs font-bold text-gray-700">{promedio}</span>
+                      <div className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
+                        <span>{pasajeros.length} pasajero{pasajeros.length !== 1 ? 's' : ''}</span>
+                        {ingresos > 0 && <span className="font-bold text-green-600">+${ingresos.toLocaleString('es-CO')}</span>}
+                      </div>
+                      {pasajeros.length > 0 && (
+                        <div className="space-y-1.5">
+                          {pasajeros.map((p, i) => (
+                            <div key={p.id_reservarviajes ?? i} className="flex items-center justify-between text-xs">
+                              <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
+                                  {(p.usuario?.name || p.nombre || '?')[0]?.toUpperCase()}
+                                </div>
+                                <span className="text-gray-700 font-medium">{p.usuario?.name || p.nombre || '—'}</span>
+                              </div>
+                              {p.calificacion != null && (
+                                <div className="flex gap-0.5">
+                                  {[1,2,3,4,5].map(n => (
+                                    <FaStar key={n} className={`text-[10px] ${n <= p.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          ))}
                         </div>
                       )}
                     </div>
-                    <div className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                      <span>{pasajeros.length} pasajero{pasajeros.length !== 1 ? 's' : ''}</span>
-                      {ingresos > 0 && <span className="font-bold text-green-600">+${ingresos.toLocaleString('es-CO')}</span>}
-                    </div>
-                    {pasajeros.length > 0 && (
-                      <div className="space-y-1.5">
-                        {pasajeros.map((p, i) => (
-                          <div key={p.id_reservarviajes ?? i} className="flex items-center justify-between text-xs">
-                            <div className="flex items-center gap-2">
-                              <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
-                                {(p.usuario?.name || p.nombre || '?')[0]?.toUpperCase()}
-                              </div>
-                              <span className="text-gray-700 font-medium">{p.usuario?.name || p.nombre || '—'}</span>
-                            </div>
-                            {p.calificacion != null && (
-                              <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(n => (
-                                  <FaStar key={n} className={`text-[10px] ${n <= p.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+              <div className="mt-6">
+                <Pagination
+                  currentPage={pageHistorial}
+                  lastPage={lastPageHistorial}
+                  onPageChange={p => fetchHistorial(p)}
+                  loading={loadingHistorial}
+                />
+              </div>
+            </>
           )}
         </Modal>
       )}

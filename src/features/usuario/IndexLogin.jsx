@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FaCar } from 'react-icons/fa';
 
@@ -7,60 +7,71 @@ import Footer        from '../../components/layout/Footer';
 import Carousel      from '../../components/ui/Carousel';
 import CarCard       from '../../components/ui/CarCard';
 import LoadingScreen from '../../components/ui/LoadingScreen';
-import PageBg        from '../../components/ui/PageBg';
+import Pagination    from '../../components/ui/Pagination';
 
-import { listarCarrosApi, listarReservasApi } from '../../services/api';
-import { calcularAsientosDisponibles }        from '../../utils';
+import { listarCarrosApi, listarPreciosApi } from '../../services/api';
 
-const filtrarCarros = (cars, term, origen, destino, fecha) => {
-  let r = cars;
-  if (origen)    r = r.filter(c => c.precioviaje?.origen === origen);
-  if (destino)   r = r.filter(c => c.precioviaje?.destino === destino);
-  if (fecha)     r = r.filter(c => c.fecha?.startsWith(fecha));
-  if (term.trim()) {
-    const q = term.toLowerCase();
-    r = r.filter(c =>
-      c.conductor?.toLowerCase().includes(q)          ||
-      c.precioviaje?.origen?.toLowerCase().includes(q) ||
-      c.precioviaje?.destino?.toLowerCase().includes(q)||
-      c.placa?.toLowerCase().includes(q)              ||
-      c.horasalida?.toLowerCase().includes(q)         ||
-      c.fecha?.toLowerCase().includes(q)
-    );
-  }
-  return r;
-};
+// Calcula asientos disponibles desde las reservas embebidas en cada carro
+const withSeats = (cars) => cars.map(c => {
+  const occupied = (c.reservas || []).filter(r => {
+    const est = (r.estado || '').toLowerCase();
+    return est === 'pendiente' || est === 'confirmada';
+  }).length;
+  return { ...c, asientos_disponibles: Math.max(0, (c.asientos || 0) - occupied) };
+});
 
 // ── Componente ─────────────────────────────────────────────────────────────────
 
 const IndexLogin = () => {
-  const [userData,       setUserData]       = useState(null);
-  const [isLoading,      setIsLoading]      = useState(true);
-  const [cars,           setCars]           = useState([]);
-  const [filteredCars,   setFilteredCars]   = useState([]);
+  const [userData,        setUserData]        = useState(null);
+  const [initialLoading,  setInitialLoading]  = useState(true);
+  const [loading,         setLoading]         = useState(false);
+  const [cars,            setCars]            = useState([]);
+  const [currentPage,     setCurrentPage]     = useState(1);
+  const [lastPage,        setLastPage]        = useState(1);
+  const [total,           setTotal]           = useState(0);
+  const [precios,         setPrecios]         = useState([]);
+
+  // Filtros
   const [searchTerm,     setSearchTerm]     = useState('');
   const [selectedOrigen, setSelectedOrigen] = useState('');
   const [selectedDestino,setSelectedDestino]= useState('');
   const [selectedFecha,  setSelectedFecha]  = useState('');
-  const navigate = useNavigate();
 
-  // ── Origenes únicos disponibles ──────────────────────────────────────────────
+  const debounceRef = useRef(null);
+  const navigate    = useNavigate();
+
+  // ── Opciones del dropdown ─────────────────────────────────────────────────────
   const origenesDisponibles = useMemo(() =>
-    [...new Set(cars.map(c => c.precioviaje?.origen).filter(Boolean))].sort(),
-    [cars]
+    [...new Set(precios.map(p => p.origen).filter(Boolean))].sort(),
+    [precios]
   );
 
-  // ── Destinos filtrados según el origen seleccionado ──────────────────────────
   const destinosDisponibles = useMemo(() => {
     const base = selectedOrigen
-      ? cars.filter(c => c.precioviaje?.origen === selectedOrigen)
-      : cars;
-    return [...new Set(base.map(c => c.precioviaje?.destino).filter(Boolean))].sort();
-  }, [cars, selectedOrigen]);
+      ? precios.filter(p => p.origen === selectedOrigen)
+      : precios;
+    return [...new Set(base.map(p => p.destino).filter(Boolean))].sort();
+  }, [precios, selectedOrigen]);
 
-  const hasFilters = selectedOrigen || selectedDestino || selectedFecha || searchTerm.trim();
+  // ── Fetch de carros (server-side: filtros + página) ───────────────────────────
+  const fetchCars = async (params = {}) => {
+    setLoading(true);
+    try {
+      const data    = await listarCarrosApi(params);
+      const rawCars = Array.isArray(data.data) ? data.data : [];
+      setCars(withSeats(rawCars));
+      setCurrentPage(data.current_page ?? 1);
+      setLastPage(data.last_page ?? 1);
+      setTotal(data.total ?? 0);
+    } catch {
+      setCars([]);
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // ── Carga inicial ─────────────────────────────────────────────────────────────
+  // ── Auth + carga inicial ──────────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
@@ -70,67 +81,64 @@ const IndexLogin = () => {
       setUserData(user);
     } catch { navigate('/login'); return; }
 
-    (async () => {
-      try {
-        const data = await listarCarrosApi();
-        let carsData = (Array.isArray(data.data) ? data.data : [])
-          .filter(c => parseInt(c.id_estados ?? 0) !== 5);
-        try {
-          const reservasData  = await listarReservasApi();
-          const reservasArray = Array.isArray(reservasData) ? reservasData : (reservasData.data ?? []);
-          carsData = calcularAsientosDisponibles(carsData, reservasArray);
-        } catch {
-          carsData = carsData.map(c => ({ ...c, asientos_disponibles: c.asientos || 4 }));
-        }
-        setCars(carsData);
-        setFilteredCars(carsData);
-      } catch {
-        setCars([]); setFilteredCars([]);
-      } finally {
-        setIsLoading(false);
-      }
-    })();
+    Promise.all([
+      fetchCars({ page: 1 }),
+      listarPreciosApi().then(r => setPrecios(Array.isArray(r.data?.data) ? r.data.data : [])).catch(() => {}),
+    ]).finally(() => setInitialLoading(false));
   }, [navigate]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────────
+  const buildParams = (overrides = {}) => {
+    const base = { page: 1, origen: selectedOrigen, destino: selectedDestino, fecha: selectedFecha, search: searchTerm };
+    return Object.fromEntries(
+      Object.entries({ ...base, ...overrides }).filter(([, v]) => v != null && v !== '')
+    );
+  };
+
   const handleSearch = (value) => {
     setSearchTerm(value);
-    setFilteredCars(filtrarCarros(cars, value, selectedOrigen, selectedDestino, selectedFecha));
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() =>
+      fetchCars(buildParams({ search: value, page: 1 }))
+    , 400);
   };
 
   const handleOrigen = (origen) => {
     const next = origen === selectedOrigen ? '' : origen;
-    setSelectedOrigen(next);
-    // Resetear destino si no existe en el nuevo origen
-    const validDestinos = new Set(
-      cars.filter(c => !next || c.precioviaje?.origen === next)
-          .map(c => c.precioviaje?.destino).filter(Boolean)
-    );
+    const validDestinos = new Set(precios.filter(p => !next || p.origen === next).map(p => p.destino));
     const newDestino = validDestinos.has(selectedDestino) ? selectedDestino : '';
+    setSelectedOrigen(next);
     setSelectedDestino(newDestino);
-    setFilteredCars(filtrarCarros(cars, searchTerm, next, newDestino, selectedFecha));
+    fetchCars(buildParams({ origen: next, destino: newDestino, page: 1 }));
   };
 
   const handleDestino = (destino) => {
     const next = destino === selectedDestino ? '' : destino;
     setSelectedDestino(next);
-    setFilteredCars(filtrarCarros(cars, searchTerm, selectedOrigen, next, selectedFecha));
+    fetchCars(buildParams({ destino: next, page: 1 }));
   };
 
   const handleFecha = (fecha) => {
     setSelectedFecha(fecha);
-    setFilteredCars(filtrarCarros(cars, searchTerm, selectedOrigen, selectedDestino, fecha));
+    fetchCars(buildParams({ fecha, page: 1 }));
   };
 
   const handleClearFilters = () => {
     setSelectedOrigen('');
     setSelectedDestino('');
-    setSearchTerm('');
     setSelectedFecha('');
-    setFilteredCars(cars);
+    setSearchTerm('');
+    fetchCars({ page: 1 });
   };
 
-  if (isLoading) return <LoadingScreen message="Cargando viajes..." />;
+  const handlePageChange = (p) => {
+    fetchCars(buildParams({ page: p }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  if (initialLoading) return <LoadingScreen message="Cargando viajes..." />;
+
+  const hasFilters = selectedOrigen || selectedDestino || selectedFecha || searchTerm.trim();
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900 relative">
@@ -149,11 +157,11 @@ const IndexLogin = () => {
           selectedOrigen,
           selectedDestino,
           selectedFecha,
-          onOrigen:  handleOrigen,
-          onDestino: handleDestino,
-          onFecha:   handleFecha,
-          onClear:   handleClearFilters,
-          resultCount: filteredCars.length,
+          onOrigen:    handleOrigen,
+          onDestino:   handleDestino,
+          onFecha:     handleFecha,
+          onClear:     handleClearFilters,
+          resultCount: total,
         }}
       />
       <Carousel />
@@ -172,8 +180,13 @@ const IndexLogin = () => {
           <div className="mx-auto mt-4 w-16 h-1 rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
         </div>
 
-        {/* ── Resultados ── */}
-        {filteredCars.length === 0 ? (
+        {/* Estado de carga / resultados */}
+        {loading ? (
+          <div className="flex flex-col items-center justify-center py-24 gap-4">
+            <div className="w-10 h-10 border-4 border-white/20 border-t-white rounded-full animate-spin" />
+            <p className="text-white/60 text-sm">Buscando viajes...</p>
+          </div>
+        ) : cars.length === 0 ? (
           <div className="text-center py-24 animate-fade-in">
             <div className="flex justify-center mb-4">
               <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
@@ -185,16 +198,12 @@ const IndexLogin = () => {
             </p>
             <p className="text-blue-200 text-sm">
               {selectedOrigen && selectedDestino
-                ? `No hay viajes de ${selectedOrigen} a ${selectedDestino}${selectedFecha ? ` el ${new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES')}` : ''}.`
-                : selectedOrigen
-                  ? `No hay viajes desde ${selectedOrigen}.`
-                  : selectedDestino
-                    ? `No hay viajes hacia ${selectedDestino}.`
-                    : selectedFecha
-                      ? `No hay viajes para esta fecha.`
-                      : searchTerm
-                        ? `Sin coincidencias para "${searchTerm}".`
-                        : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
+                ? `No hay viajes de ${selectedOrigen} a ${selectedDestino}.`
+                : selectedOrigen ? `No hay viajes desde ${selectedOrigen}.`
+                : selectedDestino ? `No hay viajes hacia ${selectedDestino}.`
+                : selectedFecha ? 'No hay viajes para esta fecha.'
+                : searchTerm ? `Sin coincidencias para "${searchTerm}".`
+                : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
             </p>
             {hasFilters && (
               <button
@@ -206,23 +215,37 @@ const IndexLogin = () => {
             )}
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredCars.map((car, idx) =>
-              car ? (
-                <div
-                  key={car.id_carros || idx}
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: `${Math.min(idx * 60, 400)}ms` }}
-                >
-                  <CarCard
-                    car={car}
-                    userData={userData}
-                    onVerDetalles={id => navigate(`/ver-detalles/${id}`)}
-                  />
-                </div>
-              ) : null
-            )}
-          </div>
+          <>
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+              {cars.map((car, idx) =>
+                car ? (
+                  <div
+                    key={car.id_carros || idx}
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: `${Math.min(idx * 60, 400)}ms` }}
+                  >
+                    <CarCard
+                      car={car}
+                      userData={userData}
+                      onVerDetalles={id => navigate(`/ver-detalles/${id}`)}
+                    />
+                  </div>
+                ) : null
+              )}
+            </div>
+
+            {/* Paginación */}
+            <div className="mt-10">
+              <Pagination
+                currentPage={currentPage}
+                lastPage={lastPage}
+                total={total}
+                onPageChange={handlePageChange}
+                loading={loading}
+                className="[&_button]:bg-white/10 [&_button]:text-white [&_button:hover:not(:disabled)]:bg-white/20 [&_button.bg-violet-600]:bg-violet-500"
+              />
+            </div>
+          </>
         )}
       </main>
 
