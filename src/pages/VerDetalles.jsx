@@ -413,6 +413,7 @@ const VerDetalles = () => {
     if (!userData) { navigate('/login'); return; }
     if (selectedSeats.length === 0)                 { showToast('Selecciona al menos un asiento.', 'error'); return; }
     if (!pickupLocation.trim())                     { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
+    if (pickupLocation.trim().length < 10)          { showToast('La ubicación debe tener al menos 10 caracteres.', 'error'); return; }
     if (!nombre.trim())                             { showToast('Ingresa tu nombre.', 'error'); return; }
     if (!telefono.trim())                           { showToast('Ingresa tu teléfono.', 'error'); return; }
     if (carDetails.asientos - asientosOcupados.length <= 0) { showToast('No hay asientos disponibles.', 'error'); return; }
@@ -713,7 +714,9 @@ const VerDetalles = () => {
                       type="text"
                       value={pickupLocation}
                       onChange={e => setPickupLocation(e.target.value)}
-                      placeholder="Tu dirección de recogida"
+                      placeholder="Ej: Calle 50 #23-45, Barrio El Centro"
+                      minLength={10}
+                      maxLength={500}
                       className="w-full pl-8 pr-[7.5rem] py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
                     />
                     <button

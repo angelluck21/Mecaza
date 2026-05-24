@@ -2,7 +2,8 @@ import React, { useState } from 'react';
 import { FaCar } from 'react-icons/fa';
 import { ArrowLeftIcon, Bars3Icon, XMarkIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
-import UserMenu from '../ui/UserMenu';
+import UserMenu          from '../ui/UserMenu';
+import NotificationBell  from '../ui/NotificationBell';
 
 /**
  * Navbar para páginas internas (perfil, reservas, conductor, etc.)
@@ -57,9 +58,10 @@ const InnerNavbar = ({ userData, title, backTo, actions }) => {
             <p className="hidden md:block text-sm font-semibold text-gray-600 truncate">{title}</p>
           )}
 
-          {/* Derecha: acciones + user menu */}
+          {/* Derecha: acciones + notificaciones + user menu */}
           <div className="hidden md:flex items-center gap-3">
             {actions}
+            {userData && <NotificationBell />}
             {userData && <UserMenu userData={userData} />}
           </div>
 
@@ -82,8 +84,11 @@ const InnerNavbar = ({ userData, title, backTo, actions }) => {
               <ArrowLeftIcon className="w-4 h-4" /> Volver
             </button>
             {userData && (
-              <div className="px-3 py-2 text-sm text-gray-600 font-medium">
-                {userData?.Nombre || userData?.nombre || 'Usuario'}
+              <div className="flex items-center justify-between px-3 py-2">
+                <span className="text-sm text-gray-600 font-medium">
+                  {userData?.Nombre || userData?.nombre || 'Usuario'}
+                </span>
+                <NotificationBell />
               </div>
             )}
           </div>

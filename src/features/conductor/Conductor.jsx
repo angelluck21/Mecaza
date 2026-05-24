@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaPlus, FaTrash, FaListAlt,
@@ -16,10 +16,11 @@ import Pagination        from '../../components/ui/Pagination';
 import { useToast }      from '../../hooks/useToast';
 
 import {
-  misReservasApi, listarEstadosApi, listarPreciosApi,
+  misReservasApi, listarPreciosApi,
   crearCarroApi, eliminarCarroApi,
   confirmarReservaApi, iniciarViajeApi, terminarViajeApi,
   historialConductorApi, asignarViajeApi, misCarrosApi,
+  calificarPasajeroApi,
 } from '../../services/api';
 import { compressImage, getEstadoInfo, formatFecha } from '../../utils';
 
@@ -94,7 +95,6 @@ const Conductor = () => {
   const [reservas,       setReservas]       = useState([]);
   const [carros,         setCarros]         = useState([]);
   const [rutas,          setRutas]          = useState([]);
-  const [estados,        setEstados]        = useState([]);
   const [carroToDelete,  setCarroToDelete]  = useState(null);
   const [carroAAsignar,  setCarroAAsignar]  = useState(null);
   const [historial,      setHistorial]      = useState([]);
@@ -114,6 +114,11 @@ const Conductor = () => {
   const [procesando,       setProcesando]       = useState(null);
   const [accionCarroId,    setAccionCarroId]    = useState(null);
 
+  // Rating pasajero (conductor → pasajero)
+  const [expandedRatingId,      setExpandedRatingId]      = useState(null);
+  const [ratingDraft,           setRatingDraft]           = useState({ stars: 0, comment: '' });
+  const [calificandoPasajeroId, setCalificandoPasajeroId] = useState(null);
+
   // Paginación reservas
   const [pageReservas,      setPageReservas]      = useState(1);
   const [lastPageReservas,  setLastPageReservas]  = useState(1);
@@ -124,7 +129,7 @@ const Conductor = () => {
 
   // Formulario nuevo vehículo
   const [carData, setCarData] = useState({
-    Conductor: '', Placa: '', Telefono: '', Asientos: '', Imagencarro: null,
+    Conductor: '', Placa: '', Telefono: '', Imagencarro: null,
   });
 
   // Formulario asignar viaje
@@ -133,11 +138,13 @@ const Conductor = () => {
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
+  const procesandoRef = useRef(null);
+  const accionRef     = useRef(null);
+
   // ── Auth ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('userData');
-    const token  = localStorage.getItem('authToken');
-    if (!token || !stored) { navigate('/login'); return; }
+    if (!stored) { navigate('/login'); return; }
     try {
       const user = JSON.parse(stored);
       if (user.rol !== 'conductor' && user.rol !== 'admin') {
@@ -170,14 +177,6 @@ const Conductor = () => {
     try {
       const { data } = await listarPreciosApi();
       setRutas(Array.isArray(data.data) ? data.data : []);
-    } catch { /* silencioso */ }
-  };
-
-  const fetchEstados = async () => {
-    if (estados.length > 0) return;
-    try {
-      const { data } = await listarEstadosApi();
-      setEstados(Array.isArray(data.data) ? data.data : []);
     } catch { /* silencioso */ }
   };
 
@@ -218,13 +217,10 @@ const Conductor = () => {
   // ── Crear vehículo ────────────────────────────────────────────────────────────
   const handleAddCar = async (e) => {
     e.preventDefault();
-    const { Conductor, Placa, Asientos, Telefono, Imagencarro } = carData;
-    if (!Conductor || !Placa || !Asientos || !Telefono || !Imagencarro) {
+    const { Conductor, Placa, Telefono, Imagencarro } = carData;
+    if (!Conductor || !Placa || !Telefono || !Imagencarro) {
       showToast('Completa todos los campos.', 'error'); return;
     }
-    const userId = userData?.id || userData?.id_users || userData?.ID;
-    if (!userId) { showToast('No se pudo identificar tu cuenta.', 'error'); return; }
-
     const nombreLogueado = userData?.Nombre || userData?.nombre || userData?.name || '';
     if (Conductor.trim().toLowerCase() !== nombreLogueado.toLowerCase()) {
       showToast('El nombre del conductor debe coincidir con tu cuenta.', 'error'); return;
@@ -236,14 +232,12 @@ const Conductor = () => {
       formData.append('Conductor',  Conductor.trim());
       formData.append('Telefono',   Telefono.trim());
       formData.append('Placa',      Placa.trim());
-      formData.append('Asientos',   Asientos);
-      formData.append('Userid',     parseInt(userId));
       const compressed = await compressImage(Imagencarro);
       formData.append('Imagencarro', compressed);
 
       await crearCarroApi(formData);
       showToast('Vehículo registrado. Ahora asígnale un viaje desde "Vehículos inactivos".', 'success');
-      setCarData({ Conductor: '', Placa: '', Telefono: '', Asientos: '', Imagencarro: null });
+      setCarData({ Conductor: '', Placa: '', Telefono: '', Imagencarro: null });
       setShowAddCar(false);
       await loadDashboard();
     } catch (err) {
@@ -295,6 +289,8 @@ const Conductor = () => {
 
   // ── Iniciar / terminar viaje ──────────────────────────────────────────────────
   const handleIniciarViaje = async (carroId) => {
+    if (accionRef.current !== null) return;
+    accionRef.current = carroId;
     setAccionCarroId(carroId);
     try {
       await iniciarViajeApi(carroId);
@@ -302,10 +298,12 @@ const Conductor = () => {
       await loadDashboard();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error al iniciar el viaje.', 'error');
-    } finally { setAccionCarroId(null); }
+    } finally { accionRef.current = null; setAccionCarroId(null); }
   };
 
   const handleTerminarViaje = async (carroId) => {
+    if (accionRef.current !== null) return;
+    accionRef.current = carroId;
     setAccionCarroId(carroId);
     try {
       await terminarViajeApi(carroId);
@@ -313,20 +311,36 @@ const Conductor = () => {
       await loadDashboard();
     } catch (err) {
       showToast(err.response?.data?.message || 'Error al finalizar el viaje.', 'error');
-    } finally { setAccionCarroId(null); }
+    } finally { accionRef.current = null; setAccionCarroId(null); }
   };
 
   // ── Confirmar / rechazar reserva ──────────────────────────────────────────────
   const cambiarEstadoReserva = async (reserva, estado) => {
     const id = reserva.id_reservarviajes || reserva.id_reservarviaje || reserva.id || reserva.ID;
+    if (procesandoRef.current !== null) return;
+    procesandoRef.current = id;
     setProcesando(id);
     try {
       await confirmarReservaApi(id, estado);
-      showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Operación exitosa.', 'success');
+      showToast(estado === 'confirmada' ? 'Reserva confirmada.' : 'Operación exitosa.', 'success');
       await loadDashboard();
       await fetchReservas(pageReservas);
     } catch { showToast('Error al actualizar la reserva.', 'error'); }
-    finally { setProcesando(null); }
+    finally { procesandoRef.current = null; setProcesando(null); }
+  };
+
+  const handleCalificarPasajero = async (reservaId) => {
+    if (ratingDraft.stars === 0) return;
+    setCalificandoPasajeroId(reservaId);
+    try {
+      await calificarPasajeroApi(reservaId, ratingDraft.stars, ratingDraft.comment);
+      showToast('¡Pasajero calificado!', 'success');
+      setExpandedRatingId(null);
+      setRatingDraft({ stars: 0, comment: '' });
+      await fetchHistorial(pageHistorial);
+    } catch (err) {
+      showToast(err.response?.data?.message || 'Error al calificar.', 'error');
+    } finally { setCalificandoPasajeroId(null); }
   };
 
   if (isLoading) return <LoadingScreen message="Cargando panel..." />;
@@ -671,11 +685,6 @@ const Conductor = () => {
                 value={carData.Placa}
                 onChange={e => setCarData(p => ({ ...p, Placa: e.target.value }))}
                 placeholder="ABC-123" required />
-              <FormInput label="Asientos" icon={<FaCar className="text-xs" />}
-                type="number" min="1" max="20"
-                value={carData.Asientos}
-                onChange={e => setCarData(p => ({ ...p, Asientos: e.target.value }))}
-                placeholder="Ej. 4" required />
             </div>
             <div>
               <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Imagen del vehículo</label>
@@ -739,6 +748,7 @@ const Conductor = () => {
                 <div className="relative">
                   <FaCalendarAlt className="absolute left-3 top-3 text-violet-400 text-xs pointer-events-none" />
                   <input type="date" required value={viajeData.fecha}
+                    min={new Date().toISOString().split('T')[0]}
                     onChange={e => setViajeData(p => ({ ...p, fecha: e.target.value }))}
                     className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
                 </div>
@@ -801,7 +811,7 @@ const Conductor = () => {
                       </div>
                       {(!estado || estado === 'pendiente') && (
                         <div className="flex gap-2 pt-2 border-t border-gray-100">
-                          <button onClick={() => cambiarEstadoReserva(r, 'Confirmada')} disabled={enProceso}
+                          <button onClick={() => cambiarEstadoReserva(r, 'confirmada')} disabled={enProceso}
                             className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50">
                             {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
                             Confirmar
@@ -896,61 +906,108 @@ const Conductor = () => {
           ) : (
             <>
               <div className="space-y-4">
-                {historial.map((viaje, idx) => {
-                  const ruta      = viaje.precioviaje ? `${viaje.precioviaje.origen} → ${viaje.precioviaje.destino}` : 'Ruta no especificada';
-                  const pasajeros = viaje.reservas ?? [];
-                  const ingresos  = pasajeros.length * parseFloat(viaje.precioviaje?.precio ?? 0);
-                  const califs    = pasajeros.filter(p => p.calificacion != null);
-                  const promedio  = califs.length
-                    ? (califs.reduce((s, p) => s + p.calificacion, 0) / califs.length).toFixed(1)
-                    : null;
-                  const claveUnica = `${viaje.id_carros}_${viaje.viaje_numero ?? idx}_${viaje.fecha ?? idx}`;
+                {historial.map((r, idx) => {
+                  const resId      = r.id_reservarviajes ?? idx;
+                  const carro      = r.carro;
+                  const precio     = carro?.precioviaje;
+                  const ruta       = precio ? `${precio.origen} → ${precio.destino}` : 'Ruta no especificada';
+                  const nombre     = r.usuario?.name || r.nombre || '—';
+                  const ingreso    = parseFloat(precio?.precio ?? 0);
+                  const isExpanded = expandedRatingId === resId;
                   return (
-                    <div key={claveUnica} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between flex-wrap gap-2">
-                        <div>
-                          <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-                            <FaRoad className="text-orange-400 text-xs" /> {ruta}
+                    <div key={resId} className="border border-gray-100 rounded-xl p-4 space-y-3">
+                      {/* Info del viaje */}
+                      <div>
+                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
+                          <FaRoad className="text-orange-400 text-xs" /> {ruta}
+                        </p>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          {carro?.placa} · {formatFecha(r.updated_at?.split('T')[0])} · {carro?.horasalida || '—'}
+                        </p>
+                        {ingreso > 0 && (
+                          <p className="text-xs font-bold text-green-600 mt-0.5">
+                            +${ingreso.toLocaleString('es-CO')}
                           </p>
-                          <p className="text-xs text-gray-400 mt-0.5">
-                            {viaje.placa} · {formatFecha(viaje.fecha)} · {viaje.horasalida}
-                            {viaje.viaje_numero > 1 && (
-                              <span className="ml-2 bg-orange-100 text-orange-600 px-1.5 py-0.5 rounded-full text-[10px] font-bold">
-                                Viaje #{viaje.viaje_numero}
-                              </span>
-                            )}
-                          </p>
-                        </div>
-                        {promedio && (
-                          <div className="flex items-center gap-1">
-                            <FaStar className="text-yellow-400 text-xs" />
-                            <span className="text-xs font-bold text-gray-700">{promedio}</span>
-                          </div>
                         )}
                       </div>
-                      <div className="flex items-center justify-between text-xs text-gray-500 bg-gray-50 rounded-lg px-3 py-2">
-                        <span>{pasajeros.length} pasajero{pasajeros.length !== 1 ? 's' : ''}</span>
-                        {ingresos > 0 && <span className="font-bold text-green-600">+${ingresos.toLocaleString('es-CO')}</span>}
-                      </div>
-                      {pasajeros.length > 0 && (
-                        <div className="space-y-1.5">
-                          {pasajeros.map((p, i) => (
-                            <div key={p.id_reservarviajes ?? i} className="flex items-center justify-between text-xs">
-                              <div className="flex items-center gap-2">
-                                <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-[10px] font-bold">
-                                  {(p.usuario?.name || p.nombre || '?')[0]?.toUpperCase()}
-                                </div>
-                                <span className="text-gray-700 font-medium">{p.usuario?.name || p.nombre || '—'}</span>
+
+                      {/* Pasajero */}
+                      <div className="flex items-center justify-between gap-2 flex-wrap">
+                        <div className="flex items-center gap-2">
+                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
+                            {nombre[0]?.toUpperCase()}
+                          </div>
+                          <span className="text-sm text-gray-700 font-medium">{nombre}</span>
+                        </div>
+                        <div className="flex items-center gap-3 shrink-0">
+                          {/* Estrellas que el pasajero dio al conductor */}
+                          {r.calificacion != null && (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Pasajero</span>
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(n => (
+                                  <FaStar key={n} className={`text-[11px] ${n <= r.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
+                                ))}
                               </div>
-                              {p.calificacion != null && (
-                                <div className="flex gap-0.5">
-                                  {[1,2,3,4,5].map(n => (
-                                    <FaStar key={n} className={`text-[10px] ${n <= p.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
-                                  ))}
-                                </div>
-                              )}
                             </div>
-                          ))}
+                          )}
+                          {/* Estrellas que el conductor dio al pasajero */}
+                          {r.calificacion_conductor != null ? (
+                            <div className="flex flex-col items-center gap-0.5">
+                              <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Tú</span>
+                              <div className="flex gap-0.5">
+                                {[1,2,3,4,5].map(n => (
+                                  <FaStar key={n} className={`text-[11px] ${n <= r.calificacion_conductor ? 'text-orange-400' : 'text-gray-200'}`} />
+                                ))}
+                              </div>
+                            </div>
+                          ) : !isExpanded && (
+                            <button
+                              type="button"
+                              onClick={() => { setExpandedRatingId(resId); setRatingDraft({ stars: 0, comment: '' }); }}
+                              className="text-[10px] px-2 py-1 rounded-full border border-orange-200 text-orange-500 font-semibold hover:bg-orange-50 transition-colors"
+                            >
+                              Calificar
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Formulario calificación */}
+                      {isExpanded && r.calificacion_conductor == null && (
+                        <div className="space-y-2 pt-2 border-t border-gray-100">
+                          <div className="flex gap-1 justify-center">
+                            {[1,2,3,4,5].map(n => (
+                              <button key={n} type="button"
+                                onClick={() => setRatingDraft(d => ({ ...d, stars: n }))}
+                                className={`text-xl transition-colors ${n <= ratingDraft.stars ? 'text-orange-400' : 'text-gray-300 hover:text-orange-300'}`}
+                              >
+                                <FaStar />
+                              </button>
+                            ))}
+                          </div>
+                          <textarea
+                            rows={2} maxLength={500}
+                            value={ratingDraft.comment}
+                            onChange={e => setRatingDraft(d => ({ ...d, comment: e.target.value }))}
+                            placeholder="Comentario opcional..."
+                            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700"
+                          />
+                          <div className="flex gap-2">
+                            <button type="button"
+                              onClick={() => { setExpandedRatingId(null); setRatingDraft({ stars: 0, comment: '' }); }}
+                              className="flex-1 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-all"
+                            >
+                              Cancelar
+                            </button>
+                            <button type="button"
+                              onClick={() => handleCalificarPasajero(resId)}
+                              disabled={ratingDraft.stars === 0 || calificandoPasajeroId === resId}
+                              className="flex-1 py-1.5 text-xs bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:shadow-md transition-all disabled:opacity-50"
+                            >
+                              {calificandoPasajeroId === resId ? '...' : 'Calificar pasajero'}
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

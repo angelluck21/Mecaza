@@ -212,7 +212,12 @@ const MisFacturas = () => {
                   <p className="font-bold text-gray-800">${selectedFactura.subtotal?.toLocaleString('es-CO') || '0'}</p>
                 </div>
                 <div>
-                  <p className="text-xs text-green-600 font-semibold uppercase">Descuento web (10%)</p>
+                  <p className="text-xs text-green-600 font-semibold uppercase">
+                    Descuento
+                    {selectedFactura.subtotal > 0
+                      ? ` (${Math.round((selectedFactura.impuesto / selectedFactura.subtotal) * 100)}%)`
+                      : ''}
+                  </p>
                   <p className="font-bold text-green-600">- ${selectedFactura.impuesto?.toLocaleString('es-CO') || '0'}</p>
                 </div>
               </div>

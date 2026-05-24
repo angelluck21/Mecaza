@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { FaCar, FaPlus, FaEnvelope, FaUsers, FaCog } from 'react-icons/fa';
 import { MagnifyingGlassIcon, Bars3Icon } from '@heroicons/react/24/outline';
 import UserMenu from '../../components/ui/UserMenu';
-import { agregarPrecioApi, agregarEstadoApi } from '../../services/api';
+import { agregarPrecioApi } from '../../services/api';
 
 const IndexAdmin = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -121,38 +121,9 @@ const IndexAdmin = () => {
     }
   };
 
-  const handleSaveEstado = async (e) => {
+  const handleSaveEstado = (e) => {
     e.preventDefault();
-    
-    if (!estadoSeleccionado) {
-      showToastNotification('Por favor, selecciona un estado del viaje', 'error');
-      return;
-    }
-    
-    setIsSavingEstado(true);
-    
-    const estadoElegido = estadosDisponibles.find(estado => estado.id === parseInt(estadoSeleccionado));
-    
-    const dataToSend = {
-      Estados: estadoElegido.nombre
-    };
-    
-    try {
-      await agregarEstadoApi(dataToSend);
-      showToastNotification('¡Estado del viaje guardado exitosamente!');
-      setEstadoSeleccionado('');
-      setShowEstadoModal(false);
-    } catch (error) {
-      if (error.response?.status === 422) {
-        showToastNotification('Error de validación: Verifica los datos enviados', 'error');
-      } else if (error.request) {
-        showToastNotification('Error de conexión con el servidor.', 'error');
-      } else {
-        showToastNotification('Error inesperado al guardar el estado', 'error');
-      }
-    } finally {
-      setIsSavingEstado(false);
-    }
+    setShowEstadoModal(false);
   };
 
   const limpiarFormulario = () => {

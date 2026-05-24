@@ -42,14 +42,11 @@ const GoogleAuthInner = ({ onSuccess, onError, label }) => {
         // Para mayor seguridad en producción se recomienda usar id_token.
         const { data } = await googleAuthApi(tokenResponse.access_token);
 
-        localStorage.setItem('authToken', data.token);
-        localStorage.setItem('token',     data.token);
-
         const userData = buildUserData(data, data.user?.email || profile.email);
         localStorage.setItem('userData', JSON.stringify(userData));
         localStorage.setItem('id_users', userData.id_users || '');
 
-        onSuccess?.(userData, data.token);
+        onSuccess?.(userData);
       } catch (err) {
         const msg = err.response?.data?.message || 'Error al iniciar sesión con Google.';
         onError?.(msg);

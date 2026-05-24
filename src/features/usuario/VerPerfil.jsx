@@ -13,7 +13,7 @@ import SectionCard   from '../../components/ui/SectionCard';
 import InfoRow       from '../../components/ui/InfoRow';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
-import { verUsuarioApi, eliminarUsuarioApi, getConductorPerfilApi } from '../../services/api';
+import { verUsuarioApi, eliminarUsuarioApi, getConductorPerfilApi, getUsuarioPerfilApi } from '../../services/api';
 import { getUserPhotoUrl } from '../../utils';
 import UserAvatar from '../../components/ui/UserAvatar';
 
@@ -64,6 +64,7 @@ const VerPerfil = () => {
   const [showDelete,      setShowDelete]      = useState(false);
   const [isDeleting,      setIsDeleting]      = useState(false);
   const [conductorStats,  setConductorStats]  = useState(null);
+  const [usuarioStats,    setUsuarioStats]    = useState(null);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -71,9 +72,8 @@ const VerPerfil = () => {
   // ── Carga de datos ────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
-      const stored    = localStorage.getItem('userData');
-      const authToken = localStorage.getItem('authToken');
-      if (!stored || !authToken) { navigate('/login'); return; }
+      const stored = localStorage.getItem('userData');
+      if (!stored) { navigate('/login'); return; }
 
       let loggedIn;
       try { loggedIn = JSON.parse(stored); } catch { navigate('/login'); return; }
@@ -105,11 +105,15 @@ const VerPerfil = () => {
           setUserData(finalData);
         }
 
-        // Si es conductor, cargar estadísticas
+        // Cargar estadísticas según rol
         const perfilRol = finalData.rol ?? perfil.rol;
         if (perfilRol === 'conductor') {
           getConductorPerfilApi(targetId)
             .then(res => { if (res?.data) setConductorStats(res.data); })
+            .catch(() => {});
+        } else if (perfilRol === 'usuario') {
+          getUsuarioPerfilApi(targetId)
+            .then(res => { if (res?.data) setUsuarioStats(res.data); })
             .catch(() => {});
         }
       } catch {
@@ -174,6 +178,15 @@ const VerPerfil = () => {
   const distrib  = [5, 4, 3, 2, 1].map(star => ({
     star,
     count: resenas.filter(r => Math.round(r.calificacion) === star).length,
+  }));
+
+  // Estadísticas del usuario (calificaciones como pasajero)
+  const uResenas  = usuarioStats?.resenas ?? [];
+  const uTotalCal = usuarioStats?.total_calificaciones ?? 0;
+  const uPromedio = usuarioStats?.promedio_estrellas    ?? null;
+  const uDistrib  = [5, 4, 3, 2, 1].map(star => ({
+    star,
+    count: uResenas.filter(r => Math.round(r.calificacion) === star).length,
   }));
 
   // Foto de perfil procesada
@@ -374,6 +387,84 @@ const VerPerfil = () => {
               ) : (
                 <div className="space-y-4">
                   {resenas.map((r, i) => (
+                    <div key={i} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <StarRow value={r.calificacion} size="text-sm" />
+                        <span className="text-[11px] text-gray-400">{r.fecha}</span>
+                      </div>
+                      <p className="text-sm text-gray-700 leading-relaxed">{r.comentario}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </SectionCard>
+
+          </div>
+        )}
+
+        {/* ── Sección usuario: calificaciones como pasajero ─────────────────── */}
+        {!esConductor && rol === 'usuario' && (
+          <div className="space-y-4 animate-fade-in-up">
+
+            {/* Stats tiles */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
+                <p className="text-3xl font-extrabold text-blue-700">
+                  {usuarioStats ? usuarioStats.total_viajes : '—'}
+                </p>
+                <p className="text-xs text-blue-500 font-medium mt-1">
+                  {usuarioStats?.total_viajes === 1 ? 'Viaje realizado' : 'Viajes realizados'}
+                </p>
+              </div>
+              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
+                <p className="text-3xl font-extrabold text-amber-600">
+                  {usuarioStats && uPromedio != null ? Number(uPromedio).toFixed(1) : '—'}
+                </p>
+                <p className="text-xs text-amber-500 font-medium mt-1">Calificación como pasajero</p>
+              </div>
+            </div>
+
+            {/* Distribución */}
+            <SectionCard title="Calificaciones recibidas" icon={<FaStar className="text-xs text-amber-400" />} accent="orange">
+              {!usuarioStats ? (
+                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+              ) : uTotalCal === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  {isOwnProfile
+                    ? 'Aún no tienes calificaciones como pasajero.'
+                    : 'Este usuario aún no tiene calificaciones.'}
+                </p>
+              ) : (
+                <div className="flex gap-6 items-start">
+                  <div className="flex flex-col items-center shrink-0">
+                    <p className="text-5xl font-extrabold text-gray-900 leading-none">
+                      {Number(uPromedio).toFixed(1)}
+                    </p>
+                    <StarRow value={uPromedio} size="text-base" />
+                    <p className="text-xs text-gray-400 mt-1">
+                      {uTotalCal} {uTotalCal === 1 ? 'reseña' : 'reseñas'}
+                    </p>
+                  </div>
+                  <div className="flex-1 space-y-2 pt-1">
+                    {uDistrib.map(({ star, count }) => (
+                      <StarBar key={star} label={star} count={count} total={uTotalCal} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </SectionCard>
+
+            {/* Reseñas recientes */}
+            <SectionCard title="Comentarios de conductores" icon={<FaCommentAlt className="text-xs" />} accent="violet">
+              {!usuarioStats ? (
+                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+              ) : uResenas.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-2">
+                  {isOwnProfile ? 'Aún no tienes comentarios escritos sobre ti.' : 'Sin comentarios por el momento.'}
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {uResenas.map((r, i) => (
                     <div key={i} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
                       <div className="flex items-center justify-between mb-1">
                         <StarRow value={r.calificacion} size="text-sm" />

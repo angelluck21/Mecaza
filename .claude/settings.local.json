@@ -25,7 +25,8 @@
       "Bash(cd \"/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza\" && grep -n \"TERMINAR_VIAJE\\\\|HISTORIAL\" src/constants/api.js)",
       "Read(//c/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza/src/constants/**)",
       "Bash(cd \"/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza\" && grep -n \"iniciarViajeApi\\\\|terminarViajeApi\" src/services/api.js)",
-      "Read(//c/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza/src/services/**)"
+      "Read(//c/c/Users/dsfwg/DIRECTORIOS SOFTWARE/Mecaza/src/services/**)",
+      "Bash(ls \"/mnt/c/Users/dsfwg/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/048a4a8b-5344-4b15-995e-903414e9bce1/1a873148-f4bc-4598-a79d-8517deca424e/skills/\")"
     ]
   }
 }

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FaCar, FaPlus, FaUsers, FaCog, FaSync, FaTicketAlt,
@@ -18,11 +18,10 @@ import { useToast }      from '../../hooks/useToast';
 import { getEstadoInfo, formatFecha } from '../../utils';
 
 import {
-  listarCarrosAdminApi, listarReservasApi, listarEstadosApi,
+  listarCarrosAdminApi, listarReservasApi, listarReservasAuthApi,
   listarUsuariosApi, eliminarCarroApi, actualizarEstadoCarroApi,
   confirmarReservaApi, eliminarReservaApi,
   agregarPrecioApi, eliminarPrecioApi, actualizarPrecioApi,
-  agregarEstadoApi, eliminarEstadoApi,
   invitarConductorApi, listarFacturasApi, listarPreciosApi,
   descargarFacturaApi, descargarTodasFacturasApi,
 } from '../../services/api';
@@ -97,20 +96,17 @@ const IndexAdmin = () => {
   const [nuevoPrecio,      setNuevoPrecio]      = useState({ Origen: '', Destino: '', Precio: '' });
   const [preciosList,      setPreciosList]      = useState([]);
   const [loadingPrecios,   setLoadingPrecios]   = useState(false);
+  const [pagePrecios,      setPagePrecios]      = useState(1);
+  const [lastPagePrecios,  setLastPagePrecios]  = useState(1);
+  const [totalPrecios,     setTotalPrecios]     = useState(0);
   const [deletingPrecioId,  setDeletingPrecioId]  = useState(null);
   const [editingPrecioId,   setEditingPrecioId]   = useState(null);
   const [editingPrecioForm, setEditingPrecioForm] = useState({ Origen: '', Destino: '', Precio: '' });
   const [savingPrecioId,    setSavingPrecioId]    = useState(null);
-  const [estadoSel,         setEstadoSel]         = useState('');
-  const [estadosConfigList,  setEstadosConfigList]  = useState([]);
-  const [loadingEstadosConf, setLoadingEstadosConf] = useState(false);
-  const [deletingEstadoId,   setDeletingEstadoId]   = useState(null);
-
   // Modal carros
   const [showCarrosModal, setShowCarrosModal] = useState(false);
   const [carrosList,      setCarrosList]      = useState([]);
   const [loadingCarros,   setLoadingCarros]   = useState(false);
-  const [estadosList,     setEstadosList]     = useState([]);
   const [carroEstados,    setCarroEstados]    = useState({});
   const [savingCarroId,   setSavingCarroId]   = useState(null);
   const [pageCarros,      setPageCarros]      = useState(1);
@@ -141,6 +137,8 @@ const IndexAdmin = () => {
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail,     setInviteEmail]     = useState('');
   const [isInviting,      setIsInviting]      = useState(false);
+
+  const accionReservaRef = useRef(null);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -179,11 +177,14 @@ const IndexAdmin = () => {
   };
 
   // ── Precios ───────────────────────────────────────────────────────────────
-  const fetchPrecios = async () => {
+  const fetchPrecios = async (page = 1) => {
     setLoadingPrecios(true);
     try {
-      const { data } = await listarPreciosApi();
+      const { data } = await listarPreciosApi(page);
       setPreciosList(Array.isArray(data.data) ? data.data : []);
+      setPagePrecios(data.current_page ?? 1);
+      setLastPagePrecios(data.last_page ?? 1);
+      setTotalPrecios(data.total ?? 0);
     } catch { showToast('Error al cargar rutas.', 'error'); }
     finally { setLoadingPrecios(false); }
   };
@@ -202,7 +203,7 @@ const IndexAdmin = () => {
       });
       showToast('Ruta agregada correctamente.', 'success');
       setNuevoPrecio({ Origen: '', Destino: '', Precio: '' });
-      await fetchPrecios();
+      await fetchPrecios(1);
     } catch (err) {
       showToast(err.response?.data?.message || 'Error al guardar la ruta.', 'error');
     } finally { setIsSaving(false); }
@@ -213,7 +214,7 @@ const IndexAdmin = () => {
     try {
       await eliminarPrecioApi(id);
       showToast('Ruta eliminada.', 'success');
-      await fetchPrecios();
+      await fetchPrecios(pagePrecios);
     } catch { showToast('Error al eliminar la ruta.', 'error'); }
     finally { setDeletingPrecioId(null); }
   };
@@ -228,44 +229,9 @@ const IndexAdmin = () => {
       });
       showToast('Ruta actualizada.', 'success');
       setEditingPrecioId(null);
-      await fetchPrecios();
+      await fetchPrecios(pagePrecios);
     } catch { showToast('Error al actualizar la ruta.', 'error'); }
     finally { setSavingPrecioId(null); }
-  };
-
-  const fetchEstadosConfig = async () => {
-    setLoadingEstadosConf(true);
-    try {
-      const { data } = await listarEstadosApi();
-      setEstadosConfigList(Array.isArray(data.data) ? data.data : []);
-    } catch { showToast('Error al cargar estados.', 'error'); }
-    finally { setLoadingEstadosConf(false); }
-  };
-
-  const handleEliminarEstado = async (id) => {
-    setDeletingEstadoId(id);
-    try {
-      await eliminarEstadoApi(id);
-      showToast('Estado eliminado.', 'success');
-      await fetchEstadosConfig();
-    } catch { showToast('Error al eliminar el estado.', 'error'); }
-    finally { setDeletingEstadoId(null); }
-  };
-
-  // ── Estados ───────────────────────────────────────────────────────────────
-  const handleSaveEstado = async (e) => {
-    e.preventDefault();
-    if (!estadoSel) { showToast('Selecciona un estado.', 'error'); return; }
-    setIsSaving(true);
-    try {
-      const estado = ESTADOS_LABELS.find(s => s.id === parseInt(estadoSel));
-      await agregarEstadoApi({ Estados: estado.label });
-      showToast('Estado guardado correctamente.', 'success');
-      setEstadoSel('');
-      setShowEstadoModal(false);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Error al guardar estado.', 'error');
-    } finally { setIsSaving(false); }
   };
 
   // ── Carros ────────────────────────────────────────────────────────────────
@@ -273,13 +239,11 @@ const IndexAdmin = () => {
     setLoadingCarros(true);
     setShowCarrosModal(true);
     try {
-      const [cRes, eRes] = await Promise.all([listarCarrosAdminApi(page), listarEstadosApi()]);
-      const cars    = Array.isArray(cRes.data?.data) ? cRes.data.data : [];
-      const estados = Array.isArray(eRes.data?.data) ? eRes.data.data : [];
+      const { data } = await listarCarrosAdminApi(page);
+      const cars = Array.isArray(data?.data) ? data.data : [];
       setCarrosList(cars);
-      setEstadosList(estados);
-      setPageCarros(cRes.data?.current_page ?? 1);
-      setLastPageCarros(cRes.data?.last_page ?? 1);
+      setPageCarros(data?.current_page ?? 1);
+      setLastPageCarros(data?.last_page ?? 1);
       const initial = {};
       cars.forEach(c => { initial[c.id_carros || c.id] = c.id_estados || ''; });
       setCarroEstados(initial);
@@ -304,7 +268,7 @@ const IndexAdmin = () => {
     setLoadingReservas(true);
     setShowReservasModal(true);
     try {
-      const data = await listarReservasApi(page);
+      const { data } = await listarReservasAuthApi(page);
       const list = Array.isArray(data.data) ? data.data : (Array.isArray(data) ? data : []);
       setReservasList(list);
       setPageReservas(data.current_page ?? 1);
@@ -315,13 +279,15 @@ const IndexAdmin = () => {
 
   const handleReservaEstado = async (reserva, estado) => {
     const id = reserva.id_reservarviajes || reserva.id_reservarviaje || reserva.id;
+    if (accionReservaRef.current !== null) return;
+    accionReservaRef.current = id;
     setProcesandoResId(id);
     try {
       await confirmarReservaApi(id, estado);
-      showToast(estado === 'Confirmada' ? 'Reserva confirmada.' : 'Reserva rechazada.', estado === 'Confirmada' ? 'success' : 'error');
+      showToast(estado === 'confirmada' ? 'Reserva confirmada.' : 'Reserva rechazada.', estado === 'confirmada' ? 'success' : 'error');
       await fetchReservas(pageReservas);
     } catch { showToast('Error al actualizar la reserva.', 'error'); }
-    finally { setProcesandoResId(null); }
+    finally { accionReservaRef.current = null; setProcesandoResId(null); }
   };
 
   // ── Eliminar (compartido) ─────────────────────────────────────────────────
@@ -446,11 +412,11 @@ const IndexAdmin = () => {
           <div className="grid sm:grid-cols-2 gap-4 mt-1">
             <ActionCard
               icon={<FaCar />}
-              title="Estado del viaje"
-              desc="Configura los estados disponibles para los viajes del sistema."
-              btnLabel="Gestionar estados"
+              title="Estados del sistema"
+              desc="Consulta los estados fijos disponibles para los vehículos del sistema."
+              btnLabel="Ver estados"
               btnColor="green"
-              onClick={() => { setShowEstadoModal(true); fetchEstadosConfig(); }}
+              onClick={() => setShowEstadoModal(true)}
             />
             <ActionCard
               icon={<FaTicketAlt />}
@@ -458,7 +424,7 @@ const IndexAdmin = () => {
               desc="Gestiona las rutas y precios disponibles para los conductores."
               btnLabel="Gestionar rutas"
               btnColor="blue"
-              onClick={() => { setShowPreciosModal(true); fetchPrecios(); }}
+              onClick={() => { setShowPreciosModal(true); fetchPrecios(1); }}
             />
           </div>
         </SectionCard>
@@ -510,78 +476,25 @@ const IndexAdmin = () => {
         </SectionCard>
       </div>
 
-      {/* ── Modal: Gestionar Estados ── */}
+      {/* ── Modal: Estados del Sistema (solo lectura) ── */}
       {showEstadoModal && (
-        <Modal title="Gestionar Estados de Viaje" maxWidth="max-w-2xl" onClose={() => { setShowEstadoModal(false); setEstadoSel(''); }}>
-          <div className="grid grid-cols-2 gap-6">
-
-            {/* Izquierda: agregar */}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Agregar estado</p>
-              <form onSubmit={handleSaveEstado} className="space-y-2">
-                {ESTADOS_LABELS.map(e => (
-                  <label
-                    key={e.id}
-                    className={`flex items-center gap-3 p-3 rounded-xl border-2 cursor-pointer transition-all ${
-                      estadoSel == e.id ? 'border-violet-500 bg-violet-50' : 'border-gray-200 hover:border-violet-300'
-                    }`}
-                  >
-                    <input type="radio" name="estado" value={e.id} checked={estadoSel == e.id} onChange={ev => setEstadoSel(ev.target.value)} className="sr-only" />
-                    <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${e.color}`}>{e.label}</span>
-                  </label>
-                ))}
-                <div className="flex gap-2 pt-2">
-                  <button type="submit" disabled={isSaving || !estadoSel}
-                    className="flex-1 py-2.5 bg-gradient-to-r from-green-600 to-emerald-500 text-white font-bold rounded-xl disabled:opacity-50 transition-all flex items-center justify-center gap-2">
-                    {isSaving ? <><div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> Guardando...</> : <><FaPlus className="text-xs" /> Agregar</>}
-                  </button>
-                  <button type="button" onClick={() => setShowEstadoModal(false)}
-                    className="px-4 py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all">
-                    Cerrar
-                  </button>
-                </div>
-              </form>
-            </div>
-
-            {/* Derecha: lista */}
-            <div>
-              <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-3">Estados registrados</p>
-              {loadingEstadosConf ? (
-                <div className="flex items-center gap-2 py-4 text-gray-400 text-sm">
-                  <div className="w-4 h-4 border-2 border-green-300 border-t-green-600 rounded-full animate-spin" />
-                  Cargando...
-                </div>
-              ) : estadosConfigList.length === 0 ? (
-                <p className="text-sm text-gray-400 py-3 text-center">Sin estados registrados.</p>
-              ) : (
-                <div className="space-y-2">
-                  {estadosConfigList.map(est => {
-                    const id  = est.id_estados || est.id;
-                    const lbl = est.estados || est.nombre || `Estado ${id}`;
-                    const info = ESTADOS_LABELS.find(e => e.label.toLowerCase() === lbl.toLowerCase());
-                    const deleting = deletingEstadoId === id;
-                    return (
-                      <div key={id} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${info?.color ?? 'bg-gray-100 text-gray-600 border-gray-200'}`}>
-                          {lbl}
-                        </span>
-                        <button
-                          onClick={() => handleEliminarEstado(id)}
-                          disabled={deleting}
-                          className="p-1.5 text-red-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-all disabled:opacity-50"
-                          title="Eliminar estado"
-                        >
-                          {deleting
-                            ? <div className="w-3 h-3 border-2 border-red-300 border-t-red-600 rounded-full animate-spin" />
-                            : <FaTrash className="text-xs" />}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+        <Modal title="Estados del Sistema" onClose={() => setShowEstadoModal(false)}>
+          <p className="text-xs text-gray-400 mb-4">Los estados están fijos en el sistema. No se pueden agregar ni eliminar desde aquí.</p>
+          <div className="space-y-2">
+            {ESTADOS_LABELS.map(e => (
+              <div key={e.id} className={`flex items-center gap-3 p-3 rounded-xl border ${e.color}`}>
+                <span className="text-xs font-bold w-5 text-center opacity-60">{e.id}</span>
+                <span className="text-sm font-semibold">{e.label}</span>
+              </div>
+            ))}
           </div>
+          <button
+            type="button"
+            onClick={() => setShowEstadoModal(false)}
+            className="mt-4 w-full py-2.5 bg-gray-100 text-gray-600 font-semibold rounded-xl hover:bg-gray-200 transition-all"
+          >
+            Cerrar
+          </button>
         </Modal>
       )}
 
@@ -739,6 +652,16 @@ const IndexAdmin = () => {
                   })}
                 </div>
               )}
+              {lastPagePrecios > 1 && (
+                <Pagination
+                  currentPage={pagePrecios}
+                  lastPage={lastPagePrecios}
+                  total={totalPrecios}
+                  onPageChange={fetchPrecios}
+                  loading={loadingPrecios}
+                  className="mt-3"
+                />
+              )}
             </div>
           </div>
         </Modal>
@@ -795,16 +718,9 @@ const IndexAdmin = () => {
                           className="flex-1 min-w-[140px] py-1.5 px-3 border border-gray-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-violet-400"
                         >
                           <option value="">Cambiar estado...</option>
-                          {estadosList.length > 0
-                            ? estadosList.map(e => (
-                                <option key={e.id_estados || e.id} value={e.id_estados || e.id}>
-                                  {e.estados || e.nombre || `Estado ${e.id_estados || e.id}`}
-                                </option>
-                              ))
-                            : ESTADOS_LABELS.map(e => (
-                                <option key={e.id} value={e.id}>{e.label}</option>
-                              ))
-                          }
+                          {ESTADOS_LABELS.map(e => (
+                            <option key={e.id} value={e.id}>{e.label}</option>
+                          ))}
                         </select>
                         <button
                           onClick={() => handleUpdateCarroEstado(carId)}
@@ -883,7 +799,7 @@ const IndexAdmin = () => {
                         {pendiente && (
                           <>
                             <button
-                              onClick={() => handleReservaEstado(r, 'Confirmada')}
+                              onClick={() => handleReservaEstado(r, 'confirmada')}
                               disabled={procesando}
                               className="flex items-center gap-1 px-3 py-1.5 bg-green-500 text-white text-xs font-bold rounded-lg hover:bg-green-600 transition-all disabled:opacity-50"
                             >

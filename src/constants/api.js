@@ -6,6 +6,7 @@ export const ENDPOINTS = {
 
   // Auth
   LOGIN:       `${API_BASE_URL}/login`,
+  LOGOUT:      `${API_BASE_URL}/logout`,
   REGISTRAR:   `${API_BASE_URL}/registrar`,
   GOOGLE_AUTH: `${API_BASE_URL}/auth/google`,
 
@@ -22,11 +23,6 @@ export const ENDPOINTS = {
   ELIMINAR_RESERVA: (id) => `${API_BASE_URL}/eliminarreserva/${id}`,
   ACTUALIZAR_RESERVA: (id) => `${API_BASE_URL}/actualizarreserva/${id}`,
   CONFIRMAR_RESERVA:  (id) => `${API_BASE_URL}/confirmarreserva/${id}`,
-
-  // Estados
-  LISTAR_ESTADOS:  `${API_BASE_URL}/listarestados`,
-  AGREGAR_ESTADO:  `${API_BASE_URL}/agregarestados`,
-  ELIMINAR_ESTADO: (id) => `${API_BASE_URL}/eliminarestados/${id}`,
 
   // Usuarios
   LISTAR_USUARIOS: `${API_BASE_URL}/listarusuarios`,
@@ -55,11 +51,22 @@ export const ENDPOINTS = {
   TERMINAR_VIAJE:      (id) => `${API_BASE_URL}/terminarviaje/${id}`,
   ASIGNAR_VIAJE:       (id) => `${API_BASE_URL}/asignarviaje/${id}`,
   MIS_CARROS:          `${API_BASE_URL}/mis-carros`,
-  MIS_RESERVAS:        `${API_BASE_URL}/mis-reservas`,
+  MIS_RESERVAS:            `${API_BASE_URL}/mis-reservas`,
+  MIS_RESERVAS_USUARIO:    `${API_BASE_URL}/mis-reservas-usuario`,
+  HISTORIAL_USUARIO:       `${API_BASE_URL}/mis-reservas-historial`,
   HISTORIAL_CONDUCTOR: `${API_BASE_URL}/historial-conductor`,
   COMPLETAR_RESERVA:  (id) => `${API_BASE_URL}/completarreserva/${id}`,
   CALIFICAR_RESERVA:   (id) => `${API_BASE_URL}/calificarreserva/${id}`,
+  CALIFICAR_PASAJERO:  (id) => `${API_BASE_URL}/calificar-pasajero/${id}`,
   CONDUCTOR_PERFIL:    (id) => `${API_BASE_URL}/conductor-perfil/${id}`,
+  USUARIO_PERFIL:      (id) => `${API_BASE_URL}/usuario-perfil/${id}`,
+  EXPORTAR_MIS_DATOS:  `${API_BASE_URL}/exportar-mis-datos`,
+
+  // Notificaciones in-app
+  NOTIFICACIONES:              `${API_BASE_URL}/notificaciones`,
+  CONTADOR_NOTIFICACIONES:     `${API_BASE_URL}/notificaciones/contador`,
+  MARCAR_TODAS_LEIDAS:         `${API_BASE_URL}/notificaciones/leer-todas`,
+  MARCAR_NOTIFICACION_LEIDA:   (id) => `${API_BASE_URL}/notificaciones/${id}/leida`,
 
   // Facturas
   GENERAR_FACTURA:  (id) => `${API_BASE_URL}/generarFactura/${id}`,

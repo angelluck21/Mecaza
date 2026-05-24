@@ -37,9 +37,8 @@ const ListaUsuarios = () => {
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   useEffect(() => {
-    const stored    = localStorage.getItem('userData');
-    const authToken = localStorage.getItem('authToken');
-    if (!stored || !authToken) { navigate('/login'); return; }
+    const stored = localStorage.getItem('userData');
+    if (!stored) { navigate('/login'); return; }
     try {
       const user = JSON.parse(stored);
       if (user.rol !== 'admin' && user.rol !== 'administrador') { navigate('/indexAdmin'); return; }

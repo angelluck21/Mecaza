@@ -32,13 +32,10 @@ const Login = () => {
     try {
       const { data } = await loginApi(correo, contrasena);
 
-      if (data.token) localStorage.setItem('authToken', data.token);
-
       const userRol  = data.user?.rol || data.rol || data.user?.Rol || data.Rol || 'usuario';
       const userData = buildUserData(data, correo);
 
       localStorage.setItem('id_users', userData.id_users || '');
-      localStorage.setItem('token',    data.token || '');
       localStorage.setItem('userData', JSON.stringify(userData));
 
       showToast('¡Inicio de sesión exitoso!', 'success');

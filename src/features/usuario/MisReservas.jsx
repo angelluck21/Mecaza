@@ -11,9 +11,10 @@ import InnerNavbar       from '../../components/layout/InnerNavbar';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
 import CarImage          from '../../components/ui/CarImage';
 import ToastNotification from '../../components/ui/ToastNotification';
+import Pagination        from '../../components/ui/Pagination';
 import { useToast }      from '../../hooks/useToast';
 import {
-  listarCarrosApi, listarReservasApi,
+  misReservasUsuarioApi, historialUsuarioApi,
   confirmarReservaApi, calificarReservaApi,
 } from '../../services/api';
 import { getCarImageUrl } from '../../utils';
@@ -68,7 +69,10 @@ const MisReservas = () => {
   const [isLoading,           setIsLoading]           = useState(true);
   const [reservations,        setReservations]        = useState([]);
   const [historial,           setHistorial]           = useState([]);
-  const [cars,                setCars]                = useState([]);
+  const [pageHistorial,       setPageHistorial]       = useState(1);
+  const [lastPageHistorial,   setLastPageHistorial]   = useState(1);
+  const [totalHistorial,      setTotalHistorial]      = useState(0);
+  const [loadingHistorial,    setLoadingHistorial]    = useState(false);
   const [showDeleteModal,     setShowDeleteModal]     = useState(false);
   const [reservationToDelete, setReservationToDelete] = useState(null);
   const [isDeleting,          setIsDeleting]          = useState(false);
@@ -85,50 +89,19 @@ const MisReservas = () => {
   const navigate = useNavigate();
 
   const getCarInfo = (r) => {
-    // Usar datos embebidos en la reserva (persisten aunque el carro esté inactivo)
     if (r.carro && typeof r.carro === 'object') return r.carro;
-    // Fallback: buscar en la lista de carros activos
-    const id = r.id_carros || r.id_carro || r.carro_id;
-    if (!id) return null;
-    return cars.find(c =>
-      String(c.id_carros) === String(id) ||
-      String(c.id)        === String(id)
-    );
+    return null;
   };
 
-  const fetchData = async (user) => {
+  const fetchData = async () => {
     try {
-      const [carsResp, reservasResp] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
-      const rawCars       = Array.isArray(carsResp)     ? carsResp     : (carsResp.data ?? []);
-      const carsData      = Array.isArray(rawCars)      ? rawCars      : (Array.isArray(rawCars.data) ? rawCars.data : []);
-      const reservasArray = Array.isArray(reservasResp) ? reservasResp : (reservasResp.data ?? []);
-      setCars(carsData);
+      const resp          = await misReservasUsuarioApi();
+      // Backend returns only active: pendiente, confirmada, completada-sin-calificar
+      const reservasArray = Array.isArray(resp.data?.data) ? resp.data.data : [];
+      setReservations(reservasArray);
 
-      const userId = user?.id || user?.ID || user?.id_users;
-      const misReservas = userId
-        ? reservasArray.filter(r => (r.id_users || r.id_user || r.user_id) == userId)
-        : [];
-
-      // Activas: excluir rechazadas, canceladas y completadas calificadas
-      const visibles = misReservas.filter(r => {
-        const estado = r.estado?.toLowerCase();
-        if (estado === 'rechazada' || estado === 'cancelada') return false;
-        if (estado === 'completada' && r.calificacion != null) return false;
-        return true;
-      });
-      setReservations(visibles);
-
-      // Historial: rechazadas, canceladas y completadas calificadas
-      const hist = misReservas.filter(r => {
-        const estado = r.estado?.toLowerCase();
-        if (estado === 'rechazada' || estado === 'cancelada') return true;
-        if (estado === 'completada' && r.calificacion != null) return true;
-        return false;
-      });
-      setHistorial(hist);
-
-      // Abrir modal de calificación si hay una completada sin calificar
-      const pendienteRating = misReservas.find(
+      // Auto-open rating modal for any completada without calificacion
+      const pendienteRating = reservasArray.find(
         r => r.estado?.toLowerCase() === 'completada' && r.calificacion == null
       );
       if (pendienteRating) {
@@ -144,13 +117,30 @@ const MisReservas = () => {
     }
   };
 
+  const fetchHistorial = async (page = 1) => {
+    setLoadingHistorial(true);
+    try {
+      const { data }  = await historialUsuarioApi(page);
+      const list      = Array.isArray(data.data) ? data.data : [];
+      setHistorial(list);
+      setPageHistorial(data.current_page ?? 1);
+      setLastPageHistorial(data.last_page ?? 1);
+      setTotalHistorial(data.total ?? 0);
+    } catch {
+      showToast('Error al cargar el historial.', 'error');
+    } finally {
+      setLoadingHistorial(false);
+    }
+  };
+
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
     try {
       const user = JSON.parse(stored);
       setUserData(user);
-      fetchData(user);
+      fetchData();
+      fetchHistorial(1);
     } catch { navigate('/login'); }
   }, [navigate]);
 
@@ -164,7 +154,7 @@ const MisReservas = () => {
       await calificarReservaApi(id, ratingStars, ratingComentario.trim() || null);
       showToast('¡Calificación guardada!', 'success');
       setShowRatingModal(false);
-      await fetchData(userData);
+      await Promise.all([fetchData(), fetchHistorial(1)]);
     } catch {
       showToast('Error al guardar la calificación.', 'error');
     } finally { setIsSavingRating(false); }
@@ -180,7 +170,7 @@ const MisReservas = () => {
       setShowDeleteModal(false);
       setReservationToDelete(null);
       setMotivoCancelacion('');
-      await fetchData(userData);
+      await Promise.all([fetchData(), fetchHistorial(1)]);
     } catch (err) {
       const s = err.response?.status;
       if (s === 404)        showToast('Reserva no encontrada.', 'error');
@@ -431,13 +421,20 @@ const MisReservas = () => {
         )}
 
         {/* ── Historial ── */}
-        {historial.length > 0 && (
+        {(totalHistorial > 0 || loadingHistorial) && (
           <div className="mt-10 animate-fade-in-up">
             <div className="flex items-center gap-2 mb-4">
               <FaRoad className="text-blue-300 text-sm" />
               <h2 className="text-lg font-bold text-white">Historial de viajes</h2>
-              <span className="text-xs bg-white/10 text-white px-2 py-0.5 rounded-full">{historial.length}</span>
+              {totalHistorial > 0 && (
+                <span className="text-xs bg-white/10 text-white px-2 py-0.5 rounded-full">{totalHistorial}</span>
+              )}
             </div>
+            {loadingHistorial ? (
+              <div className="flex justify-center py-6">
+                <div className="w-6 h-6 border-2 border-blue-400/40 border-t-blue-300 rounded-full animate-spin" />
+              </div>
+            ) : (
             <div className="space-y-3">
               {historial.map((r, idx) => {
                 const rid     = r.id_reservarviajes || r.id;
@@ -482,6 +479,15 @@ const MisReservas = () => {
                 );
               })}
             </div>
+            )}
+            <Pagination
+              currentPage={pageHistorial}
+              lastPage={lastPageHistorial}
+              total={totalHistorial}
+              onPageChange={fetchHistorial}
+              loading={loadingHistorial}
+              className="mt-4"
+            />
           </div>
         )}
       </div>

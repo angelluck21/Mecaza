@@ -84,7 +84,6 @@ export const calcularAsientosDisponibles = (carsData, reservasArray) =>
  * Obtiene los headers de autenticación.
  */
 export const getAuthHeaders = () => ({
-  Authorization: `Bearer ${localStorage.getItem('authToken')}`,
   'Content-Type': 'application/json',
   Accept: 'application/json',
 });

@@ -4,6 +4,7 @@ import { UserCircleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '../../constants';
 import UserAvatar from './UserAvatar';
+import { logoutApi } from '../../services/api';
 
 const UserMenu = ({ userData }) => {
   const [open, setOpen] = useState(false);
@@ -20,9 +21,12 @@ const UserMenu = ({ userData }) => {
 
   const go = (path) => { setOpen(false); navigate(path); };
 
-  const handleLogout = () => {
-    localStorage.removeItem('authToken');
+  const handleLogout = async () => {
+    try { await logoutApi(); } catch { /* continuar aunque falle */ }
     localStorage.removeItem('userData');
+    localStorage.removeItem('id_users');
+    localStorage.removeItem('authToken');
+    localStorage.removeItem('token');
     go('/login');
   };
 
@@ -31,7 +35,7 @@ const UserMenu = ({ userData }) => {
   const isAdmin     = rol === ROLES.ADMIN || rol === 'administrador';
   const isUsuario   = !isConductor && !isAdmin;
 
-  const nombre = userData?.Nombre || userData?.nombre || 'Usuario';
+  const nombre = userData?.Nombre || userData?.nombre || userData?.name || 'Usuario';
 
   return (
     <div className="relative" ref={menuRef}>

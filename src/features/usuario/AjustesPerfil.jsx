@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaUser, FaCamera, FaSave } from 'react-icons/fa';
-import { EnvelopeIcon, PhoneIcon, LockClosedIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/outline';
+import { FaUser, FaCamera, FaSave, FaDownload } from 'react-icons/fa';
+import { EnvelopeIcon, PhoneIcon, LockClosedIcon, EyeIcon, EyeSlashIcon, ShieldCheckIcon } from '@heroicons/react/24/outline';
 
 import PageBg        from '../../components/ui/PageBg';
 import InnerNavbar   from '../../components/layout/InnerNavbar';
@@ -10,7 +10,7 @@ import FormInput     from '../../components/ui/FormInput';
 import SectionCard   from '../../components/ui/SectionCard';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }            from '../../hooks/useToast';
-import { actualizarUsuarioApi, actualizarUsuarioConFotoApi } from '../../services/api';
+import { actualizarUsuarioApi, actualizarUsuarioConFotoApi, exportarMisDatosApi } from '../../services/api';
 import { getUserPhotoUrl, compressImage } from '../../utils';
 import UserAvatar from '../../components/ui/UserAvatar';
 
@@ -29,6 +29,7 @@ const AjustesPerfil = () => {
   const [userData,    setUserData]    = useState(null);
   const [isLoading,   setIsLoading]   = useState(true);
   const [isSaving,    setIsSaving]    = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [showPass,    setShowPass]    = useState(false);
   const [imagePreview, setImagePreview] = useState(null);
   const [profileImage, setProfileImage] = useState(null);
@@ -38,9 +39,8 @@ const AjustesPerfil = () => {
 
   // ── Carga inicial ─────────────────────────────────────────────────────────
   useEffect(() => {
-    const stored    = localStorage.getItem('userData');
-    const authToken = localStorage.getItem('authToken');
-    if (!stored || !authToken) { navigate('/login'); return; }
+    const stored = localStorage.getItem('userData');
+    if (!stored) { navigate('/login'); return; }
 
     try {
       const user = JSON.parse(stored);
@@ -141,6 +141,25 @@ const AjustesPerfil = () => {
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleExportarDatos = async () => {
+    setIsExporting(true);
+    try {
+      const { data } = await exportarMisDatosApi();
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url  = URL.createObjectURL(blob);
+      const a    = document.createElement('a');
+      a.href     = url;
+      a.download = `mecaza-mis-datos-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      showToast('Datos exportados correctamente.', 'success');
+    } catch {
+      showToast('Error al exportar los datos. Intenta de nuevo.', 'error');
+    } finally { setIsExporting(false); }
   };
 
   const set = (key) => (e) => setForm(f => ({ ...f, [key]: e.target.value }));
@@ -248,6 +267,31 @@ const AjustesPerfil = () => {
                 />
               )}
             </div>
+          </SectionCard>
+
+          {/* Privacidad y datos */}
+          <SectionCard title="Privacidad y datos" icon={<ShieldCheckIcon className="w-4 h-4" />}>
+            <p className="text-xs text-gray-500 leading-relaxed mb-4">
+              Descarga una copia completa de los datos que Mecaza tiene sobre tu cuenta: perfil, reservas, facturas y notificaciones. El archivo se descarga en formato JSON.
+            </p>
+            <button
+              type="button"
+              onClick={handleExportarDatos}
+              disabled={isExporting}
+              className="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-bold rounded-xl hover:shadow-lg hover:shadow-violet-300/40 transition-all active:scale-95 disabled:opacity-50"
+            >
+              {isExporting ? (
+                <>
+                  <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                  </svg>
+                  Exportando...
+                </>
+              ) : (
+                <><FaDownload className="text-xs" /> Descargar mis datos</>
+              )}
+            </button>
           </SectionCard>
 
           {/* Acciones */}
