@@ -4,107 +4,503 @@ import {
   FaCar, FaPlus, FaTrash, FaListAlt,
   FaMapMarkerAlt, FaClock, FaCalendarAlt, FaPhone,
   FaUser, FaCheck, FaTimes, FaIdCard, FaPlay, FaFlagCheckered,
-  FaSync, FaRoad, FaStar, FaRoute,
+  FaSync, FaRoad, FaStar, FaRoute, FaBolt,
 } from 'react-icons/fa';
 
-import PageBg            from '../../components/ui/PageBg';
-import InnerNavbar       from '../../components/layout/InnerNavbar';
+import Navbar            from '../../components/layout/Navbar';
+import Footer            from '../../components/layout/Footer';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
-import FormInput         from '../../components/ui/FormInput';
 import ToastNotification from '../../components/ui/ToastNotification';
-import Pagination        from '../../components/ui/Pagination';
+import DarkPagination    from '../../components/ui/DarkPagination';
 import { useToast }      from '../../hooks/useToast';
-
 import {
-  misReservasApi, listarPreciosApi,
-  crearCarroApi, eliminarCarroApi,
+  misReservasApi, listarPreciosApi, crearCarroApi, eliminarCarroApi,
   confirmarReservaApi, iniciarViajeApi, terminarViajeApi,
-  historialConductorApi, asignarViajeApi, misCarrosApi,
-  calificarPasajeroApi,
+  historialConductorApi, asignarViajeApi, misCarrosApi, calificarPasajeroApi,
 } from '../../services/api';
-import { compressImage, getEstadoInfo, formatFecha } from '../../utils';
+import { compressImage, formatFecha } from '../../utils';
 
-// ── Modal base ────────────────────────────────────────────────────────────────
-const Modal = ({ title, accent = 'violet', onClose, children }) => {
-  const accents = {
-    violet: 'from-violet-700 to-blue-700',
-    green:  'from-green-600 to-emerald-600',
-    red:    'from-red-600 to-rose-600',
-    blue:   'from-blue-700 to-cyan-600',
-    orange: 'from-orange-500 to-amber-500',
-  };
+const RPER = 6; // reservas visibles por página (client-side)
+
+// ── Design tokens ─────────────────────────────────────────────────────────────
+const T = {
+  void:        '#080B12',
+  surface:     '#0E1422',
+  surface2:    '#141D30',
+  border:      'rgba(255,255,255,0.07)',
+  amber:       '#FFBE00',
+  amberGlow:   'rgba(255,190,0,0.12)',
+  amberBorder: 'rgba(255,190,0,0.3)',
+  white:       '#EEF0FA',
+  fog:         '#6B728F',
+  muted:       '#3A4060',
+  green:       '#22c55e',
+  sky:         '#38bdf8',
+  red:         '#ef4444',
+};
+
+const STATUS = {
+  1: { color: '#38bdf8', label: 'Esperando', live: true  },
+  2: { color: '#22c55e', label: 'En ruta',   live: true  },
+  3: { color: '#FFBE00', label: 'Activo',    live: true  },
+  4: { color: '#6B728F', label: 'Inactivo',  live: false },
+  5: { color: '#6B728F', label: 'Terminado', live: false },
+};
+const getS  = (id) => STATUS[parseInt(id)] ?? { color: T.fog, label: '—', live: false };
+const fmtM  = (n)  => n != null ? `$${Number(n).toLocaleString('es-CO')}` : '$0';
+const fmtD  = (ts) => ts ? new Date(ts).toLocaleDateString('es-ES', { day: '2-digit', month: 'short' }) : '—';
+
+// ── Atoms ─────────────────────────────────────────────────────────────────────
+
+const LiveDot = ({ color }) => (
+  <span style={{ position: 'relative', display: 'inline-flex', width: 10, height: 10, flexShrink: 0 }}>
+    <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', background: color, opacity: 0.6, animation: 'ping 1.5s ease-out infinite' }} />
+    <span style={{ width: 10, height: 10, borderRadius: '50%', background: color, display: 'block' }} />
+  </span>
+);
+
+const PlateChip = ({ value }) => (
+  <span style={{
+    fontFamily: 'monospace', fontWeight: 800, fontSize: '0.88rem',
+    letterSpacing: '0.12em', color: T.white, textTransform: 'uppercase',
+    background: T.surface2, border: `1px solid ${T.border}`,
+    borderRadius: 8, padding: '4px 10px',
+  }}>{value || '—'}</span>
+);
+
+const SeatGrid = ({ total, ocupados }) => {
+  const n = parseInt(total) || 4;
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4"
-      style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
-      onClick={(e) => e.target === e.currentTarget && onClose()}
-    >
-      <div className="bg-white rounded-2xl w-full max-w-lg shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
-        <div className={`bg-gradient-to-r ${accents[accent]} px-6 py-4 flex items-center justify-between shrink-0`}>
-          <h2 className="text-base font-bold text-white">{title}</h2>
-          <button onClick={onClose} className="text-white/60 hover:text-white text-xl leading-none transition-colors">&times;</button>
-        </div>
-        <div className="overflow-y-auto flex-1 p-6">{children}</div>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>
+      {Array.from({ length: n }, (_, i) => (
+        <div key={i} style={{
+          width: 22, height: 16, borderRadius: 4,
+          background: i < ocupados ? 'rgba(255,190,0,0.22)' : 'rgba(255,255,255,0.04)',
+          border: `1px solid ${i < ocupados ? 'rgba(255,190,0,0.45)' : T.border}`,
+        }} />
+      ))}
+      <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.68rem', color: T.fog, marginLeft: 6 }}>
+        {ocupados}/{n}
+      </span>
+    </div>
+  );
+};
+
+const StatChip = ({ value, label, color, loading }) => (
+  <div style={{
+    background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: 14, padding: '12px 20px', minWidth: 80, textAlign: 'center',
+  }}>
+    {loading
+      ? <div style={{ width: 22, height: 22, border: `2px solid ${T.muted}`, borderTopColor: color, borderRadius: '50%', animation: 'spin 0.8s linear infinite', margin: '0 auto 4px' }} />
+      : <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.5rem', fontWeight: 800, color, margin: 0, lineHeight: 1 }}>{value}</p>
+    }
+    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.62rem', color: T.fog, marginTop: 4 }}>{label}</p>
+  </div>
+);
+
+const TabBtn = ({ id, label, icon, active, badge, onClick }) => (
+  <button
+    onClick={() => onClick(id)}
+    style={{
+      display: 'flex', alignItems: 'center', gap: 6,
+      padding: '9px 16px', borderRadius: 10, whiteSpace: 'nowrap',
+      background: active ? T.amberGlow : 'transparent',
+      border: `1px solid ${active ? T.amberBorder : 'transparent'}`,
+      color: active ? T.amber : T.fog,
+      fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', fontWeight: 700,
+      cursor: 'pointer', transition: 'all 0.2s', position: 'relative',
+    }}
+    onMouseEnter={e => { if (!active) { e.currentTarget.style.color = T.white; e.currentTarget.style.background = 'rgba(255,255,255,0.04)'; } }}
+    onMouseLeave={e => { if (!active) { e.currentTarget.style.color = T.fog;   e.currentTarget.style.background = 'transparent'; } }}
+  >
+    <span style={{ fontSize: '0.72rem' }}>{icon}</span>
+    {label}
+    {badge > 0 && (
+      <span style={{
+        position: 'absolute', top: -5, right: -5,
+        minWidth: 16, height: 16, borderRadius: 999, padding: '0 3px',
+        background: T.red, color: '#fff', fontSize: '0.5rem', fontWeight: 700,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        border: `2px solid ${T.void}`,
+      }}>{badge}</span>
+    )}
+  </button>
+);
+
+const Spinner = () => (
+  <div style={{ display: 'flex', justifyContent: 'center', padding: '4rem 0' }}>
+    <div style={{ width: 28, height: 28, border: `3px solid ${T.muted}`, borderTopColor: T.amber, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} />
+  </div>
+);
+
+const EmptyTab = ({ icon, title, desc, action }) => (
+  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, padding: '4rem 2rem', textAlign: 'center' }}>
+    <div style={{ width: 58, height: 58, borderRadius: 16, background: T.surface2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 1.25rem' }}>
+      {icon}
+    </div>
+    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '1rem', fontWeight: 700, color: T.white, marginBottom: 8 }}>{title}</p>
+    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', color: T.fog, marginBottom: action ? '1.5rem' : 0 }}>{desc}</p>
+    {action && (
+      <button onClick={action.onClick} style={{ padding: '10px 24px', borderRadius: 10, background: 'linear-gradient(135deg,#C8960C,#FFBE00)', color: '#080B12', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '0.82rem', border: 'none', cursor: 'pointer' }}>
+        {action.label}
+      </button>
+    )}
+  </div>
+);
+
+// ── DarkModal ─────────────────────────────────────────────────────────────────
+const DarkModal = ({ title, onClose, children }) => (
+  <div
+    onClick={(e) => e.target === e.currentTarget && onClose()}
+    style={{ position: 'fixed', inset: 0, zIndex: 60, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem', background: 'rgba(8,11,18,0.85)', backdropFilter: 'blur(8px)' }}
+  >
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20, width: '100%', maxWidth: 480, maxHeight: '90vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', animation: 'scaleIn 0.2s cubic-bezier(.22,1,.36,1) both' }}>
+      <div style={{ padding: '16px 20px', borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'linear-gradient(135deg,rgba(255,190,0,0.07) 0%,transparent 100%)', flexShrink: 0 }}>
+        <span style={{ fontFamily: 'Syne, sans-serif', fontWeight: 700, fontSize: '0.9rem', color: T.white }}>{title}</span>
+        <button onClick={onClose} style={{ width: 28, height: 28, borderRadius: 7, background: 'rgba(255,255,255,0.05)', border: `1px solid ${T.border}`, color: T.fog, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+          onMouseEnter={e => { e.currentTarget.style.color = T.white; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+          onMouseLeave={e => { e.currentTarget.style.color = T.fog;   e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
+        >
+          <FaTimes style={{ fontSize: '0.7rem' }} />
+        </button>
+      </div>
+      <div style={{ overflowY: 'auto', flex: 1, padding: '20px' }}>{children}</div>
+    </div>
+  </div>
+);
+
+// ── Form fields ───────────────────────────────────────────────────────────────
+const DField = ({ label, icon, type = 'text', value, onChange, placeholder, disabled, required, min }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{label}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surface2, borderRadius: 10, padding: '0 12px', border: `1px solid ${focused ? T.amber : T.border}`, boxShadow: focused ? '0 0 0 3px rgba(255,190,0,0.07)' : 'none', transition: 'all 0.2s', opacity: disabled ? 0.5 : 1 }}>
+        {icon && <span style={{ color: focused ? T.amber : T.fog, fontSize: '0.8rem', flexShrink: 0, transition: 'color 0.2s' }}>{icon}</span>}
+        <input type={type} value={value} onChange={onChange} placeholder={placeholder} disabled={disabled} required={required} min={min}
+          onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: T.white, fontSize: '0.85rem', padding: '11px 0', fontFamily: 'DM Sans, sans-serif' }} />
       </div>
     </div>
   );
 };
 
-const ActionCard = ({ icon, title, desc, btnLabel, gradient, onClick }) => (
-  <div className="bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all p-5 flex flex-col gap-3 hover:-translate-y-0.5">
-    <div className="flex items-center gap-3">
-      <div className={`w-10 h-10 rounded-xl bg-gradient-to-r ${gradient} flex items-center justify-center text-white shadow-sm`}>
-        {icon}
-      </div>
-      <h3 className="font-bold text-gray-800 text-sm">{title}</h3>
-    </div>
-    <p className="text-xs text-gray-500 leading-relaxed flex-1">{desc}</p>
-    <button
-      onClick={onClick}
-      className={`w-full py-2.5 bg-gradient-to-r ${gradient} text-white text-sm font-semibold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-95`}
-    >
-      <FaPlus className="text-xs" /> {btnLabel}
-    </button>
-  </div>
-);
-
-const InfoRow = ({ icon, label, value }) => (
-  <div className="flex items-start gap-2 text-sm">
-    <span className="text-violet-400 mt-0.5 shrink-0">{icon}</span>
+const DSelect = ({ label, icon, value, onChange, required, children }) => {
+  const [focused, setFocused] = useState(false);
+  return (
     <div>
-      <p className="text-xs text-gray-400 font-medium">{label}</p>
-      <p className="text-gray-700">{value || '—'}</p>
+      <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>{label}</p>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: T.surface2, borderRadius: 10, padding: '0 12px', border: `1px solid ${focused ? T.amber : T.border}`, boxShadow: focused ? '0 0 0 3px rgba(255,190,0,0.07)' : 'none', transition: 'all 0.2s' }}>
+        {icon && <span style={{ color: focused ? T.amber : T.fog, fontSize: '0.8rem', flexShrink: 0, transition: 'color 0.2s' }}>{icon}</span>}
+        <select value={value} onChange={onChange} required onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+          style={{ flex: 1, background: 'none', border: 'none', outline: 'none', color: T.white, fontSize: '0.85rem', padding: '11px 0', fontFamily: 'DM Sans, sans-serif', cursor: 'pointer' }}>
+          {children}
+        </select>
+      </div>
     </div>
+  );
+};
+
+// ── Card: vehículo activo (dispatch console style) ────────────────────────────
+const ActiveVehicleCard = ({ carro, dashReservas, accionCarroId, procesando, onIniciar, onTerminar, onConfirmar, onRechazar, idx }) => {
+  const id        = carro.id_carros || carro.id;
+  const estadoNum = parseInt(carro.id_estados);
+  const s         = getS(carro.id_estados);
+  const precio    = carro.precioviaje;
+
+  const pasajeros = dashReservas
+    .filter(r => String(r.id_carros || r.id_carro || r.carro_id) === String(id))
+    .filter(r => { const e = r.estado?.toLowerCase(); return e === 'pendiente' || e === 'confirmada'; });
+
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `4px solid ${s.color}`, borderRadius: '0 16px 16px 0', overflow: 'hidden', animation: 'fadeUp 0.35s ease both', animationDelay: `${idx * 70}ms` }}>
+
+      {/* Header strip */}
+      <div style={{ padding: '14px 20px', background: `linear-gradient(90deg,${s.color}09 0%,transparent 50%)`, borderBottom: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <PlateChip value={carro.placa} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            {s.live && <LiveDot color={s.color} />}
+            <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.68rem', fontWeight: 700, color: s.color, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{s.label}</span>
+          </div>
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 18 }}>
+          {precio?.precio && (
+            <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.95rem', fontWeight: 800, color: T.amber }}>
+              {fmtM(precio.precio)}<span style={{ fontSize: '0.6rem', fontWeight: 400, color: T.fog }}> /pasajero</span>
+            </span>
+          )}
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.fog }}>
+            <FaClock style={{ fontSize: '0.6rem' }} />{carro.horasalida || '—'}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: 5, fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.fog }}>
+            <FaCalendarAlt style={{ fontSize: '0.6rem' }} />{fmtD(carro.fecha)}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ padding: '16px 20px', display: 'grid', gridTemplateColumns: '1fr auto', gap: 20, alignItems: 'start' }}>
+        {/* Left panel */}
+        <div>
+          {/* Route */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+            <FaMapMarkerAlt style={{ color: s.color, fontSize: '0.8rem', flexShrink: 0 }} />
+            {precio ? (
+              <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.9rem', fontWeight: 600, color: T.white }}>
+                {precio.origen} <span style={{ color: T.muted }}>→</span> {precio.destino}
+              </span>
+            ) : (
+              <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', color: T.fog, fontStyle: 'italic' }}>Sin ruta asignada</span>
+            )}
+          </div>
+
+          {/* Seat grid */}
+          <div style={{ marginBottom: 16 }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 6 }}>Ocupación</p>
+            <SeatGrid total={carro.asientos} ocupados={pasajeros.length} />
+          </div>
+
+          {/* Passenger list */}
+          {pasajeros.length > 0 && (
+            <div>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 8 }}>Pasajeros</p>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {pasajeros.map((r, ri) => {
+                  const resId     = r.id_reservarviajes || r.id;
+                  const enProceso = procesando === resId;
+                  const estado    = r.estado?.toLowerCase();
+                  return (
+                    <div key={resId ?? ri} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: T.surface2, borderRadius: 10, padding: '8px 12px', border: `1px solid ${T.border}` }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div style={{ width: 28, height: 28, borderRadius: 8, background: T.amberGlow, border: `1px solid ${T.amberBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontSize: '0.7rem', fontWeight: 800, color: T.amber, flexShrink: 0 }}>
+                          {(r.nombre || r.name || '?')[0]?.toUpperCase()}
+                        </div>
+                        <div>
+                          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', fontWeight: 600, color: T.white }}>{r.nombre || r.name || '—'}</p>
+                          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.65rem', color: T.fog }}>Asiento {r.asiento || r.Asiento || '—'}</p>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                        <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, padding: '3px 8px', borderRadius: 999, textTransform: 'uppercase', background: estado === 'confirmada' ? 'rgba(34,197,94,0.1)' : 'rgba(255,190,0,0.1)', color: estado === 'confirmada' ? T.green : T.amber, border: `1px solid ${estado === 'confirmada' ? 'rgba(34,197,94,0.3)' : T.amberBorder}` }}>
+                          {r.estado || 'Pendiente'}
+                        </span>
+                        {(!estado || estado === 'pendiente') && (
+                          <div style={{ display: 'flex', gap: 4 }}>
+                            <button onClick={() => !enProceso && onConfirmar(r)} disabled={enProceso} style={{ width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer', background: 'rgba(34,197,94,0.15)', color: T.green, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}><FaCheck /></button>
+                            <button onClick={() => !enProceso && onRechazar(r)} disabled={enProceso} style={{ width: 26, height: 26, borderRadius: 7, border: 'none', cursor: 'pointer', background: 'rgba(239,68,68,0.12)', color: T.red, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.6rem' }}><FaTimes /></button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Right: action button */}
+        {(estadoNum === 1 || estadoNum === 2) && (
+          <div>
+            {estadoNum === 1 && (
+              <button onClick={() => onIniciar(id)} disabled={accionCarroId === id} style={{ padding: '12px 18px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#166534,#22c55e)', color: '#fff', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 7, cursor: accionCarroId === id ? 'not-allowed' : 'pointer', opacity: accionCarroId === id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                {accionCarroId === id ? <div style={{ width: 13, height: 13, border: '2px solid rgba(255,255,255,0.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <FaPlay style={{ fontSize: '0.65rem' }} />}
+                Iniciar viaje
+              </button>
+            )}
+            {estadoNum === 2 && (
+              <button onClick={() => onTerminar(id)} disabled={accionCarroId === id} style={{ padding: '12px 18px', borderRadius: 12, border: 'none', background: 'linear-gradient(135deg,#C8960C,#FFBE00)', color: '#080B12', fontFamily: 'Syne, sans-serif', fontWeight: 800, fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 7, cursor: accionCarroId === id ? 'not-allowed' : 'pointer', opacity: accionCarroId === id ? 0.6 : 1, whiteSpace: 'nowrap' }}>
+                {accionCarroId === id ? <div style={{ width: 13, height: 13, border: '2px solid rgba(8,11,18,0.25)', borderTopColor: '#080B12', borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : <FaFlagCheckered style={{ fontSize: '0.65rem' }} />}
+                Terminar
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+// ── Card: reserva ─────────────────────────────────────────────────────────────
+const ICell = ({ label, value, accent }) => (
+  <div>
+    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.57rem', fontWeight: 700, color: T.muted, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 2 }}>{label}</p>
+    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: accent || T.fog }}>{value || '—'}</p>
   </div>
 );
 
-// ── Componente principal ──────────────────────────────────────────────────────
+const ReservaCard = ({ r, id, enProceso, estado, onConfirmar, onRechazar, idx }) => {
+  const sc = estado === 'confirmada' ? { c: T.green, bg: 'rgba(34,197,94,0.08)', b: 'rgba(34,197,94,0.25)' }
+           : (estado === 'rechazada' || estado === 'cancelada') ? { c: T.red, bg: 'rgba(239,68,68,0.08)', b: 'rgba(239,68,68,0.25)' }
+           : { c: T.amber, bg: T.amberGlow, b: T.amberBorder };
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `4px solid ${sc.c}`, borderRadius: '0 14px 14px 0', padding: '16px 20px', animation: 'fadeUp 0.3s ease both', animationDelay: `${idx * 50}ms` }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+        <div>
+          <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 700, color: T.white }}>Reserva #{id}</p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.68rem', color: T.fog }}>{r.created_at ? new Date(r.created_at).toLocaleDateString('es-ES') : '—'}</p>
+        </div>
+        <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, padding: '4px 10px', borderRadius: 999, background: sc.bg, color: sc.c, border: `1px solid ${sc.b}`, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+          {r.estado || 'Pendiente'}
+        </span>
+      </div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px,1fr))', gap: 12, marginBottom: 14 }}>
+        <ICell label="Pasajero"   value={r.nombre}    accent={T.white} />
+        <ICell label="Ubicación"  value={r.ubicacion} />
+        <ICell label="Asiento"    value={r.asiento}   accent={T.amber} />
+        {r.tel && <ICell label="Teléfono" value={r.tel} />}
+      </div>
+      {(!estado || estado === 'pendiente') && (
+        <div style={{ display: 'flex', gap: 8, borderTop: `1px solid ${T.border}`, paddingTop: 12 }}>
+          {[
+            { label: 'Confirmar', fn: onConfirmar, bg: 'rgba(34,197,94,0.13)', color: T.green, icon: <FaCheck style={{ fontSize: '0.65rem' }} /> },
+            { label: 'Rechazar',  fn: onRechazar,  bg: 'rgba(239,68,68,0.1)',  color: T.red,   icon: <FaTimes style={{ fontSize: '0.65rem' }} /> },
+          ].map(b => (
+            <button key={b.label} onClick={b.fn} disabled={enProceso} style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', background: b.bg, color: b.color, fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: enProceso ? 'not-allowed' : 'pointer', opacity: enProceso ? 0.5 : 1 }}>
+              {enProceso ? <div style={{ width: 12, height: 12, border: `2px solid ${b.color}40`, borderTopColor: b.color, borderRadius: '50%', animation: 'spin 0.8s linear infinite' }} /> : b.icon}
+              {b.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Card: flota ───────────────────────────────────────────────────────────────
+const FleetCard = ({ carro, onDelete, onAsignar, idx }) => {
+  const s        = getS(carro.id_estados);
+  const inactive = [4, 5].includes(parseInt(carro.id_estados));
+  const imgSrc   = carro.imagencarro
+    ? (carro.imagencarro.startsWith('http') ? carro.imagencarro : `http://localhost:8000${carro.imagencarro}`)
+    : null;
+  const precio = carro.precioviaje;
+
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden', animation: 'fadeUp 0.3s ease both', animationDelay: `${idx * 50}ms` }}>
+      {/* Photo */}
+      <div style={{ position: 'relative', height: 120, background: T.surface2 }}>
+        {imgSrc
+          ? <img src={imgSrc} alt={carro.placa} style={{ width: '100%', height: '100%', objectFit: 'cover', opacity: 0.72 }} />
+          : <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}><FaCar style={{ fontSize: '2.5rem', color: T.muted }} /></div>
+        }
+        <div style={{ position: 'absolute', inset: 0, background: 'linear-gradient(to top,rgba(14,20,34,0.9) 0%,transparent 55%)' }} />
+        <div style={{ position: 'absolute', top: 10, right: 10 }}>
+          <span style={{ display: 'inline-flex', alignItems: 'center', gap: 5, padding: '3px 9px', borderRadius: 999, background: 'rgba(8,11,18,0.72)', backdropFilter: 'blur(4px)', border: `1px solid ${s.color}40`, fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, color: s.color, textTransform: 'uppercase' }}>
+            {s.live && <LiveDot color={s.color} />}{s.label}
+          </span>
+        </div>
+        <div style={{ position: 'absolute', bottom: 10, left: 10 }}>
+          <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: '0.82rem', letterSpacing: '0.1em', color: '#fff', background: 'rgba(8,11,18,0.7)', backdropFilter: 'blur(4px)', borderRadius: 6, padding: '3px 8px', textTransform: 'uppercase' }}>
+            {carro.placa || '—'}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ padding: '12px 14px' }}>
+        {precio
+          ? <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog, marginBottom: 4 }}><FaMapMarkerAlt style={{ fontSize: '0.62rem', marginRight: 4 }} />{precio.origen} → {precio.destino}</p>
+          : <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.75rem', color: T.muted, fontStyle: 'italic', marginBottom: 4 }}>Sin ruta asignada</p>
+        }
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.muted, marginBottom: 12 }}>{carro.asientos} asientos{carro.horasalida ? ` · ${carro.horasalida}` : ''}</p>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button onClick={onDelete} style={{ width: 34, height: 34, borderRadius: 9, border: `1px solid rgba(239,68,68,0.2)`, background: 'rgba(239,68,68,0.07)', color: T.red, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', flexShrink: 0 }}>
+            <FaTrash style={{ fontSize: '0.65rem' }} />
+          </button>
+          {inactive && (
+            <button onClick={onAsignar} style={{ flex: 1, padding: '8px 0', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#C8960C,#FFBE00)', color: '#080B12', fontFamily: 'Syne, sans-serif', fontSize: '0.75rem', fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, cursor: 'pointer' }}>
+              <FaRoute style={{ fontSize: '0.62rem' }} /> Asignar viaje
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Card: historial ───────────────────────────────────────────────────────────
+const HistorialCard = ({ r, resId, ruta, nombre, isExpanded, ratingDraft, calificandoPasajeroId, onExpandRating, onCollapseRating, onSetStars, onSetComment, onCalificar, idx }) => {
+  const precio  = r.carro?.precioviaje;
+  const ingreso = parseFloat(precio?.precio ?? 0);
+  const LABELS  = ['', 'Muy malo', 'Malo', 'Regular', 'Bueno', '¡Excelente!'];
+  return (
+    <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderLeft: `4px solid ${T.muted}`, borderRadius: '0 14px 14px 0', padding: '16px 20px', animation: 'fadeUp 0.3s ease both', animationDelay: `${idx * 50}ms` }}>
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 600, color: T.white, marginBottom: 3, display: 'flex', alignItems: 'center', gap: 6 }}>
+            <FaRoad style={{ color: T.fog, fontSize: '0.72rem' }} />{ruta}
+          </p>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.fog }}>{r.carro?.placa} · {fmtD(r.updated_at?.split('T')[0])} · {r.carro?.horasalida || '—'}</p>
+          {ingreso > 0 && <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 700, color: T.green, marginTop: 3 }}>+{fmtM(ingreso)}</p>}
+        </div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+            <div style={{ width: 28, height: 28, borderRadius: 8, background: T.surface2, border: `1px solid ${T.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontSize: '0.7rem', fontWeight: 800, color: T.fog }}>
+              {nombre[0]?.toUpperCase()}
+            </div>
+            <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog }}>{nombre}</span>
+          </div>
+          {r.calificacion != null && (
+            <div style={{ display: 'flex', gap: 2 }}>{[1,2,3,4,5].map(n => <FaStar key={n} style={{ fontSize: '0.72rem', color: n <= r.calificacion ? T.amber : T.muted }} />)}</div>
+          )}
+          {r.calificacion_conductor != null
+            ? <div style={{ display: 'flex', gap: 2 }}>{[1,2,3,4,5].map(n => <FaStar key={n} style={{ fontSize: '0.72rem', color: n <= r.calificacion_conductor ? '#f97316' : T.muted }} />)}</div>
+            : !isExpanded && (
+              <button onClick={onExpandRating} style={{ padding: '5px 12px', borderRadius: 8, cursor: 'pointer', border: `1px solid ${T.amberBorder}`, background: T.amberGlow, color: T.amber, fontFamily: 'Syne, sans-serif', fontSize: '0.62rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <FaStar style={{ fontSize: '0.58rem' }} /> Calificar
+              </button>
+            )
+          }
+        </div>
+      </div>
+
+      {isExpanded && r.calificacion_conductor == null && (
+        <div style={{ marginTop: 16, paddingTop: 14, borderTop: `1px solid ${T.border}` }}>
+          <div style={{ display: 'flex', gap: 6, justifyContent: 'center', marginBottom: 6 }}>
+            {[1,2,3,4,5].map(n => (
+              <button key={n} onClick={() => onSetStars(n)} style={{ fontSize: '1.4rem', background: 'none', border: 'none', cursor: 'pointer', color: n <= ratingDraft.stars ? T.amber : T.muted, transition: 'color 0.15s, transform 0.1s' }}
+                onMouseEnter={e => e.currentTarget.style.transform = 'scale(1.2)'}
+                onMouseLeave={e => e.currentTarget.style.transform = 'scale(1)'}
+              ><FaStar /></button>
+            ))}
+          </div>
+          {ratingDraft.stars > 0 && <p style={{ textAlign: 'center', fontFamily: 'DM Sans, sans-serif', fontSize: '0.72rem', color: T.amber, marginBottom: 10 }}>{LABELS[ratingDraft.stars]}</p>}
+          <textarea rows={2} maxLength={500} value={ratingDraft.comment} onChange={e => onSetComment(e.target.value)} placeholder="Comentario opcional…"
+            style={{ width: '100%', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 10, padding: '10px 12px', color: T.white, resize: 'none', fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', outline: 'none', boxSizing: 'border-box', marginBottom: 10 }} />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button onClick={onCollapseRating} style={{ flex: 1, padding: '9px 0', borderRadius: 9, background: T.surface2, border: `1px solid ${T.border}`, color: T.fog, fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+            <button onClick={onCalificar} disabled={ratingDraft.stars === 0 || calificandoPasajeroId === resId} style={{ flex: 1, padding: '9px 0', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#C8960C,#FFBE00)', color: '#080B12', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', fontWeight: 800, cursor: (ratingDraft.stars === 0 || calificandoPasajeroId === resId) ? 'not-allowed' : 'pointer', opacity: (ratingDraft.stars === 0 || calificandoPasajeroId === resId) ? 0.5 : 1 }}>
+              {calificandoPasajeroId === resId ? 'Guardando…' : 'Enviar'}
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+// ── Main component ────────────────────────────────────────────────────────────
 const Conductor = () => {
-  const [userData,  setUserData]  = useState(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [userData,       setUserData]       = useState(null);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [activeTab,      setActiveTab]      = useState('activos');
 
-  // Modales
   const [showAddCar,      setShowAddCar]      = useState(false);
-  const [showAsignar,     setShowAsignar]      = useState(false);
-  const [showReservas,    setShowReservas]     = useState(false);
-  const [showCarros,      setShowCarros]       = useState(false);
-  const [showDeleteModal, setShowDeleteModal]  = useState(false);
-  const [showHistorial,   setShowHistorial]    = useState(false);
+  const [showAsignar,     setShowAsignar]     = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
-  // Datos
-  const [reservas,       setReservas]       = useState([]);
-  const [carros,         setCarros]         = useState([]);
-  const [rutas,          setRutas]          = useState([]);
-  const [carroToDelete,  setCarroToDelete]  = useState(null);
-  const [carroAAsignar,  setCarroAAsignar]  = useState(null);
-  const [historial,      setHistorial]      = useState([]);
+  const [reservas,      setReservas]      = useState([]);
+  const [carros,        setCarros]        = useState([]);
+  const [rutas,         setRutas]         = useState([]);
+  const [historial,     setHistorial]     = useState([]);
+  const [carroToDelete, setCarroToDelete] = useState(null);
+  const [carroAAsignar, setCarroAAsignar] = useState(null);
 
-  // Dashboard
   const [dashCarros,   setDashCarros]   = useState([]);
   const [dashReservas, setDashReservas] = useState([]);
   const [loadingDash,  setLoadingDash]  = useState(true);
 
-  // Loading
   const [loadingReservas,  setLoadingReservas]  = useState(false);
   const [loadingCarros,    setLoadingCarros]    = useState(false);
   const [loadingHistorial, setLoadingHistorial] = useState(false);
@@ -114,44 +510,30 @@ const Conductor = () => {
   const [procesando,       setProcesando]       = useState(null);
   const [accionCarroId,    setAccionCarroId]    = useState(null);
 
-  // Rating pasajero (conductor → pasajero)
   const [expandedRatingId,      setExpandedRatingId]      = useState(null);
   const [ratingDraft,           setRatingDraft]           = useState({ stars: 0, comment: '' });
   const [calificandoPasajeroId, setCalificandoPasajeroId] = useState(null);
 
-  // Paginación reservas
   const [pageReservas,      setPageReservas]      = useState(1);
   const [lastPageReservas,  setLastPageReservas]  = useState(1);
-
-  // Paginación historial
+  const [pageRUI,           setPageRUI]           = useState(1); // client-side page for reservas
   const [pageHistorial,     setPageHistorial]     = useState(1);
   const [lastPageHistorial, setLastPageHistorial] = useState(1);
 
-  // Formulario nuevo vehículo
-  const [carData, setCarData] = useState({
-    Conductor: '', Placa: '', Telefono: '', Imagencarro: null,
-  });
-
-  // Formulario asignar viaje
+  const [carData,   setCarData]   = useState({ Conductor: '', Placa: '', Telefono: '', Imagencarro: null });
   const [viajeData, setViajeData] = useState({ id_precioviaje: '', horasalida: '', fecha: '' });
 
   const { toast, showToast, hideToast } = useToast();
-  const navigate = useNavigate();
-
+  const navigate      = useNavigate();
   const procesandoRef = useRef(null);
   const accionRef     = useRef(null);
 
-  // ── Auth ──────────────────────────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
     try {
       const user = JSON.parse(stored);
-      if (user.rol !== 'conductor' && user.rol !== 'admin') {
-        showToast('Sin permisos para el panel de conductor.', 'error');
-        navigate('/indexLogin');
-        return;
-      }
+      if (user.rol !== 'conductor' && user.rol !== 'admin') { navigate('/'); return; }
       setUserData(user);
     } catch { navigate('/login'); }
     setIsLoading(false);
@@ -159,33 +541,27 @@ const Conductor = () => {
 
   useEffect(() => { if (userData) loadDashboard(); }, [userData]);
 
-  // ── Cargar dashboard ───────────────────────────────────────────────────────────
   const loadDashboard = async () => {
     setLoadingDash(true);
     try {
-      const [carsResp, resResp] = await Promise.all([misCarrosApi(), misReservasApi(1)]);
-      const misCarros = Array.isArray(carsResp.data?.data) ? carsResp.data.data : [];
-      const activeRes = Array.isArray(resResp.data?.data) ? resResp.data.data : [];
-      setDashCarros(misCarros);
-      setDashReservas(activeRes);
-    } catch { /* silencioso */ }
+      const [carsR, resR] = await Promise.all([misCarrosApi(), misReservasApi(1)]);
+      setDashCarros(Array.isArray(carsR.data?.data) ? carsR.data.data : []);
+      setDashReservas(Array.isArray(resR.data?.data) ? resR.data.data : []);
+    } catch {}
     finally { setLoadingDash(false); }
   };
 
   const fetchRutas = async () => {
     if (rutas.length > 0) return;
-    try {
-      const { data } = await listarPreciosApi();
-      setRutas(Array.isArray(data.data) ? data.data : []);
-    } catch { /* silencioso */ }
+    try { const { data } = await listarPreciosApi(); setRutas(Array.isArray(data.data) ? data.data : []); } catch {}
   };
 
   const fetchReservas = async (page = 1) => {
     setLoadingReservas(true);
-    setShowReservas(true);
     try {
       const { data } = await misReservasApi(page);
       setReservas(Array.isArray(data.data) ? data.data : []);
+      setPageRUI(1);                              // reset client-side page on fresh fetch
       setPageReservas(data.current_page ?? 1);
       setLastPageReservas(data.last_page ?? 1);
     } catch { showToast('Error al cargar reservas.', 'error'); }
@@ -194,138 +570,106 @@ const Conductor = () => {
 
   const fetchCarros = async () => {
     setLoadingCarros(true);
-    setShowCarros(true);
-    try {
-      const { data } = await misCarrosApi();
-      setCarros(Array.isArray(data.data) ? data.data : []);
-    } catch { showToast('Error al cargar vehículos.', 'error'); }
+    try { const { data } = await misCarrosApi(); setCarros(Array.isArray(data.data) ? data.data : []); }
+    catch { showToast('Error al cargar vehículos.', 'error'); }
     finally { setLoadingCarros(false); }
   };
 
   const fetchHistorial = async (page = 1) => {
     setLoadingHistorial(true);
-    setShowHistorial(true);
     try {
       const { data } = await historialConductorApi(page);
       setHistorial(Array.isArray(data.data) ? data.data : []);
       setPageHistorial(data.current_page ?? 1);
       setLastPageHistorial(data.last_page ?? 1);
-    } catch { showToast('Error al cargar el historial.', 'error'); }
+    } catch { showToast('Error al cargar historial.', 'error'); }
     finally { setLoadingHistorial(false); }
   };
 
-  // ── Crear vehículo ────────────────────────────────────────────────────────────
+  const handleTabChange = (tab) => {
+    setActiveTab(tab);
+    if (tab === 'reservas'  && reservas.length === 0)  fetchReservas(1);
+    if (tab === 'flota'     && carros.length === 0)    fetchCarros();
+    if (tab === 'historial' && historial.length === 0) fetchHistorial(1);
+  };
+
   const handleAddCar = async (e) => {
     e.preventDefault();
     const { Conductor, Placa, Telefono, Imagencarro } = carData;
-    if (!Conductor || !Placa || !Telefono || !Imagencarro) {
-      showToast('Completa todos los campos.', 'error'); return;
-    }
+    if (!Conductor || !Placa || !Telefono || !Imagencarro) { showToast('Completa todos los campos.', 'error'); return; }
     const nombreLogueado = userData?.Nombre || userData?.nombre || userData?.name || '';
-    if (Conductor.trim().toLowerCase() !== nombreLogueado.toLowerCase()) {
-      showToast('El nombre del conductor debe coincidir con tu cuenta.', 'error'); return;
-    }
-
+    if (Conductor.trim().toLowerCase() !== nombreLogueado.toLowerCase()) { showToast('El nombre debe coincidir con tu cuenta.', 'error'); return; }
     setIsSaving(true);
     try {
-      const formData = new FormData();
-      formData.append('Conductor',  Conductor.trim());
-      formData.append('Telefono',   Telefono.trim());
-      formData.append('Placa',      Placa.trim());
-      const compressed = await compressImage(Imagencarro);
-      formData.append('Imagencarro', compressed);
-
-      await crearCarroApi(formData);
-      showToast('Vehículo registrado. Ahora asígnale un viaje desde "Vehículos inactivos".', 'success');
+      const fd = new FormData();
+      fd.append('Conductor', Conductor.trim());
+      fd.append('Telefono',  Telefono.trim());
+      fd.append('Placa',     Placa.trim());
+      fd.append('Imagencarro', await compressImage(Imagencarro));
+      await crearCarroApi(fd);
+      showToast('Vehículo registrado. Asígnale un viaje desde Mi Flota.', 'success');
       setCarData({ Conductor: '', Placa: '', Telefono: '', Imagencarro: null });
       setShowAddCar(false);
       await loadDashboard();
+      if (activeTab === 'flota') await fetchCarros();
     } catch (err) {
       const errors = err.response?.data?.errors;
-      const msg = errors ? Object.values(errors).flat()[0] : (err.response?.data?.message || 'Error al guardar.');
-      showToast(String(msg), 'error');
+      showToast(String(errors ? Object.values(errors).flat()[0] : (err.response?.data?.message || 'Error al guardar.')), 'error');
     } finally { setIsSaving(false); }
   };
 
-  // ── Asignar viaje ─────────────────────────────────────────────────────────────
   const handleAsignarViaje = async (e) => {
     e.preventDefault();
-    if (!carroAAsignar || !viajeData.id_precioviaje || !viajeData.horasalida || !viajeData.fecha) {
-      showToast('Completa todos los campos del viaje.', 'error'); return;
-    }
-    const id = carroAAsignar.id_carros || carroAAsignar.id;
+    if (!carroAAsignar || !viajeData.id_precioviaje || !viajeData.horasalida || !viajeData.fecha) { showToast('Completa todos los campos.', 'error'); return; }
     setIsAsignando(true);
     try {
-      await asignarViajeApi(id, {
-        id_precioviaje: parseInt(viajeData.id_precioviaje),
-        horasalida:     viajeData.horasalida,
-        fecha:          viajeData.fecha,
-      });
-      showToast('¡Viaje asignado! El vehículo ya está activo.', 'success');
-      setShowAsignar(false);
-      setCarroAAsignar(null);
+      await asignarViajeApi(carroAAsignar.id_carros || carroAAsignar.id, { id_precioviaje: parseInt(viajeData.id_precioviaje), horasalida: viajeData.horasalida, fecha: viajeData.fecha });
+      showToast('¡Viaje asignado!', 'success');
+      setShowAsignar(false); setCarroAAsignar(null);
       setViajeData({ id_precioviaje: '', horasalida: '', fecha: '' });
       await loadDashboard();
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Error al asignar el viaje.', 'error');
-    } finally { setIsAsignando(false); }
+      if (activeTab === 'flota') await fetchCarros();
+    } catch (err) { showToast(err.response?.data?.message || 'Error al asignar.', 'error'); }
+    finally { setIsAsignando(false); }
   };
 
-  // ── Eliminar vehículo ─────────────────────────────────────────────────────────
   const handleDeleteCarro = async () => {
     if (!carroToDelete) return;
     setIsDeleting(true);
     try {
-      const id = carroToDelete.id_carros || carroToDelete.id;
-      await eliminarCarroApi(id);
+      await eliminarCarroApi(carroToDelete.id_carros || carroToDelete.id);
       showToast('Vehículo eliminado.', 'success');
-      setShowDeleteModal(false);
-      setCarroToDelete(null);
-      await fetchCarros();
-      await loadDashboard();
-    } catch { showToast('Error al eliminar el vehículo.', 'error'); }
+      setShowDeleteModal(false); setCarroToDelete(null);
+      await fetchCarros(); await loadDashboard();
+    } catch { showToast('Error al eliminar.', 'error'); }
     finally { setIsDeleting(false); }
   };
 
-  // ── Iniciar / terminar viaje ──────────────────────────────────────────────────
   const handleIniciarViaje = async (carroId) => {
     if (accionRef.current !== null) return;
-    accionRef.current = carroId;
-    setAccionCarroId(carroId);
-    try {
-      await iniciarViajeApi(carroId);
-      showToast('¡Viaje iniciado!', 'success');
-      await loadDashboard();
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Error al iniciar el viaje.', 'error');
-    } finally { accionRef.current = null; setAccionCarroId(null); }
+    accionRef.current = carroId; setAccionCarroId(carroId);
+    try { await iniciarViajeApi(carroId); showToast('¡Viaje iniciado!', 'success'); await loadDashboard(); }
+    catch (err) { showToast(err.response?.data?.message || 'Error al iniciar.', 'error'); }
+    finally { accionRef.current = null; setAccionCarroId(null); }
   };
 
   const handleTerminarViaje = async (carroId) => {
     if (accionRef.current !== null) return;
-    accionRef.current = carroId;
-    setAccionCarroId(carroId);
-    try {
-      await terminarViajeApi(carroId);
-      showToast('Viaje finalizado. El vehículo quedó inactivo.', 'success');
-      await loadDashboard();
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Error al finalizar el viaje.', 'error');
-    } finally { accionRef.current = null; setAccionCarroId(null); }
+    accionRef.current = carroId; setAccionCarroId(carroId);
+    try { await terminarViajeApi(carroId); showToast('Viaje finalizado.', 'success'); await loadDashboard(); }
+    catch (err) { showToast(err.response?.data?.message || 'Error al finalizar.', 'error'); }
+    finally { accionRef.current = null; setAccionCarroId(null); }
   };
 
-  // ── Confirmar / rechazar reserva ──────────────────────────────────────────────
   const cambiarEstadoReserva = async (reserva, estado) => {
     const id = reserva.id_reservarviajes || reserva.id_reservarviaje || reserva.id || reserva.ID;
     if (procesandoRef.current !== null) return;
-    procesandoRef.current = id;
-    setProcesando(id);
+    procesandoRef.current = id; setProcesando(id);
     try {
       await confirmarReservaApi(id, estado);
       showToast(estado === 'confirmada' ? 'Reserva confirmada.' : 'Operación exitosa.', 'success');
-      await loadDashboard();
-      await fetchReservas(pageReservas);
-    } catch { showToast('Error al actualizar la reserva.', 'error'); }
+      await loadDashboard(); await fetchReservas(pageReservas);
+    } catch { showToast('Error al actualizar.', 'error'); }
     finally { procesandoRef.current = null; setProcesando(null); }
   };
 
@@ -335,722 +679,262 @@ const Conductor = () => {
     try {
       await calificarPasajeroApi(reservaId, ratingDraft.stars, ratingDraft.comment);
       showToast('¡Pasajero calificado!', 'success');
-      setExpandedRatingId(null);
-      setRatingDraft({ stars: 0, comment: '' });
+      setExpandedRatingId(null); setRatingDraft({ stars: 0, comment: '' });
       await fetchHistorial(pageHistorial);
-    } catch (err) {
-      showToast(err.response?.data?.message || 'Error al calificar.', 'error');
-    } finally { setCalificandoPasajeroId(null); }
+    } catch (err) { showToast(err.response?.data?.message || 'Error al calificar.', 'error'); }
+    finally { setCalificandoPasajeroId(null); }
   };
 
-  if (isLoading) return <LoadingScreen message="Cargando panel..." />;
+  if (isLoading) return <LoadingScreen message="Cargando panel…" />;
   if (!userData)  return null;
 
-  const nombre = userData.Nombre || userData.nombre || userData.name || 'Conductor';
-
-  // Separar carros activos (1,2,3) e inactivos (4,5)
+  const nombre          = userData.Nombre || userData.nombre || userData.name || 'Conductor';
+  const inicial         = nombre[0]?.toUpperCase() || 'C';
   const carrosActivos   = dashCarros.filter(c => ![4, 5].includes(parseInt(c.id_estados)));
   const carrosInactivos = dashCarros.filter(c => [4, 5].includes(parseInt(c.id_estados)));
+  const pendientesCount = dashReservas.filter(r => r.estado?.toLowerCase() === 'pendiente').length;
 
   return (
-    <PageBg>
+    <>
+      <style>{`
+        @keyframes ping    { 0% { transform:scale(1);    opacity:.8; } 100% { transform:scale(2.5); opacity:0; } }
+        @keyframes spin    { to { transform:rotate(360deg); } }
+        @keyframes fadeUp  { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:translateY(0); } }
+        @keyframes scaleIn { from { opacity:0; transform:scale(0.96); }      to { opacity:1; transform:scale(1); } }
+        select option { background:#141D30; color:#EEF0FA; }
+      `}</style>
+
       <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
 
-      <InnerNavbar userData={userData} title="Panel de Conductor" backTo="/" />
+      <div style={{ minHeight: '100vh', background: T.void, display: 'flex', flexDirection: 'column' }}>
+        <Navbar />
 
-      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-8">
-
-        {/* Bienvenida */}
-        <div className="animate-fade-in-up">
-          <h1 className="text-3xl font-extrabold text-white">Hola, {nombre}</h1>
-          <p className="text-blue-200 mt-1 text-sm">Gestiona tus vehículos y reservas desde aquí.</p>
-        </div>
-
-        {/* Acciones */}
-        <div className="grid sm:grid-cols-4 gap-4 animate-fade-in-up" style={{ animationDelay: '80ms' }}>
-          <ActionCard
-            icon={<FaPlus />}
-            title="Agregar Vehículo"
-            desc="Registra un nuevo vehículo. Luego asígnale un viaje."
-            btnLabel="Agregar"
-            gradient="from-violet-600 to-blue-600"
-            onClick={() => {
-              setCarData(p => ({
-                ...p,
-                Conductor: userData?.Nombre || userData?.nombre || userData?.name || '',
-                Telefono:  userData?.Telefono || userData?.telefono || userData?.tel || '',
-              }));
-              setShowAddCar(true);
-            }}
-          />
-          <ActionCard
-            icon={<FaListAlt />}
-            title="Ver Reservas"
-            desc="Consulta y gestiona las reservas de tus vehículos."
-            btnLabel="Ver reservas"
-            gradient="from-blue-600 to-cyan-500"
-            onClick={() => fetchReservas(1)}
-          />
-          <ActionCard
-            icon={<FaCar />}
-            title="Mis Vehículos"
-            desc="Administra, elimina o revisa el estado de tus carros."
-            btnLabel="Ver vehículos"
-            gradient="from-green-600 to-emerald-500"
-            onClick={fetchCarros}
-          />
-          <ActionCard
-            icon={<FaRoad />}
-            title="Historial"
-            desc="Consulta los viajes completados y sus pasajeros."
-            btnLabel="Ver historial"
-            gradient="from-orange-500 to-amber-500"
-            onClick={() => fetchHistorial(1)}
-          />
-        </div>
-
-        {/* ── Vehículos activos ── */}
-        <div className="animate-fade-in-up" style={{ animationDelay: '160ms' }}>
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-xl font-extrabold text-white">Mis vehículos activos</h2>
-              <p className="text-blue-200 text-xs mt-0.5">Gestiona pasajeros e inicia o termina el viaje</p>
-            </div>
-            <button onClick={loadDashboard} disabled={loadingDash}
-              className="flex items-center gap-2 px-3 py-1.5 bg-white/10 text-white text-sm rounded-xl border border-white/20 hover:bg-white/20 transition-all disabled:opacity-50">
-              <FaSync className={`text-xs ${loadingDash ? 'animate-spin' : ''}`} />
-              Actualizar
-            </button>
-          </div>
-
-          {loadingDash ? (
-            <div className="bg-white/10 rounded-2xl p-10 flex flex-col items-center gap-3">
-              <div className="w-8 h-8 border-4 border-white/30 border-t-white rounded-full animate-spin" />
-              <p className="text-white/70 text-sm">Cargando tus vehículos...</p>
-            </div>
-          ) : carrosActivos.length === 0 ? (
-            <div className="bg-white rounded-2xl p-8 text-center shadow-md">
-              <div className="w-14 h-14 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-4">
-                <FaCar className="text-violet-400 text-2xl" />
-              </div>
-              <h3 className="text-gray-800 font-bold mb-1">Sin vehículos activos</h3>
-              <p className="text-gray-400 text-sm">Agrega un vehículo y asígnale un viaje para verlo aquí.</p>
-            </div>
-          ) : (
-            <div className="space-y-5">
-              {carrosActivos.map(carro => {
-                const id = carro.id_carros || carro.id;
-                const estadoNum  = parseInt(carro.id_estados);
-                const estadoInfo = getEstadoInfo(carro.id_estados);
-                const reservasDelCarro = dashReservas
-                  .filter(r => String(r.id_carros || r.id_carro || r.carro_id) === String(id))
-                  .filter(r => { const est = r.estado?.toLowerCase(); return est === 'pendiente' || est === 'confirmada'; });
-
-                return (
-                  <div key={id} className="bg-white rounded-2xl shadow-lg overflow-hidden">
-                    <div className="h-1.5 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
-                    <div className="p-5 space-y-5">
-
-                      {/* Info vehículo */}
-                      <div className="flex items-start justify-between gap-4 flex-wrap">
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-2 flex-wrap">
-                            <span className="font-mono font-bold text-gray-800 bg-gray-100 px-3 py-1 rounded-lg text-sm tracking-wider">
-                              {carro.placa || '—'}
-                            </span>
-                            <span className={`text-xs font-semibold px-2.5 py-1 rounded-full border ${estadoInfo.color}`}>
-                              {estadoInfo.label}
-                            </span>
-                          </div>
-                          <p className="text-gray-700 font-semibold text-base flex items-center gap-1.5">
-                            <FaMapMarkerAlt className="text-violet-500 text-sm" />
-                            {carro.precioviaje
-                              ? `${carro.precioviaje.origen} → ${carro.precioviaje.destino}`
-                              : 'Ruta no asignada'}
-                          </p>
-                          {carro.precioviaje?.precio && (
-                            <p className="text-violet-600 font-bold text-sm">
-                              ${Number(carro.precioviaje.precio).toLocaleString('es-CO')} por pasajero
-                            </p>
-                          )}
-                        </div>
-                        <div className="text-sm text-gray-500 space-y-1 text-right">
-                          <p className="flex items-center gap-1.5 justify-end">
-                            <FaCalendarAlt className="text-violet-400 text-xs" />{formatFecha(carro.fecha)}
-                          </p>
-                          <p className="flex items-center gap-1.5 justify-end">
-                            <FaClock className="text-violet-400 text-xs" />{carro.horasalida || '—'}
-                          </p>
-                          <p className="flex items-center gap-1.5 justify-end">
-                            <FaCar className="text-violet-400 text-xs" />{carro.asientos} asientos
-                          </p>
-                        </div>
-                      </div>
-
-                      {/* Pasajeros */}
-                      <div>
-                        <div className="flex items-center justify-between mb-2">
-                          <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Pasajeros</p>
-                          <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${
-                            reservasDelCarro.length >= parseInt(carro.asientos) ? 'bg-red-100 text-red-600' : 'bg-green-100 text-green-700'
-                          }`}>
-                            {reservasDelCarro.length} / {carro.asientos}
-                          </span>
-                        </div>
-                        {reservasDelCarro.length === 0 ? (
-                          <div className="flex items-center gap-2 py-3 px-3 bg-gray-50 rounded-xl text-gray-400 text-sm">
-                            <FaUser className="text-gray-300" /> Sin reservas todavía
-                          </div>
-                        ) : (
-                          <div className="space-y-2">
-                            {reservasDelCarro.map((r, idx) => {
-                              const resId = r.id_reservarviajes || r.id;
-                              const estRes = r.estado?.toLowerCase();
-                              const statusCls =
-                                estRes === 'confirmada' ? 'bg-green-100 text-green-700 border-green-200' :
-                                estRes === 'completada' ? 'bg-blue-100 text-blue-700 border-blue-200' :
-                                'bg-yellow-100 text-yellow-700 border-yellow-200';
-                              return (
-                                <div key={resId ?? idx} className="flex items-center justify-between gap-2 p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors">
-                                  <div className="flex items-center gap-2.5 min-w-0">
-                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                                      {(r.nombre || r.name || '?')[0]?.toUpperCase()}
-                                    </div>
-                                    <div className="min-w-0">
-                                      <p className="text-sm font-semibold text-gray-800 truncate">{r.nombre || r.name || '—'}</p>
-                                      <p className="text-xs text-gray-400">Asiento {r.asiento || r.Asiento || '—'}</p>
-                                    </div>
-                                  </div>
-                                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border shrink-0 ${statusCls}`}>
-                                    {r.estado || 'Pendiente'}
-                                  </span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Botones de viaje */}
-                      {(estadoNum === 1 || estadoNum === 2) && (
-                        <div className="pt-1 border-t border-gray-100">
-                          {estadoNum === 1 && (
-                            <button onClick={() => handleIniciarViaje(id)} disabled={accionCarroId === id}
-                              className="w-full py-3.5 bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 text-sm">
-                              {accionCarroId === id ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaPlay className="text-xs" />}
-                              Iniciar viaje
-                            </button>
-                          )}
-                          {estadoNum === 2 && (
-                            <button onClick={() => handleTerminarViaje(id)} disabled={accionCarroId === id}
-                              className="w-full py-3.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white font-bold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg transition-all active:scale-95 disabled:opacity-50 text-sm">
-                              {accionCarroId === id ? <div className="w-5 h-5 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaFlagCheckered className="text-xs" />}
-                              Terminar viaje
-                            </button>
-                          )}
-                        </div>
-                      )}
-                    </div>
+        {/* ── Hero band ── */}
+        <div style={{
+          borderBottom: `1px solid ${T.border}`, padding: '2rem 1.25rem 1.5rem',
+          backgroundImage: `radial-gradient(ellipse 90% 55% at 50% -5%, rgba(255,190,0,0.07) 0%, transparent 65%), radial-gradient(rgba(255,190,0,0.035) 1px, transparent 1px)`,
+          backgroundSize: 'auto, 28px 28px',
+        }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto' }}>
+            {/* Driver row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 16, marginBottom: '1.5rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{ width: 54, height: 54, borderRadius: 16, background: T.amberGlow, border: `2px solid ${T.amberBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'Syne, sans-serif', fontSize: '1.3rem', fontWeight: 800, color: T.amber, flexShrink: 0 }}>
+                  {inicial}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3 }}>
+                    <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.25rem', fontWeight: 800, color: T.white, margin: 0 }}>{nombre}</h1>
+                    <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, color: T.amber, background: T.amberGlow, border: `1px solid ${T.amberBorder}`, borderRadius: 999, padding: '2px 8px', textTransform: 'uppercase', letterSpacing: '0.08em' }}>Conductor</span>
                   </div>
-                );
-              })}
+                  <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog, margin: 0 }}>Panel de despacho</p>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => { setCarData(p => ({ ...p, Conductor: userData?.Nombre || userData?.nombre || userData?.name || '', Telefono: userData?.Telefono || userData?.telefono || '' })); setShowAddCar(true); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '9px 16px', borderRadius: 10, background: 'linear-gradient(135deg,#C8960C,#FFBE00)', color: '#080B12', border: 'none', fontFamily: 'Syne, sans-serif', fontSize: '0.78rem', fontWeight: 800, cursor: 'pointer' }}
+                >
+                  <FaPlus style={{ fontSize: '0.7rem' }} /> Nuevo vehículo
+                </button>
+                <button onClick={loadDashboard} disabled={loadingDash} style={{ width: 38, height: 38, borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}`, color: loadingDash ? T.amber : T.fog, display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: loadingDash ? 'default' : 'pointer' }}>
+                  <FaSync style={{ fontSize: '0.8rem', animation: loadingDash ? 'spin 1s linear infinite' : 'none' }} />
+                </button>
+              </div>
+            </div>
+            {/* Stats */}
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+              <StatChip value={carrosActivos.length}   label="En servicio"  color={T.green} loading={loadingDash} />
+              <StatChip value={dashCarros.length}      label="Flota total"  color={T.amber} loading={loadingDash} />
+              <StatChip value={pendientesCount}        label="Pendientes"   color={pendientesCount > 0 ? T.red : T.fog} loading={loadingDash} />
+              <StatChip value={carrosInactivos.length} label="Inactivos"    color={T.fog}   loading={loadingDash} />
+            </div>
+          </div>
+        </div>
+
+        {/* ── Tab bar ── */}
+        <div style={{ background: T.surface, borderBottom: `1px solid ${T.border}`, padding: '0.5rem 1.25rem', overflowX: 'auto' }}>
+          <div style={{ maxWidth: 1000, margin: '0 auto', display: 'flex', gap: 4 }}>
+            {[
+              { id: 'activos',   label: 'En servicio', icon: <FaBolt />,    badge: 0 },
+              { id: 'reservas',  label: 'Reservas',    icon: <FaListAlt />, badge: pendientesCount },
+              { id: 'flota',     label: 'Mi flota',    icon: <FaCar />,     badge: 0 },
+              { id: 'historial', label: 'Historial',   icon: <FaRoad />,    badge: 0 },
+            ].map(t => <TabBtn key={t.id} {...t} active={activeTab === t.id} onClick={handleTabChange} />)}
+          </div>
+        </div>
+
+        {/* ── Content ── */}
+        <main style={{ flex: 1, maxWidth: 1000, margin: '0 auto', width: '100%', padding: '1.75rem 1.25rem' }}>
+
+          {activeTab === 'activos' && (
+            <div style={{ animation: 'fadeUp 0.3s ease both' }}>
+              {loadingDash ? <Spinner /> : carrosActivos.length === 0 ? (
+                <EmptyTab icon={<FaBolt style={{ fontSize: '2rem', color: T.muted }} />} title="Sin vehículos en servicio" desc="Registra un vehículo y asígnale una ruta para verlo aquí activo." action={{ label: 'Agregar vehículo', onClick: () => setShowAddCar(true) }} />
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                  {carrosActivos.map((c, idx) => (
+                    <ActiveVehicleCard key={c.id_carros || c.id} carro={c} dashReservas={dashReservas} accionCarroId={accionCarroId} procesando={procesando} onIniciar={handleIniciarViaje} onTerminar={handleTerminarViaje} onConfirmar={(r) => cambiarEstadoReserva(r, 'confirmada')} onRechazar={(r) => cambiarEstadoReserva(r, 'rechazada')} idx={idx} />
+                  ))}
+                </div>
+              )}
             </div>
           )}
-        </div>
 
-        {/* ── Vehículos inactivos ── */}
-        {!loadingDash && carrosInactivos.length > 0 && (
-          <div className="animate-fade-in-up" style={{ animationDelay: '220ms' }}>
-            <div className="flex items-center justify-between mb-5">
-              <div>
-                <h2 className="text-xl font-extrabold text-white">Vehículos inactivos</h2>
-                <p className="text-blue-200/60 text-xs mt-0.5">
-                  Fuera de servicio o con viaje terminado — asígnales un nuevo viaje para activarlos
-                </p>
+          {activeTab === 'reservas' && (() => {
+            const lastPageR    = Math.ceil(reservas.length / RPER);
+            const reservasPage = reservas.slice((pageRUI - 1) * RPER, pageRUI * RPER);
+            return (
+              <div style={{ animation: 'fadeUp 0.3s ease both' }}>
+                {loadingReservas ? <Spinner /> : reservas.length === 0 ? (
+                  <EmptyTab icon={<FaListAlt style={{ fontSize: '2rem', color: T.muted }} />} title="Sin reservas activas" desc="Las reservas de tus vehículos aparecerán aquí." />
+                ) : (
+                  <>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                      {reservasPage.map((r, idx) => {
+                        const id = r.id_reservarviajes || r.id_reservarviaje || r.id || r.ID;
+                        return <ReservaCard key={id ?? idx} r={r} id={id} enProceso={procesando === id} estado={r.estado?.toLowerCase()} onConfirmar={() => cambiarEstadoReserva(r, 'confirmada')} onRechazar={() => cambiarEstadoReserva(r, 'rechazada')} idx={idx} />;
+                      })}
+                    </div>
+                    <DarkPagination
+                      currentPage={pageRUI}
+                      lastPage={lastPageR}
+                      onPageChange={p => { setPageRUI(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                      loading={loadingReservas}
+                      total={reservas.length}
+                      label="reservas"
+                    />
+                  </>
+                )}
               </div>
-              <span className="bg-white/10 text-white/70 text-xs font-bold px-3 py-1.5 rounded-full border border-white/10">
-                {carrosInactivos.length} vehículo{carrosInactivos.length !== 1 ? 's' : ''}
-              </span>
+            );
+          })()}
+
+          {activeTab === 'flota' && (
+            <div style={{ animation: 'fadeUp 0.3s ease both' }}>
+              {loadingCarros ? <Spinner /> : carros.length === 0 ? (
+                <EmptyTab icon={<FaCar style={{ fontSize: '2rem', color: T.muted }} />} title="Sin vehículos registrados" desc="Agrega tu primer vehículo para empezar." action={{ label: 'Agregar vehículo', onClick: () => setShowAddCar(true) }} />
+              ) : (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(270px,1fr))', gap: 16 }}>
+                  {carros.map((c, idx) => (
+                    <FleetCard key={c.id_carros || c.id} carro={c} idx={idx}
+                      onDelete={() => { setCarroToDelete(c); setShowDeleteModal(true); }}
+                      onAsignar={() => { setCarroAAsignar(c); setViajeData({ id_precioviaje: String(c.id_precioviaje || ''), horasalida: '', fecha: '' }); fetchRutas(); setShowAsignar(true); }}
+                    />
+                  ))}
+                </div>
+              )}
             </div>
-            <div className="grid sm:grid-cols-2 gap-4">
-              {carrosInactivos.map(carro => {
-                const id         = carro.id_carros || carro.id;
-                const estadoNum  = parseInt(carro.id_estados);
-                const estadoInfo = getEstadoInfo(carro.id_estados);
-                const esTerminado = estadoNum === 5;
-                return (
-                  <div key={id} className="bg-white rounded-2xl shadow-lg overflow-hidden flex flex-col hover:shadow-xl hover:-translate-y-0.5 transition-all duration-200">
+          )}
 
-                    <div className={`h-1.5 ${esTerminado ? 'bg-gradient-to-r from-gray-400 to-slate-500' : 'bg-gradient-to-r from-red-400 to-rose-500'}`} />
-
-                    <div className="relative h-32 bg-gradient-to-br from-slate-100 to-gray-200 overflow-hidden">
-                      {carro.imagencarro ? (
-                        <img
-                          src={carro.imagencarro.startsWith('http') ? carro.imagencarro : `http://localhost:8000${carro.imagencarro}`}
-                          alt={carro.placa}
-                          className="w-full h-full object-cover opacity-80"
+          {activeTab === 'historial' && (
+            <div style={{ animation: 'fadeUp 0.3s ease both' }}>
+              {loadingHistorial ? <Spinner /> : historial.length === 0 ? (
+                <EmptyTab icon={<FaRoad style={{ fontSize: '2rem', color: T.muted }} />} title="Sin viajes completados" desc="Aquí verás el historial de todos tus viajes terminados." />
+              ) : (
+                <>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {historial.map((r, idx) => {
+                      const resId  = r.id_reservarviajes ?? idx;
+                      const precio = r.carro?.precioviaje;
+                      const ruta   = precio ? `${precio.origen} → ${precio.destino}` : '—';
+                      return (
+                        <HistorialCard key={resId} r={r} resId={resId} ruta={ruta} nombre={r.usuario?.name || r.nombre || '—'} isExpanded={expandedRatingId === resId} ratingDraft={ratingDraft} calificandoPasajeroId={calificandoPasajeroId}
+                          onExpandRating={() => { setExpandedRatingId(resId); setRatingDraft({ stars: 0, comment: '' }); }}
+                          onCollapseRating={() => { setExpandedRatingId(null); setRatingDraft({ stars: 0, comment: '' }); }}
+                          onSetStars={n => setRatingDraft(d => ({ ...d, stars: n }))}
+                          onSetComment={c => setRatingDraft(d => ({ ...d, comment: c }))}
+                          onCalificar={() => handleCalificarPasajero(resId)}
+                          idx={idx}
                         />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center">
-                          <FaCar className="text-gray-300 text-5xl" />
-                        </div>
-                      )}
-                      <div className="absolute top-3 right-3">
-                        <span className={`text-xs font-bold px-2.5 py-1 rounded-full border shadow-sm ${estadoInfo.color}`}>
-                          {estadoInfo.label}
-                        </span>
-                      </div>
-                      <div className="absolute bottom-3 left-3">
-                        <span className="font-mono font-extrabold text-white text-sm tracking-widest bg-black/50 backdrop-blur-sm px-3 py-1 rounded-lg">
-                          {carro.placa || '—'}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="p-4 flex-1 space-y-3">
-                      <div className="space-y-1.5">
-                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-                          <FaUser className="text-violet-400 text-xs shrink-0" />
-                          {carro.conductor || '—'}
-                        </p>
-                        <p className="text-xs text-gray-500 flex items-center gap-1.5">
-                          <FaCar className="text-gray-300 text-xs shrink-0" />
-                          {carro.asientos} asientos
-                        </p>
-                      </div>
-
-                      <div className="bg-gray-50 rounded-xl p-3 space-y-1.5">
-                        <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                          {esTerminado ? 'Último viaje' : 'Sin viaje asignado'}
-                        </p>
-                        {carro.precioviaje ? (
-                          <>
-                            <p className="text-sm font-bold text-gray-700 flex items-center gap-1.5">
-                              <FaMapMarkerAlt className="text-violet-400 text-xs shrink-0" />
-                              {carro.precioviaje.origen} → {carro.precioviaje.destino}
-                            </p>
-                            {carro.fecha && (
-                              <p className="text-xs text-gray-400 flex items-center gap-1.5">
-                                <FaCalendarAlt className="text-gray-300 text-xs shrink-0" />
-                                {formatFecha(carro.fecha)}
-                                {carro.horasalida && ` · ${carro.horasalida}`}
-                              </p>
-                            )}
-                          </>
-                        ) : (
-                          <p className="text-xs text-gray-400 italic">Ninguna ruta asignada aún</p>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="px-4 pb-4">
-                      <button
-                        onClick={() => {
-                          setCarroAAsignar(carro);
-                          setViajeData({ id_precioviaje: String(carro.id_precioviaje || ''), horasalida: '', fecha: '' });
-                          fetchRutas();
-                          setShowAsignar(true);
-                        }}
-                        className="w-full py-3 bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-bold rounded-xl flex items-center justify-center gap-2 hover:shadow-lg hover:shadow-violet-500/30 transition-all active:scale-95"
-                      >
-                        <FaRoute className="text-xs" /> Asignar nuevo viaje
-                      </button>
-                    </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                  <div style={{ marginTop: 24 }}>
+                    <DarkPagination currentPage={pageHistorial} lastPage={lastPageHistorial} onPageChange={p => fetchHistorial(p)} loading={loadingHistorial} />
+                  </div>
+                </>
+              )}
             </div>
-          </div>
-        )}
+          )}
+        </main>
 
+        <Footer />
       </div>
 
-      {/* ── Modal: Agregar Vehículo ── */}
+      {/* ── Modal: Agregar vehículo ── */}
       {showAddCar && (
-        <Modal title="Registrar Vehículo" accent="violet" onClose={() => setShowAddCar(false)}>
-          <p className="text-xs text-gray-400 mb-4">
-            Ingresa los datos del vehículo. Una vez creado, podrás asignarle un viaje desde el panel de vehículos inactivos.
-          </p>
-          <form onSubmit={handleAddCar} className="space-y-4">
-            <div className="grid grid-cols-2 gap-3">
-              <FormInput label="Conductor" icon={<FaUser />}
-                value={carData.Conductor}
-                onChange={e => setCarData(p => ({ ...p, Conductor: e.target.value }))}
-                placeholder="Tu nombre" required />
-              <FormInput label="Teléfono" icon={<FaPhone />}
-                value={carData.Telefono}
-                onChange={e => setCarData(p => ({ ...p, Telefono: e.target.value }))}
-                placeholder="300 000 0000" required />
-              <FormInput label="Placa" icon={<FaIdCard />}
-                value={carData.Placa}
-                onChange={e => setCarData(p => ({ ...p, Placa: e.target.value }))}
-                placeholder="ABC-123" required />
+        <DarkModal title="Registrar vehículo" onClose={() => setShowAddCar(false)}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog, marginBottom: 20 }}>Una vez creado, asígnale un viaje desde la pestaña Mi Flota.</p>
+          <form onSubmit={handleAddCar} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <DField label="Conductor" icon={<FaUser />}  value={carData.Conductor} onChange={e => setCarData(p => ({ ...p, Conductor: e.target.value }))} placeholder="Tu nombre" required />
+              <DField label="Teléfono"  icon={<FaPhone />} value={carData.Telefono}  onChange={e => setCarData(p => ({ ...p, Telefono: e.target.value }))}  placeholder="300 000 0000" required />
             </div>
+            <DField label="Placa" icon={<FaIdCard />} value={carData.Placa} onChange={e => setCarData(p => ({ ...p, Placa: e.target.value }))} placeholder="ABC-123" required />
             <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Imagen del vehículo</label>
-              <input type="file" accept="image/*" required
-                onChange={e => setCarData(p => ({ ...p, Imagencarro: e.target.files[0] || null }))}
-                className="w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-violet-50 file:text-violet-700 hover:file:bg-violet-100" />
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.6rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>Imagen del vehículo</p>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 10, background: T.surface2, border: `1px dashed ${T.border}`, borderRadius: 10, padding: '12px 14px', cursor: 'pointer' }}>
+                <FaCar style={{ color: T.fog, fontSize: '1rem' }} />
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: carData.Imagencarro ? T.amber : T.fog }}>
+                  {carData.Imagencarro ? carData.Imagencarro.name : 'Seleccionar imagen…'}
+                </span>
+                <input type="file" accept="image/*" required hidden onChange={e => setCarData(p => ({ ...p, Imagencarro: e.target.files[0] || null }))} />
+              </label>
             </div>
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => setShowAddCar(false)}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
-                Cancelar
-              </button>
-              <button type="submit" disabled={isSaving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-violet-600 to-blue-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                {isSaving ? 'Guardando...' : 'Registrar Vehículo'}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button type="button" onClick={() => setShowAddCar(false)} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}`, color: T.fog, fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+              <button type="submit" disabled={isSaving} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'linear-gradient(135deg,#C8960C,#FFBE00)', border: 'none', color: '#080B12', fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 800, cursor: isSaving ? 'not-allowed' : 'pointer', opacity: isSaving ? 0.6 : 1 }}>
+                {isSaving ? 'Guardando…' : 'Registrar vehículo'}
               </button>
             </div>
           </form>
-        </Modal>
+        </DarkModal>
       )}
 
-      {/* ── Modal: Asignar Viaje ── */}
+      {/* ── Modal: Asignar viaje ── */}
       {showAsignar && carroAAsignar && (
-        <Modal title={`Asignar viaje — ${carroAAsignar.placa}`} accent="blue" onClose={() => { setShowAsignar(false); setCarroAAsignar(null); }}>
-          <p className="text-xs text-gray-400 mb-4">
-            Define la ruta, fecha y hora de salida. El vehículo pasará a "Esperando pasajeros" automáticamente.
-          </p>
-          <form onSubmit={handleAsignarViaje} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Ruta del viaje</label>
-              <div className="relative">
-                <FaMapMarkerAlt className="absolute left-3 top-3 text-violet-400 text-sm pointer-events-none" />
-                <select value={viajeData.id_precioviaje}
-                  onChange={e => setViajeData(p => ({ ...p, id_precioviaje: e.target.value }))}
-                  required
-                  className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400">
-                  <option value="">Seleccionar ruta</option>
-                  {rutas.map(r => {
-                    const rid = r.id_precioviajes || r.id;
-                    return (
-                      <option key={rid} value={rid}>
-                        {r.origen} → {r.destino} (${Number(r.precio).toLocaleString('es-CO')})
-                      </option>
-                    );
-                  })}
-                </select>
-              </div>
+        <DarkModal title={`Asignar viaje · ${carroAAsignar.placa}`} onClose={() => { setShowAsignar(false); setCarroAAsignar(null); }}>
+          <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog, marginBottom: 20 }}>El vehículo pasará a "Esperando pasajeros" al guardar.</p>
+          <form onSubmit={handleAsignarViaje} style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
+            <DSelect label="Ruta del viaje" icon={<FaMapMarkerAlt />} value={viajeData.id_precioviaje} onChange={e => setViajeData(p => ({ ...p, id_precioviaje: e.target.value }))} required>
+              <option value="">Seleccionar ruta…</option>
+              {rutas.map(r => { const rid = r.id_precioviajes || r.id; return <option key={rid} value={rid}>{r.origen} → {r.destino} (${Number(r.precio).toLocaleString('es-CO')})</option>; })}
+            </DSelect>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+              <DField label="Hora de salida" icon={<FaClock />}      type="time" value={viajeData.horasalida} onChange={e => setViajeData(p => ({ ...p, horasalida: e.target.value }))} required />
+              <DField label="Fecha"          icon={<FaCalendarAlt />} type="date" value={viajeData.fecha}     onChange={e => setViajeData(p => ({ ...p, fecha: e.target.value }))} min={new Date().toISOString().split('T')[0]} required />
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Hora de salida</label>
-                <div className="relative">
-                  <FaClock className="absolute left-3 top-3 text-violet-400 text-xs pointer-events-none" />
-                  <input type="time" required value={viajeData.horasalida}
-                    onChange={e => setViajeData(p => ({ ...p, horasalida: e.target.value }))}
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">Fecha</label>
-                <div className="relative">
-                  <FaCalendarAlt className="absolute left-3 top-3 text-violet-400 text-xs pointer-events-none" />
-                  <input type="date" required value={viajeData.fecha}
-                    min={new Date().toISOString().split('T')[0]}
-                    onChange={e => setViajeData(p => ({ ...p, fecha: e.target.value }))}
-                    className="w-full pl-9 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 focus:outline-none focus:ring-2 focus:ring-violet-400" />
-                </div>
-              </div>
-            </div>
-            <div className="flex gap-3 pt-2">
-              <button type="button" onClick={() => { setShowAsignar(false); setCarroAAsignar(null); }}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all">
-                Cancelar
-              </button>
-              <button type="submit" disabled={isAsignando}
-                className="flex-1 py-2.5 bg-gradient-to-r from-blue-600 to-violet-600 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-50">
-                {isAsignando ? 'Asignando...' : 'Asignar viaje'}
+            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+              <button type="button" onClick={() => { setShowAsignar(false); setCarroAAsignar(null); }} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}`, color: T.fog, fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+              <button type="submit" disabled={isAsignando} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'linear-gradient(135deg,#C8960C,#FFBE00)', border: 'none', color: '#080B12', fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 800, cursor: isAsignando ? 'not-allowed' : 'pointer', opacity: isAsignando ? 0.6 : 1 }}>
+                {isAsignando ? 'Asignando…' : 'Asignar viaje'}
               </button>
             </div>
           </form>
-        </Modal>
+        </DarkModal>
       )}
 
-      {/* ── Modal: Ver Reservas ── */}
-      {showReservas && (
-        <Modal title="Reservas de mis vehículos" accent="blue" onClose={() => setShowReservas(false)}>
-          {loadingReservas ? (
-            <div className="flex flex-col items-center py-10 gap-3">
-              <div className="w-8 h-8 border-4 border-violet-200 border-t-violet-500 rounded-full animate-spin" />
-              <p className="text-sm text-gray-400">Cargando...</p>
-            </div>
-          ) : reservas.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center mx-auto mb-3">
-                <FaListAlt className="text-blue-300 text-xl" />
-              </div>
-              <p className="text-gray-500 text-sm">No hay reservas para tus vehículos.</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4">
-                {reservas.map((r, idx) => {
-                  const id = r.id_reservarviajes || r.id_reservarviaje || r.id || r.ID;
-                  const enProceso = procesando === id;
-                  const estado    = r.estado?.toLowerCase();
-                  const statusCls = estado === 'confirmada'
-                    ? 'bg-green-50 text-green-700 border-green-200'
-                    : estado === 'rechazada' || estado === 'cancelada'
-                      ? 'bg-red-50 text-red-700 border-red-200'
-                      : 'bg-yellow-50 text-yellow-700 border-yellow-200';
-                  return (
-                    <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                      <div className="flex items-center justify-between">
-                        <p className="font-bold text-gray-800 text-sm">Reserva #{id}</p>
-                        <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${statusCls}`}>
-                          {r.estado || 'Pendiente'}
-                        </span>
-                      </div>
-                      <div className="grid grid-cols-2 gap-2">
-                        <InfoRow icon={<FaMapMarkerAlt />} label="Ubicación" value={r.ubicacion} />
-                        <InfoRow icon={<FaCar />}          label="Asiento"   value={r.asiento} />
-                        <InfoRow icon={<FaUser />}         label="Pasajero"  value={r.nombre} />
-                        <InfoRow icon={<FaPhone />}        label="Teléfono"  value={r.tel} />
-                      </div>
-                      {(!estado || estado === 'pendiente') && (
-                        <div className="flex gap-2 pt-2 border-t border-gray-100">
-                          <button onClick={() => cambiarEstadoReserva(r, 'confirmada')} disabled={enProceso}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-green-500 text-white text-xs font-bold rounded-xl hover:bg-green-600 transition-all active:scale-95 disabled:opacity-50">
-                            {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaCheck />}
-                            Confirmar
-                          </button>
-                          <button onClick={() => cambiarEstadoReserva(r, 'rechazada')} disabled={enProceso}
-                            className="flex-1 flex items-center justify-center gap-1.5 py-2 bg-red-500 text-white text-xs font-bold rounded-xl hover:bg-red-600 transition-all active:scale-95 disabled:opacity-50">
-                            {enProceso ? <div className="w-3 h-3 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <FaTimes />}
-                            Rechazar
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-6">
-                <Pagination
-                  currentPage={pageReservas}
-                  lastPage={lastPageReservas}
-                  onPageChange={p => fetchReservas(p)}
-                  loading={loadingReservas}
-                />
-              </div>
-            </>
-          )}
-        </Modal>
-      )}
-
-      {/* ── Modal: Mis Vehículos ── */}
-      {showCarros && (
-        <Modal title="Mis Vehículos" accent="green" onClose={() => setShowCarros(false)}>
-          {loadingCarros ? (
-            <div className="flex flex-col items-center py-10 gap-3">
-              <div className="w-8 h-8 border-4 border-green-200 border-t-green-500 rounded-full animate-spin" />
-              <p className="text-sm text-gray-400">Cargando...</p>
-            </div>
-          ) : carros.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="w-12 h-12 rounded-xl bg-green-50 flex items-center justify-center mx-auto mb-3">
-                <FaCar className="text-green-300 text-xl" />
-              </div>
-              <p className="text-gray-500 text-sm">No tienes vehículos registrados.</p>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              {carros.map((carro, idx) => {
-                const id         = carro.id_carros || carro.id;
-                const estadoInfo = getEstadoInfo(carro.id_estados);
-                return (
-                  <div key={id ?? idx} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-bold text-gray-800 text-sm">{carro.placa || 'Sin placa'}</p>
-                      <span className={`text-xs px-2.5 py-1 rounded-full border font-semibold ${estadoInfo.color}`}>
-                        {estadoInfo.label}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-2 gap-2">
-                      <InfoRow icon={<FaUser />}  label="Conductor" value={carro.conductor} />
-                      <InfoRow icon={<FaPhone />} label="Teléfono"  value={carro.telefono} />
-                      <InfoRow icon={<FaIdCard />} label="Placa"    value={carro.placa} />
-                      <InfoRow icon={<FaCar className="text-xs" />} label="Asientos" value={carro.asientos} />
-                    </div>
-                    <div className="flex justify-end pt-2 border-t border-gray-100">
-                      <button onClick={() => { setCarroToDelete(carro); setShowDeleteModal(true); }}
-                        className="flex items-center gap-1.5 px-3 py-2 bg-red-50 text-red-500 text-xs font-bold rounded-xl hover:bg-red-100 transition-all">
-                        <FaTrash className="text-[10px]" /> Eliminar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </Modal>
-      )}
-
-      {/* ── Modal: Historial ── */}
-      {showHistorial && (
-        <Modal title="Historial de viajes" accent="orange" onClose={() => setShowHistorial(false)}>
-          {loadingHistorial ? (
-            <div className="flex flex-col items-center py-10 gap-3">
-              <div className="w-8 h-8 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin" />
-              <p className="text-sm text-gray-400">Cargando historial...</p>
-            </div>
-          ) : historial.length === 0 ? (
-            <div className="text-center py-10">
-              <div className="w-12 h-12 rounded-xl bg-orange-50 flex items-center justify-center mx-auto mb-3">
-                <FaRoad className="text-orange-300 text-xl" />
-              </div>
-              <p className="text-gray-500 text-sm">Aún no tienes viajes completados.</p>
-            </div>
-          ) : (
-            <>
-              <div className="space-y-4">
-                {historial.map((r, idx) => {
-                  const resId      = r.id_reservarviajes ?? idx;
-                  const carro      = r.carro;
-                  const precio     = carro?.precioviaje;
-                  const ruta       = precio ? `${precio.origen} → ${precio.destino}` : 'Ruta no especificada';
-                  const nombre     = r.usuario?.name || r.nombre || '—';
-                  const ingreso    = parseFloat(precio?.precio ?? 0);
-                  const isExpanded = expandedRatingId === resId;
-                  return (
-                    <div key={resId} className="border border-gray-100 rounded-xl p-4 space-y-3">
-                      {/* Info del viaje */}
-                      <div>
-                        <p className="font-bold text-gray-800 text-sm flex items-center gap-1.5">
-                          <FaRoad className="text-orange-400 text-xs" /> {ruta}
-                        </p>
-                        <p className="text-xs text-gray-400 mt-0.5">
-                          {carro?.placa} · {formatFecha(r.updated_at?.split('T')[0])} · {carro?.horasalida || '—'}
-                        </p>
-                        {ingreso > 0 && (
-                          <p className="text-xs font-bold text-green-600 mt-0.5">
-                            +${ingreso.toLocaleString('es-CO')}
-                          </p>
-                        )}
-                      </div>
-
-                      {/* Pasajero */}
-                      <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-2">
-                          <div className="w-7 h-7 rounded-full bg-gradient-to-br from-violet-400 to-blue-500 flex items-center justify-center text-white text-xs font-bold shrink-0">
-                            {nombre[0]?.toUpperCase()}
-                          </div>
-                          <span className="text-sm text-gray-700 font-medium">{nombre}</span>
-                        </div>
-                        <div className="flex items-center gap-3 shrink-0">
-                          {/* Estrellas que el pasajero dio al conductor */}
-                          {r.calificacion != null && (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Pasajero</span>
-                              <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(n => (
-                                  <FaStar key={n} className={`text-[11px] ${n <= r.calificacion ? 'text-yellow-400' : 'text-gray-200'}`} />
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                          {/* Estrellas que el conductor dio al pasajero */}
-                          {r.calificacion_conductor != null ? (
-                            <div className="flex flex-col items-center gap-0.5">
-                              <span className="text-[9px] text-gray-400 font-semibold uppercase tracking-wide">Tú</span>
-                              <div className="flex gap-0.5">
-                                {[1,2,3,4,5].map(n => (
-                                  <FaStar key={n} className={`text-[11px] ${n <= r.calificacion_conductor ? 'text-orange-400' : 'text-gray-200'}`} />
-                                ))}
-                              </div>
-                            </div>
-                          ) : !isExpanded && (
-                            <button
-                              type="button"
-                              onClick={() => { setExpandedRatingId(resId); setRatingDraft({ stars: 0, comment: '' }); }}
-                              className="text-[10px] px-2 py-1 rounded-full border border-orange-200 text-orange-500 font-semibold hover:bg-orange-50 transition-colors"
-                            >
-                              Calificar
-                            </button>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Formulario calificación */}
-                      {isExpanded && r.calificacion_conductor == null && (
-                        <div className="space-y-2 pt-2 border-t border-gray-100">
-                          <div className="flex gap-1 justify-center">
-                            {[1,2,3,4,5].map(n => (
-                              <button key={n} type="button"
-                                onClick={() => setRatingDraft(d => ({ ...d, stars: n }))}
-                                className={`text-xl transition-colors ${n <= ratingDraft.stars ? 'text-orange-400' : 'text-gray-300 hover:text-orange-300'}`}
-                              >
-                                <FaStar />
-                              </button>
-                            ))}
-                          </div>
-                          <textarea
-                            rows={2} maxLength={500}
-                            value={ratingDraft.comment}
-                            onChange={e => setRatingDraft(d => ({ ...d, comment: e.target.value }))}
-                            placeholder="Comentario opcional..."
-                            className="w-full text-xs border border-gray-200 rounded-lg px-2.5 py-1.5 resize-none focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-700"
-                          />
-                          <div className="flex gap-2">
-                            <button type="button"
-                              onClick={() => { setExpandedRatingId(null); setRatingDraft({ stars: 0, comment: '' }); }}
-                              className="flex-1 py-1.5 text-xs border border-gray-200 text-gray-500 rounded-lg hover:bg-gray-50 transition-all"
-                            >
-                              Cancelar
-                            </button>
-                            <button type="button"
-                              onClick={() => handleCalificarPasajero(resId)}
-                              disabled={ratingDraft.stars === 0 || calificandoPasajeroId === resId}
-                              className="flex-1 py-1.5 text-xs bg-gradient-to-r from-orange-500 to-amber-500 text-white font-bold rounded-lg hover:shadow-md transition-all disabled:opacity-50"
-                            >
-                              {calificandoPasajeroId === resId ? '...' : 'Calificar pasajero'}
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-              <div className="mt-6">
-                <Pagination
-                  currentPage={pageHistorial}
-                  lastPage={lastPageHistorial}
-                  onPageChange={p => fetchHistorial(p)}
-                  loading={loadingHistorial}
-                />
-              </div>
-            </>
-          )}
-        </Modal>
-      )}
-
-      {/* ── Modal: Confirmar eliminación ── */}
+      {/* ── Modal: Eliminar vehículo ── */}
       {showDeleteModal && carroToDelete && (
-        <Modal title="Eliminar Vehículo" accent="red" onClose={() => { setShowDeleteModal(false); setCarroToDelete(null); }}>
-          <div className="text-center space-y-4">
-            <div className="w-12 h-12 rounded-xl bg-red-50 flex items-center justify-center mx-auto">
-              <FaTrash className="text-red-400 text-xl" />
+        <DarkModal title="Eliminar vehículo" onClose={() => { setShowDeleteModal(false); setCarroToDelete(null); }}>
+          <div style={{ textAlign: 'center', padding: '8px 0' }}>
+            <div style={{ width: 52, height: 52, borderRadius: 14, background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px' }}>
+              <FaTrash style={{ color: T.red, fontSize: '1.1rem' }} />
             </div>
-            <p className="text-gray-700 text-sm">
-              ¿Seguro que quieres eliminar el vehículo <strong>{carroToDelete.placa}</strong>? Esta acción no se puede deshacer.
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', color: T.fog, marginBottom: 24 }}>
+              ¿Eliminar el vehículo <strong style={{ color: T.white }}>{carroToDelete.placa}</strong>?<br />Esta acción no se puede deshacer.
             </p>
-            <div className="flex gap-3">
-              <button onClick={() => { setShowDeleteModal(false); setCarroToDelete(null); }}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50">
-                Cancelar
-              </button>
-              <button onClick={handleDeleteCarro} disabled={isDeleting}
-                className="flex-1 py-2.5 bg-gradient-to-r from-red-500 to-rose-500 text-white text-sm font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50">
-                {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+            <div style={{ display: 'flex', gap: 10 }}>
+              <button onClick={() => { setShowDeleteModal(false); setCarroToDelete(null); }} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: T.surface2, border: `1px solid ${T.border}`, color: T.fog, fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
+              <button onClick={handleDeleteCarro} disabled={isDeleting} style={{ flex: 1, padding: '11px 0', borderRadius: 10, background: 'linear-gradient(135deg,#dc2626,#ef4444)', border: 'none', color: '#fff', fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 800, cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.6 : 1 }}>
+                {isDeleting ? 'Eliminando…' : 'Sí, eliminar'}
               </button>
             </div>
           </div>
-        </Modal>
+        </DarkModal>
       )}
-    </PageBg>
+    </>
   );
 };
 

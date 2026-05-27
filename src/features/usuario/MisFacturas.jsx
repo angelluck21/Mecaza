@@ -3,23 +3,224 @@ import { useNavigate } from 'react-router-dom';
 import {
   FaFileInvoice, FaDownload, FaEye, FaTimes,
   FaCalendarAlt, FaMoneyBillWave, FaCheckCircle,
+  FaMapMarkerAlt, FaArrowRight,
 } from 'react-icons/fa';
 
-import PageBg            from '../../components/ui/PageBg';
-import InnerNavbar       from '../../components/layout/InnerNavbar';
+import Navbar            from '../../components/layout/Navbar';
+import Footer            from '../../components/layout/Footer';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
-import SectionCard       from '../../components/ui/SectionCard';
 import ToastNotification from '../../components/ui/ToastNotification';
 import { useToast }      from '../../hooks/useToast';
 import { obtenerMisFacturasApi, descargarFacturaApi } from '../../services/api';
+import DarkPagination from '../../components/ui/DarkPagination';
 
+// ── Tokens ────────────────────────────────────────────────────────────────────
+const T = {
+  void:       '#080B12',
+  surface:    '#0E1422',
+  surface2:   '#141D30',
+  border:     'rgba(255,255,255,0.07)',
+  amber:      '#FFBE00',
+  amberGlow:  'rgba(255,190,0,0.12)',
+  amberBorder:'rgba(255,190,0,0.25)',
+  white:      '#EEF0FA',
+  fog:        '#6B728F',
+  muted:      '#3A4060',
+};
+
+const fmt = (ts) =>
+  ts ? new Date(ts).toLocaleDateString('es-ES', { day: '2-digit', month: 'short', year: 'numeric' }) : '—';
+
+const fmtCOP = (n) =>
+  n != null ? `$${Number(n).toLocaleString('es-CO')}` : '$0';
+
+// ── FacturaCard ───────────────────────────────────────────────────────────────
+const FacturaCard = ({ factura, idx, onVer, onDescargar, isDownloading }) => {
+  const [hoverVer,  setHoverVer]  = useState(false);
+  const [hoverDesc, setHoverDesc] = useState(false);
+
+  const ruta = factura.origen
+    ? `${factura.origen}  →  ${factura.destino || '—'}`
+    : (factura.destino || '—');
+
+  return (
+    <div style={{
+      background:   T.surface,
+      border:       `1px solid ${T.border}`,
+      borderRadius: 16,
+      overflow:     'hidden',
+      animation:    `fadeUp 0.35s ease both`,
+      animationDelay: `${idx * 60}ms`,
+    }}>
+      {/* Amber top strip */}
+      <div style={{ height: 3, background: `linear-gradient(90deg, #C8960C, #FFBE00, #FFD84D)` }} />
+
+      <div style={{ padding: '16px 20px' }}>
+
+        {/* Row 1: número + badge */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, marginBottom: 14 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            {/* Icon */}
+            <div style={{
+              width: 36, height: 36, borderRadius: 10,
+              background: T.amberGlow,
+              border: `1px solid ${T.amberBorder}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}>
+              <FaFileInvoice style={{ color: T.amber, fontSize: '0.9rem' }} />
+            </div>
+            <div>
+              <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 700, color: T.white, marginBottom: 1 }}>
+                {factura.numero_factura}
+              </p>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.fog, display: 'flex', alignItems: 'center', gap: 5 }}>
+                <FaCalendarAlt style={{ fontSize: '0.6rem' }} />
+                {fmt(factura.fecha_emision || factura.created_at)}
+              </p>
+            </div>
+          </div>
+
+          {/* Badge */}
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 5,
+            padding: '4px 10px', borderRadius: 999,
+            background: 'rgba(34,197,94,0.1)',
+            border: '1px solid rgba(34,197,94,0.25)',
+            color: '#22c55e',
+            fontSize: '0.65rem', fontWeight: 700,
+            fontFamily: 'Syne, sans-serif', letterSpacing: '0.04em',
+          }}>
+            <FaCheckCircle style={{ fontSize: '0.6rem' }} /> CONFIRMADA
+          </span>
+        </div>
+
+        {/* Row 2: Ruta + Total */}
+        <div style={{
+          display: 'grid', gridTemplateColumns: '1fr auto',
+          gap: 12, marginBottom: 16, alignItems: 'center',
+        }}>
+          <div>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
+              Ruta
+            </p>
+            <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', color: T.white, fontWeight: 500 }}>
+              {ruta}
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.58rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.07em', marginBottom: 4 }}>
+              Total
+            </p>
+            <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.25rem', fontWeight: 800, color: T.amber }}>
+              {fmtCOP(factura.total)}
+            </p>
+          </div>
+        </div>
+
+        {/* Divider */}
+        <div style={{ height: 1, background: T.border, marginBottom: 14 }} />
+
+        {/* Actions */}
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            onClick={() => onVer(factura)}
+            onMouseEnter={() => setHoverVer(true)}
+            onMouseLeave={() => setHoverVer(false)}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '9px 0', borderRadius: 10,
+              background: hoverVer ? T.surface2 : 'transparent',
+              border: `1px solid ${hoverVer ? 'rgba(255,255,255,0.12)' : T.border}`,
+              color: hoverVer ? T.white : T.fog,
+              fontSize: '0.78rem', fontWeight: 600,
+              fontFamily: 'DM Sans, sans-serif',
+              cursor: 'pointer', transition: 'all 0.2s',
+            }}
+          >
+            <FaEye style={{ fontSize: '0.72rem' }} /> Ver detalles
+          </button>
+          <button
+            onClick={() => onDescargar(factura)}
+            onMouseEnter={() => setHoverDesc(true)}
+            onMouseLeave={() => setHoverDesc(false)}
+            disabled={isDownloading}
+            style={{
+              flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+              padding: '9px 0', borderRadius: 10,
+              background: hoverDesc ? 'rgba(255,190,0,0.18)' : T.amberGlow,
+              border: `1px solid ${hoverDesc ? 'rgba(255,190,0,0.45)' : T.amberBorder}`,
+              color: T.amber,
+              fontSize: '0.78rem', fontWeight: 700,
+              fontFamily: 'DM Sans, sans-serif',
+              cursor: isDownloading ? 'not-allowed' : 'pointer',
+              opacity: isDownloading ? 0.5 : 1,
+              transition: 'all 0.2s',
+            }}
+          >
+            <FaDownload style={{ fontSize: '0.72rem' }} />
+            {isDownloading ? 'Descargando…' : 'Descargar PDF'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Empty state ───────────────────────────────────────────────────────────────
+const EmptyState = ({ navigate }) => (
+  <div style={{
+    background: T.surface, border: `1px solid ${T.border}`, borderRadius: 20,
+    padding: '4rem 2rem', textAlign: 'center',
+  }}>
+    <div style={{
+      width: 64, height: 64, borderRadius: 18,
+      background: T.amberGlow, border: `1px solid ${T.amberBorder}`,
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      margin: '0 auto 1.25rem',
+    }}>
+      <FaFileInvoice style={{ color: T.amber, fontSize: '1.75rem' }} />
+    </div>
+    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.05rem', fontWeight: 700, color: T.white, marginBottom: 8 }}>
+      No tienes facturas aún
+    </p>
+    <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', color: T.fog, marginBottom: '1.5rem' }}>
+      Las facturas se generan cuando tus reservas son confirmadas.
+    </p>
+    <button
+      onClick={() => navigate('/mis-reservas')}
+      style={{
+        padding: '10px 24px', borderRadius: 10,
+        background: `linear-gradient(135deg, #C8960C, #FFBE00)`,
+        color: '#080B12', fontFamily: 'Syne, sans-serif', fontWeight: 800,
+        fontSize: '0.82rem', border: 'none', cursor: 'pointer',
+      }}
+    >
+      Ver Mis Reservas
+    </button>
+  </div>
+);
+
+// ── DetailRow helper ──────────────────────────────────────────────────────────
+const DetailRow = ({ label, value, valueStyle }) => (
+  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: `1px solid ${T.border}` }}>
+    <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.78rem', color: T.fog }}>{label}</span>
+    <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.82rem', fontWeight: 600, color: T.white, ...valueStyle }}>{value}</span>
+  </div>
+);
+
+// ── MisFacturas ───────────────────────────────────────────────────────────────
 const MisFacturas = () => {
-  const [userData,      setUserData]      = useState(null);
-  const [isLoading,     setIsLoading]     = useState(true);
-  const [facturas,      setFacturas]      = useState([]);
-  const [showModal,        setShowModal]        = useState(false);
-  const [selectedFactura,  setSelectedFactura]  = useState(null);
-  const [isDownloading,    setIsDownloading]    = useState(false);
+  const [userData,       setUserData]       = useState(null);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [facturas,       setFacturas]       = useState([]);
+  const [showModal,      setShowModal]      = useState(false);
+  const [selectedFactura,setSelectedFactura]= useState(null);
+  const [isDownloading,  setIsDownloading]  = useState(false);
+
+  // Paginación client-side
+  const PER_PAGE = 6;
+  const [pageF, setPageF] = useState(1);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
@@ -27,7 +228,6 @@ const MisFacturas = () => {
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
-
     try {
       const user = JSON.parse(stored);
       setUserData(user);
@@ -67,201 +267,218 @@ const MisFacturas = () => {
     }
   };
 
-  if (isLoading) return <LoadingScreen message="Cargando facturas..." />;
-  if (!userData) return null;
+  if (isLoading) return <LoadingScreen message="Cargando facturas…" />;
+  if (!userData)  return null;
+
+  const ruta = (f) => f.origen ? `${f.origen} → ${f.destino || '—'}` : (f.destino || '—');
+  const descuento = selectedFactura
+    ? (selectedFactura.subtotal > 0
+        ? `${Math.round((selectedFactura.impuesto / selectedFactura.subtotal) * 100)}%`
+        : '—')
+    : '—';
 
   return (
-    <PageBg>
+    <>
+      <style>{`
+        @keyframes fadeUp {
+          from { opacity: 0; transform: translateY(14px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes scaleIn {
+          from { opacity: 0; transform: scale(0.95); }
+          to   { opacity: 1; transform: scale(1); }
+        }
+      `}</style>
+
       <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
-      <InnerNavbar userData={userData} title="Mis Facturas" />
 
-      <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8">
+      <div style={{ minHeight: '100vh', background: T.void, display: 'flex', flexDirection: 'column' }}>
+        <Navbar />
 
-        {/* Header */}
-        <div className="mb-8 animate-fade-in-up">
-          <div className="flex items-center gap-3 mb-1">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-r from-blue-600 to-violet-600 flex items-center justify-center text-white shadow">
-              <FaFileInvoice />
+        <main style={{ flex: 1, maxWidth: 860, margin: '0 auto', width: '100%', padding: '2.5rem 1.25rem' }}>
+
+          {/* ── Page header ── */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: '2rem' }}>
+            <div style={{
+              width: 44, height: 44, borderRadius: 12,
+              background: T.amberGlow,
+              border: `1px solid ${T.amberBorder}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+            }}>
+              <FaFileInvoice style={{ color: T.amber, fontSize: '1.1rem' }} />
             </div>
             <div>
-              <h1 className="text-2xl font-extrabold text-white">Mis Facturas</h1>
-              <p className="text-blue-200 text-sm">{facturas.length} factura{facturas.length !== 1 ? 's' : ''} registrada{facturas.length !== 1 ? 's' : ''}</p>
+              <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.5rem', fontWeight: 800, color: T.white, margin: 0 }}>
+                Mis Facturas
+              </h1>
+              <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.8rem', color: T.fog, margin: 0 }}>
+                {facturas.length} factura{facturas.length !== 1 ? 's' : ''} registrada{facturas.length !== 1 ? 's' : ''}
+              </p>
             </div>
           </div>
-        </div>
 
-        {/* Sin facturas */}
-        {facturas.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-xl p-12 text-center animate-scale-in">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-2xl bg-violet-100 flex items-center justify-center">
-                <FaFileInvoice className="text-violet-400 text-3xl" />
-              </div>
-            </div>
-            <h3 className="text-xl font-bold text-gray-800 mb-2">No tienes facturas aún</h3>
-            <p className="text-gray-500 text-sm mb-6">Las facturas se generan cuando tus reservas son confirmadas.</p>
-            <button
-              onClick={() => navigate('/mis-reservas')}
-              className="px-6 py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all hover:scale-105 active:scale-95"
-            >
-              Ver Mis Reservas
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            {facturas.map((factura, idx) => (
-              <div
-                key={factura.id_factura}
-                className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden animate-fade-in-up hover:shadow-lg transition-all"
-                style={{ animationDelay: `${idx * 80}ms` }}
-              >
-                <div className="h-1 bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600" />
-
-                <div className="p-5">
-                  <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-                    <div className="flex items-center gap-3">
-                      <div className="w-9 h-9 rounded-xl bg-violet-100 flex items-center justify-center">
-                        <FaFileInvoice className="text-violet-600" />
-                      </div>
-                      <div>
-                        <p className="font-bold text-gray-800 text-sm">{factura.numero_factura}</p>
-                        <p className="text-xs text-gray-400">
-                          {factura.created_at
-                            ? new Date(factura.created_at).toLocaleDateString('es-ES')
-                            : 'Fecha no disponible'}
-                        </p>
-                      </div>
-                    </div>
-                    <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-green-100 text-green-700 text-xs font-bold">
-                      <FaCheckCircle className="text-xs" /> Confirmada
-                    </span>
-                  </div>
-
-                  <div className="grid sm:grid-cols-3 gap-4 mb-4">
-                    <div>
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Ruta</p>
-                      <p className="font-medium text-gray-700">
-                        {factura.origen ? `${factura.origen} → ${factura.destino || '—'}` : (factura.destino || '—')}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Fecha Emisión</p>
-                      <p className="font-medium text-gray-700">
-                        {factura.fecha_emision ? new Date(factura.fecha_emision).toLocaleDateString('es-ES') : '—'}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-400 font-semibold uppercase tracking-wide">Total</p>
-                      <p className="font-bold text-violet-600 text-lg">
-                        ${factura.total?.toLocaleString('es-CO') || '0'}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="pt-4 border-t border-gray-50 flex gap-2 flex-wrap">
-                    <button
-                      onClick={() => {
-                        setSelectedFactura(factura);
-                        setShowModal(true);
-                      }}
-                      className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 text-sm font-semibold rounded-xl border border-blue-200 hover:bg-blue-100 transition-all active:scale-95"
-                    >
-                      <FaEye className="text-xs" /> Ver detalles
-                    </button>
-                    <button
-                      onClick={() => handleDescargar(factura)}
-                      disabled={isDownloading}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-50 text-green-600 text-sm font-semibold rounded-xl border border-green-200 hover:bg-green-100 transition-all active:scale-95 disabled:opacity-50"
-                    >
-                      <FaDownload className="text-xs" /> Descargar
-                    </button>
-                  </div>
+          {/* ── List / empty ── */}
+          {facturas.length === 0 ? (
+            <EmptyState navigate={navigate} />
+          ) : (() => {
+            const lastPage    = Math.ceil(facturas.length / PER_PAGE);
+            const facturasPage = facturas.slice((pageF - 1) * PER_PAGE, pageF * PER_PAGE);
+            return (
+              <>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {facturasPage.map((f, idx) => (
+                    <FacturaCard
+                      key={f.id_factura}
+                      factura={f}
+                      idx={idx}
+                      onVer={(fac) => { setSelectedFactura(fac); setShowModal(true); }}
+                      onDescargar={handleDescargar}
+                      isDownloading={isDownloading}
+                    />
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
-        )}
+                <DarkPagination
+                  currentPage={pageF}
+                  lastPage={lastPage}
+                  onPageChange={(p) => { setPageF(p); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  total={facturas.length}
+                  label="facturas"
+                />
+              </>
+            );
+          })()}
+        </main>
+
+        <Footer />
       </div>
 
-      {/* Modal ver detalles */}
+      {/* ── Modal detalle ── */}
       {showModal && selectedFactura && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 animate-fade-in"
-          style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
+          onClick={(e) => e.target === e.currentTarget && setShowModal(false)}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            padding: '1rem',
+            background: 'rgba(8,11,18,0.80)',
+            backdropFilter: 'blur(6px)',
+          }}
         >
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl animate-scale-in overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-600 to-violet-600 px-6 py-5 flex items-center justify-between">
-              <h3 className="text-lg font-bold text-white">Detalles de Factura</h3>
+          <div style={{
+            background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 20, width: '100%', maxWidth: 440,
+            overflow: 'hidden',
+            animation: 'scaleIn 0.25s cubic-bezier(.22,1,.36,1) both',
+          }}>
+            {/* Modal header */}
+            <div style={{
+              padding: '16px 20px',
+              background: 'linear-gradient(135deg, rgba(200,150,12,0.15) 0%, rgba(255,190,0,0.05) 100%)',
+              borderBottom: `1px solid ${T.border}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <FaFileInvoice style={{ color: T.amber, fontSize: '1rem' }} />
+                <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.95rem', fontWeight: 700, color: T.white }}>
+                  Detalle de Factura
+                </span>
+              </div>
               <button
                 onClick={() => setShowModal(false)}
-                className="p-1 hover:bg-white/20 rounded-lg transition-all"
+                style={{
+                  width: 28, height: 28, borderRadius: 7,
+                  background: 'rgba(255,255,255,0.05)',
+                  border: `1px solid ${T.border}`,
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  color: T.fog, cursor: 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.color = T.white; e.currentTarget.style.background = 'rgba(255,255,255,0.1)'; }}
+                onMouseLeave={e => { e.currentTarget.style.color = T.fog;   e.currentTarget.style.background = 'rgba(255,255,255,0.05)'; }}
               >
-                <FaTimes className="text-white" />
+                <FaTimes style={{ fontSize: '0.75rem' }} />
               </button>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="space-y-2">
-                <p className="text-xs text-gray-400 font-semibold uppercase">Número de Factura</p>
-                <p className="font-mono font-bold text-gray-800">{selectedFactura.numero_factura}</p>
+            {/* Modal body */}
+            <div style={{ padding: '20px 20px 24px' }}>
+              {/* Número */}
+              <div style={{
+                background: T.surface2, border: `1px solid ${T.border}`,
+                borderRadius: 10, padding: '10px 14px', marginBottom: 16,
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.7rem', color: T.fog }}>Número de factura</span>
+                <span style={{ fontFamily: 'monospace', fontSize: '0.82rem', fontWeight: 700, color: T.amber }}>
+                  {selectedFactura.numero_factura}
+                </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-xs text-gray-400 font-semibold uppercase">Precio base</p>
-                  <p className="font-bold text-gray-800">${selectedFactura.subtotal?.toLocaleString('es-CO') || '0'}</p>
-                </div>
-                <div>
-                  <p className="text-xs text-green-600 font-semibold uppercase">
-                    Descuento
-                    {selectedFactura.subtotal > 0
-                      ? ` (${Math.round((selectedFactura.impuesto / selectedFactura.subtotal) * 100)}%)`
-                      : ''}
-                  </p>
-                  <p className="font-bold text-green-600">- ${selectedFactura.impuesto?.toLocaleString('es-CO') || '0'}</p>
-                </div>
+              {/* Detail rows */}
+              <DetailRow label="Ruta" value={ruta(selectedFactura)} />
+              <DetailRow label="Fecha de emisión"  value={fmt(selectedFactura.fecha_emision || selectedFactura.created_at)} />
+              <DetailRow label="Precio base"       value={fmtCOP(selectedFactura.subtotal)} />
+              <DetailRow
+                label={`Descuento ${descuento !== '—' ? `(${descuento})` : ''}`}
+                value={`- ${fmtCOP(selectedFactura.impuesto)}`}
+                valueStyle={{ color: '#22c55e' }}
+              />
+
+              {/* Total box */}
+              <div style={{
+                marginTop: 14,
+                background: T.amberGlow,
+                border: `1px solid ${T.amberBorder}`,
+                borderRadius: 12, padding: '14px 16px',
+                display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              }}>
+                <span style={{ display: 'flex', alignItems: 'center', gap: 8, fontFamily: 'DM Sans, sans-serif', fontSize: '0.85rem', fontWeight: 600, color: T.white }}>
+                  <FaMoneyBillWave style={{ color: T.amber }} /> Total a pagar
+                </span>
+                <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.5rem', fontWeight: 800, color: T.amber }}>
+                  {fmtCOP(selectedFactura.total)}
+                </span>
               </div>
 
-              <div className="bg-gradient-to-r from-blue-50 to-violet-50 p-4 rounded-xl border border-blue-100">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-gray-700 flex items-center gap-2">
-                    <FaMoneyBillWave className="text-violet-600" /> Total a pagar
-                  </span>
-                  <p className="text-2xl font-bold text-violet-600">
-                    ${selectedFactura.total?.toLocaleString('es-CO') || '0'}
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-xs text-gray-400 font-semibold uppercase">Ruta</p>
-                <p className="font-medium text-gray-700">
-                  {selectedFactura.origen
-                    ? `${selectedFactura.origen} → ${selectedFactura.destino || '—'}`
-                    : (selectedFactura.destino || '—')}
-                </p>
-              </div>
-
-              <div className="flex gap-2 pt-4">
+              {/* Buttons */}
+              <div style={{ display: 'flex', gap: 10, marginTop: 20 }}>
                 <button
                   onClick={() => setShowModal(false)}
-                  className="flex-1 py-2.5 bg-gray-100 text-gray-700 font-semibold rounded-xl hover:bg-gray-200 transition-all"
+                  style={{
+                    flex: 1, padding: '11px 0', borderRadius: 10,
+                    background: T.surface2, border: `1px solid ${T.border}`,
+                    color: T.fog, fontFamily: 'DM Sans, sans-serif',
+                    fontSize: '0.82rem', fontWeight: 600, cursor: 'pointer',
+                    transition: 'all 0.2s',
+                  }}
+                  onMouseEnter={e => { e.currentTarget.style.color = T.white; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'; }}
+                  onMouseLeave={e => { e.currentTarget.style.color = T.fog;   e.currentTarget.style.borderColor = T.border; }}
                 >
                   Cerrar
                 </button>
                 <button
                   onClick={() => handleDescargar(selectedFactura)}
                   disabled={isDownloading}
-                  className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-semibold rounded-xl hover:shadow-lg transition-all active:scale-95 disabled:opacity-60"
+                  style={{
+                    flex: 1, padding: '11px 0', borderRadius: 10,
+                    background: `linear-gradient(135deg, #C8960C, #FFBE00)`,
+                    border: 'none', color: '#080B12',
+                    fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 7,
+                    cursor: isDownloading ? 'not-allowed' : 'pointer',
+                    opacity: isDownloading ? 0.6 : 1,
+                    transition: 'opacity 0.2s',
+                  }}
                 >
-                  {isDownloading ? 'Descargando...' : 'Descargar PDF'}
+                  <FaDownload style={{ fontSize: '0.75rem' }} />
+                  {isDownloading ? 'Descargando…' : 'Descargar PDF'}
                 </button>
               </div>
             </div>
           </div>
         </div>
       )}
-    </PageBg>
+    </>
   );
 };
 

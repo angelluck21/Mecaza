@@ -242,6 +242,9 @@ export const marcarLeidaApi = (id) =>
 export const marcarTodasLeidasApi = () =>
   apiClient.put(ENDPOINTS.MARCAR_TODAS_LEIDAS);
 
+export const eliminarTodasNotificacionesApi = () =>
+  apiClient.delete(ENDPOINTS.ELIMINAR_TODAS_NOTIFICACIONES);
+
 // ── Perfil conductor (público) ───────────────────────────────────────────────
 
 export const getConductorPerfilApi = (idUsers) =>

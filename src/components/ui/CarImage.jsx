@@ -26,7 +26,7 @@ const CarImage = ({
   if (!hasValidUrl || imageError) {
     return (
       <div className={fallbackClassName}>
-        <FaCar className={`text-blue-600 ${fallbackIconSize}`} />
+        <FaCar className={fallbackIconSize} style={{ color: 'inherit' }} />
       </div>
     );
   }

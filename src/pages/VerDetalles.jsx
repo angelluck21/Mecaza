@@ -3,68 +3,205 @@ import { useNavigate, useParams } from 'react-router-dom';
 import {
   FaUser, FaMapMarkerAlt, FaClock, FaCalendar,
   FaPhone, FaCheck, FaTimes, FaLocationArrow, FaSpinner,
-  FaStar, FaRegStar, FaRoad,
+  FaStar, FaRegStar, FaRoad, FaCar, FaArrowRight,
 } from 'react-icons/fa';
 
-import PageBg            from '../components/ui/PageBg';
-import InnerNavbar       from '../components/layout/InnerNavbar';
-import SectionCard       from '../components/ui/SectionCard';
+import Navbar            from '../components/layout/Navbar';
+import Footer            from '../components/layout/Footer';
 import LoadingScreen     from '../components/ui/LoadingScreen';
-import FormInput         from '../components/ui/FormInput';
 import CarImage          from '../components/ui/CarImage';
 import UserAvatar        from '../components/ui/UserAvatar';
 import ToastNotification from '../components/ui/ToastNotification';
 import { useToast }      from '../hooks/useToast';
 import { crearReservaApi, listarCarrosApi, listarReservasApi, getConductorPerfilApi } from '../services/api';
 import { getCarImageUrl, getEstadoInfo, formatFecha } from '../utils';
+import './Home.css';
 
-const MAX_SEATS = 5;
+const MAX_SEATS = 4;
 
 // ── Fila de estrellas ────────────────────────────────────────────────────────
-const StarRow = ({ value, size = 'text-sm', emptyClass = 'text-gray-300' }) => (
-  <span className="inline-flex items-center gap-0.5">
-    {[1, 2, 3, 4, 5].map((n) =>
+const StarRow = ({ value }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: '2px' }}>
+    {[1, 2, 3, 4, 5].map(n =>
       n <= Math.round(value ?? 0)
-        ? <FaStar key={n} className={`${size} text-amber-400`} />
-        : <FaRegStar key={n} className={`${size} ${emptyClass}`} />
+        ? <FaStar key={n} style={{ color: '#FFBE00', fontSize: '0.72rem' }} />
+        : <FaRegStar key={n} style={{ color: 'rgba(107,114,143,0.4)', fontSize: '0.72rem' }} />
     )}
   </span>
 );
 
+// ── Panel reutilizable ───────────────────────────────────────────────────────
+const Panel = ({ title, icon, accent = '#FFBE00', children, noPadding = false }) => (
+  <div style={{
+    background: '#0E1422',
+    border: '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '16px',
+    overflow: 'hidden',
+  }}>
+    {title && (
+      <div style={{
+        padding: '13px 18px',
+        borderBottom: '1px solid rgba(255,255,255,0.07)',
+        display: 'flex', alignItems: 'center', gap: '8px',
+        background: 'linear-gradient(90deg, rgba(255,190,0,0.04) 0%, transparent 60%)',
+      }}>
+        {icon && <span style={{ color: accent, display: 'flex', alignItems: 'center', fontSize: '0.72rem' }}>{icon}</span>}
+        <span style={{
+          fontFamily: "'Syne', sans-serif",
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          color: '#EEF0FA',
+          letterSpacing: '0.02em',
+          textTransform: 'uppercase',
+        }}>{title}</span>
+      </div>
+    )}
+    <div style={noPadding ? {} : { padding: '18px' }}>{children}</div>
+  </div>
+);
+
+// ── Fila de info ─────────────────────────────────────────────────────────────
+const InfoRow = ({ icon, label, value, highlight }) => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '8px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+    <span style={{ color: '#FFBE00', fontSize: '0.7rem', flexShrink: 0, width: '14px', display: 'flex', justifyContent: 'center' }}>{icon}</span>
+    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', color: '#6B728F', flexShrink: 0, minWidth: '80px' }}>{label}</span>
+    <span style={{
+      fontFamily: "'DM Sans', sans-serif",
+      fontSize: '0.85rem',
+      fontWeight: highlight ? 600 : 500,
+      color: highlight ? '#EEF0FA' : 'rgba(238,240,250,0.8)',
+      marginLeft: 'auto',
+      textAlign: 'right',
+    }}>{value}</span>
+  </div>
+);
+
+// ── Input oscuro ─────────────────────────────────────────────────────────────
+const DarkInput = ({ label, icon, value, onChange, placeholder, type = 'text', rightSlot, hint }) => {
+  const [focused, setFocused] = useState(false);
+  return (
+    <div>
+      {label && (
+        <label style={{
+          display: 'block',
+          fontFamily: "'DM Sans', sans-serif",
+          fontSize: '0.7rem',
+          fontWeight: 600,
+          color: '#6B728F',
+          textTransform: 'uppercase',
+          letterSpacing: '0.06em',
+          marginBottom: '6px',
+        }}>{label}</label>
+      )}
+      <div style={{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+        {icon && (
+          <span style={{
+            position: 'absolute', left: '12px',
+            color: focused ? '#FFBE00' : '#6B728F',
+            fontSize: '0.7rem', pointerEvents: 'none',
+            transition: 'color 0.15s',
+          }}>{icon}</span>
+        )}
+        <input
+          type={type}
+          value={value}
+          onChange={onChange}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setFocused(false)}
+          placeholder={placeholder}
+          style={{
+            width: '100%',
+            padding: icon ? '10px 12px 10px 32px' : '10px 12px',
+            paddingRight: rightSlot ? '130px' : '12px',
+            background: '#080B12',
+            border: `1.5px solid ${focused ? 'rgba(255,190,0,0.5)' : 'rgba(255,255,255,0.08)'}`,
+            borderRadius: '10px',
+            color: '#EEF0FA',
+            fontFamily: "'DM Sans', sans-serif",
+            fontSize: '0.85rem',
+            outline: 'none',
+            transition: 'border-color 0.15s',
+            boxShadow: focused ? '0 0 0 3px rgba(255,190,0,0.06)' : 'none',
+          }}
+        />
+        {rightSlot && (
+          <div style={{ position: 'absolute', right: '6px' }}>{rightSlot}</div>
+        )}
+      </div>
+      {hint && (
+        <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.68rem', color: '#6B728F', marginTop: '4px', paddingLeft: '4px' }}>
+          {hint}
+        </p>
+      )}
+    </div>
+  );
+};
+
 // ── Icono de asiento individual ──────────────────────────────────────────────
 const SeatIcon = ({ number, state, onClick }) => {
-  const isClickable = state === 'available' || state === 'selected';
+  const [hov, setHov] = useState(false);
+  const clickable = state === 'available' || state === 'selected';
 
-  const headrest = {
-    available: 'border-gray-300 bg-gray-200',
-    selected:  'border-violet-500 bg-violet-300',
-    occupied:  'border-red-300   bg-red-200',
-    blocked:   'border-gray-200  bg-gray-100 opacity-50',
-    driver:    'border-blue-300  bg-blue-200',
-  }[state];
-
-  const body = {
-    available: 'border-gray-300 bg-white text-gray-500 hover:border-violet-400 hover:bg-violet-50 hover:text-violet-600 hover:scale-110 cursor-pointer',
-    selected:  'border-violet-500 bg-violet-100 text-violet-700 scale-110 shadow-lg shadow-violet-200/60',
-    occupied:  'border-red-300   bg-red-50    text-red-400   cursor-not-allowed',
-    blocked:   'border-dashed border-gray-200 bg-gray-50 text-gray-300 cursor-not-allowed opacity-50',
-    driver:    'border-blue-300  bg-blue-50   text-blue-400  cursor-not-allowed',
-  }[state];
-
-  const label = {
-    available: 'text-gray-400',
-    selected:  'text-violet-600 font-semibold',
-    occupied:  'text-red-300',
-    blocked:   'text-gray-300 opacity-50',
-    driver:    'text-blue-400',
+  const styles = {
+    available: {
+      headBg: hov ? 'rgba(255,190,0,0.22)' : 'rgba(255,255,255,0.07)',
+      headBorder: hov ? '#FFBE00' : 'rgba(255,255,255,0.1)',
+      bodyBg: hov ? 'rgba(255,190,0,0.07)' : '#141D30',
+      bodyBorder: hov ? '#FFBE00' : 'rgba(255,255,255,0.1)',
+      color: hov ? '#FFBE00' : 'rgba(107,114,143,0.8)',
+      labelColor: hov ? '#FFBE00' : 'rgba(107,114,143,0.5)',
+      shadow: 'none',
+      scale: hov ? 'scale(1.06)' : 'scale(1)',
+    },
+    selected: {
+      headBg: 'rgba(255,190,0,0.3)',
+      headBorder: '#FFBE00',
+      bodyBg: 'rgba(255,190,0,0.1)',
+      bodyBorder: '#FFBE00',
+      color: '#FFBE00',
+      labelColor: '#FFBE00',
+      shadow: '0 0 14px rgba(255,190,0,0.22)',
+      scale: 'scale(1.08)',
+    },
+    occupied: {
+      headBg: 'rgba(239,68,68,0.18)',
+      headBorder: 'rgba(239,68,68,0.4)',
+      bodyBg: 'rgba(239,68,68,0.06)',
+      bodyBorder: 'rgba(239,68,68,0.35)',
+      color: 'rgba(239,68,68,0.65)',
+      labelColor: 'rgba(239,68,68,0.5)',
+      shadow: 'none',
+      scale: 'scale(1)',
+    },
+    blocked: {
+      headBg: 'rgba(255,255,255,0.03)',
+      headBorder: 'rgba(255,255,255,0.05)',
+      bodyBg: 'rgba(255,255,255,0.02)',
+      bodyBorder: 'rgba(255,255,255,0.06)',
+      color: 'rgba(255,255,255,0.12)',
+      labelColor: 'rgba(255,255,255,0.1)',
+      shadow: 'none',
+      scale: 'scale(1)',
+    },
+    driver: {
+      headBg: 'rgba(99,102,241,0.2)',
+      headBorder: 'rgba(99,102,241,0.35)',
+      bodyBg: 'rgba(99,102,241,0.07)',
+      bodyBorder: 'rgba(99,102,241,0.3)',
+      color: 'rgba(139,148,255,0.8)',
+      labelColor: 'rgba(139,148,255,0.6)',
+      shadow: 'none',
+      scale: 'scale(1)',
+    },
   }[state];
 
   return (
     <button
       type="button"
-      onClick={isClickable ? onClick : undefined}
-      disabled={!isClickable}
-      className="flex flex-col items-center gap-0.5 group outline-none"
+      onClick={clickable ? onClick : undefined}
+      onMouseEnter={() => clickable && setHov(true)}
+      onMouseLeave={() => setHov(false)}
+      disabled={!clickable}
       title={
         state === 'driver'   ? 'Conductor' :
         state === 'occupied' ? `Asiento ${number} — ocupado` :
@@ -72,41 +209,60 @@ const SeatIcon = ({ number, state, onClick }) => {
         state === 'selected' ? `Asiento ${number} — seleccionado` :
         `Seleccionar asiento ${number}`
       }
+      style={{
+        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '3px',
+        background: 'none', border: 'none', padding: '4px',
+        cursor: clickable ? 'pointer' : 'not-allowed',
+        transform: styles.scale,
+        transition: 'transform 0.15s',
+        outline: 'none',
+        opacity: state === 'blocked' ? 0.35 : 1,
+      }}
     >
-      {/* Cabecero */}
-      <div className={`w-7 h-2 rounded-t-full border border-b-0 transition-all duration-150 ${headrest}`} />
-
-      {/* Cuerpo del asiento */}
-      <div className={`w-12 h-12 rounded-xl border-2 flex items-center justify-center transition-all duration-150 ${body}`}>
+      <div style={{
+        width: '26px', height: '8px', borderRadius: '5px 5px 0 0',
+        border: `1.5px solid ${styles.headBorder}`, borderBottom: 'none',
+        background: styles.headBg, transition: 'all 0.15s',
+      }} />
+      <div style={{
+        width: '48px', height: '48px', borderRadius: '10px',
+        border: `2px solid ${styles.bodyBorder}`,
+        background: styles.bodyBg,
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: styles.color, transition: 'all 0.15s',
+        boxShadow: styles.shadow,
+      }}>
         {state === 'driver' ? (
-          /* Volante */
-          <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor">
-            <circle cx="12" cy="12" r="8"  strokeWidth="2"/>
+          <svg viewBox="0 0 24 24" style={{ width: '22px', height: '22px' }} fill="none" stroke="currentColor">
+            <circle cx="12" cy="12" r="8" strokeWidth="2"/>
             <circle cx="12" cy="12" r="2.5" strokeWidth="2"/>
-            <line x1="12" y1="4"    x2="12" y2="9.5"  strokeWidth="1.8" strokeLinecap="round"/>
-            <line x1="4.5" y1="16"  x2="9"  y2="13.2" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="12" y1="4" x2="12" y2="9.5" strokeWidth="1.8" strokeLinecap="round"/>
+            <line x1="4.5" y1="16" x2="9" y2="13.2" strokeWidth="1.8" strokeLinecap="round"/>
             <line x1="19.5" y1="16" x2="15" y2="13.2" strokeWidth="1.8" strokeLinecap="round"/>
           </svg>
         ) : state === 'occupied' ? (
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <svg style={{ width: '18px', height: '18px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
           </svg>
         ) : state === 'blocked' ? (
-          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+          <svg style={{ width: '16px', height: '16px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
             <circle cx="12" cy="12" r="9"/>
             <line x1="4.9" y1="4.9" x2="19.1" y2="19.1"/>
           </svg>
         ) : state === 'selected' ? (
-          <svg className="w-5 h-5 text-violet-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+          <svg style={{ width: '18px', height: '18px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
           </svg>
         ) : (
-          <span className="text-sm font-bold">{number}</span>
+          <span style={{ fontSize: '0.82rem', fontWeight: 700, fontFamily: "'Syne', sans-serif" }}>{number}</span>
         )}
       </div>
-
-      {/* Etiqueta */}
-      <span className={`text-[10px] mt-0.5 transition-colors ${label}`}>
+      <span style={{
+        fontSize: '9px', color: styles.labelColor,
+        fontFamily: "'DM Sans', sans-serif",
+        fontWeight: state === 'selected' ? 600 : 400,
+        transition: 'color 0.15s', marginTop: '1px',
+      }}>
         {state === 'driver' ? 'Conductor' : `Asiento ${number}`}
       </span>
     </button>
@@ -115,10 +271,11 @@ const SeatIcon = ({ number, state, onClick }) => {
 
 // ── Mapa visual del taxi ─────────────────────────────────────────────────────
 const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeats, onToggle, onSelectAll, onOccupied }) => {
+  const [btnHov, setBtnHov] = useState(false);
   const availableSeats = Array.from({ length: totalAsientos }, (_, i) => i + 1)
-    .filter((n) => !asientosOcupados.includes(n));
-
-  const allSelected = availableSeats.length > 0 && availableSeats.every((n) => selectedSeats.includes(n));
+    .filter(n => !asientosOcupados.includes(n));
+  const allSelected = availableSeats.length > 0 && availableSeats.every(n => selectedSeats.includes(n));
+  const noneAvailable = availableSeats.length === 0;
 
   const getSeatState = (n) => {
     if (asientosOcupados.includes(n)) return 'occupied';
@@ -130,178 +287,149 @@ const TaxiSeatMap = ({ totalAsientos, asientosOcupados, selectedSeats, onToggle,
   const handleClick = (n) => {
     const s = getSeatState(n);
     if (s === 'occupied') { onOccupied(n); return; }
-    if (s === 'blocked')  return;
+    if (s === 'blocked') return;
     onToggle(n);
   };
 
-  const handleSelectAll = () => {
-    if (allSelected) onSelectAll([]);
-    else             onSelectAll(availableSeats);
-  };
+  const Divider = ({ faint }) => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', margin: '14px 0' }}>
+      <div style={{ flex: 1, borderTop: `1px dashed rgba(255,255,255,${faint ? '0.04' : '0.07'})` }} />
+      {[0,1,2].map(i => (
+        <div key={i} style={{ width: '3px', height: '3px', borderRadius: '50%', background: `rgba(255,255,255,${faint ? '0.07' : '0.1'})` }} />
+      ))}
+      <div style={{ flex: 1, borderTop: `1px dashed rgba(255,255,255,${faint ? '0.04' : '0.07'})` }} />
+    </div>
+  );
 
   return (
-    <div className="space-y-3">
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-      {/* Botón reservar todos */}
+      {/* Seleccionar todos */}
       <button
         type="button"
-        onClick={handleSelectAll}
-        disabled={availableSeats.length === 0}
-        className={[
-          'w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold border-2 transition-all duration-150 active:scale-95',
-          allSelected
-            ? 'bg-violet-500 border-violet-500 text-white shadow-md shadow-violet-200/50'
-            : availableSeats.length === 0
-              ? 'bg-gray-50 border-gray-200 text-gray-300 cursor-not-allowed'
-              : 'bg-white border-violet-300 text-violet-600 hover:bg-violet-50 hover:border-violet-500',
-        ].join(' ')}
+        onClick={() => { if (allSelected) onSelectAll([]); else onSelectAll(availableSeats); }}
+        onMouseEnter={() => !noneAvailable && setBtnHov(true)}
+        onMouseLeave={() => setBtnHov(false)}
+        disabled={noneAvailable}
+        style={{
+          width: '100%', padding: '9px 14px', borderRadius: '10px',
+          border: allSelected
+            ? '1.5px solid #FFBE00'
+            : btnHov ? '1.5px solid rgba(255,190,0,0.55)' : '1.5px solid rgba(255,190,0,0.2)',
+          background: allSelected
+            ? 'rgba(255,190,0,0.1)'
+            : noneAvailable ? 'rgba(255,255,255,0.02)'
+            : btnHov ? 'rgba(255,190,0,0.06)' : 'rgba(255,190,0,0.03)',
+          color: noneAvailable ? 'rgba(107,114,143,0.35)' : '#FFBE00',
+          fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', fontWeight: 600,
+          cursor: noneAvailable ? 'not-allowed' : 'pointer',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '7px',
+          transition: 'all 0.15s',
+        }}
       >
         {allSelected ? (
           <>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12"/>
+            <svg style={{ width: '13px', height: '13px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+              <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
             </svg>
             Deseleccionar todos
           </>
         ) : (
           <>
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+            <svg style={{ width: '13px', height: '13px' }} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/>
             </svg>
-            Reservar todos los asientos disponibles
+            Reservar todos disponibles
             {availableSeats.length > 0 && (
-              <span className="bg-violet-100 text-violet-700 text-xs font-bold px-2 py-0.5 rounded-full">
-                {availableSeats.length}
-              </span>
+              <span style={{
+                background: 'rgba(255,190,0,0.18)', color: '#FFBE00',
+                fontSize: '0.68rem', fontWeight: 700,
+                padding: '1px 7px', borderRadius: '20px',
+              }}>{availableSeats.length}</span>
             )}
           </>
         )}
       </button>
 
       {/* Contenedor del vehículo */}
-      <div className="bg-gray-50 border border-gray-200 rounded-2xl px-6 py-5 relative select-none">
-
-        {/* Indicador frente */}
-        <div className="flex items-center gap-2 mb-5 justify-center">
-          <div className="h-px flex-1 bg-gray-200" />
-          <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Frente</span>
-          <div className="h-px flex-1 bg-gray-200" />
+      <div style={{
+        background: 'rgba(8,11,18,0.7)',
+        border: '1px solid rgba(255,255,255,0.05)',
+        borderRadius: '14px', padding: '18px 24px', userSelect: 'none',
+      }}>
+        {/* Frente */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '18px', justifyContent: 'center' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+          <span style={{ fontSize: '8px', fontWeight: 700, color: 'rgba(107,114,143,0.45)', letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: "'DM Sans', sans-serif" }}>Frente</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
         </div>
 
-        {/* Fila delantera: conductor + copiloto (asiento 1) */}
-        <div className="flex items-end justify-center gap-8 mb-1">
-          <SeatIcon number={0} state="driver"             onClick={() => {}}            />
-          <SeatIcon number={1} state={getSeatState(1)}    onClick={() => handleClick(1)}/>
+        {/* Fila delantera */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '28px' }}>
+          <SeatIcon number={0} state="driver" onClick={() => {}} />
+          <SeatIcon number={1} state={getSeatState(1)} onClick={() => handleClick(1)} />
         </div>
 
-        {/* Separador entre filas */}
-        <div className="flex items-center gap-2 my-4">
-          <div className="flex-1 border-t border-dashed border-gray-300" />
-          <div className="flex gap-1">
-            <div className="w-1 h-1 rounded-full bg-gray-300" />
-            <div className="w-1 h-1 rounded-full bg-gray-300" />
-            <div className="w-1 h-1 rounded-full bg-gray-300" />
-          </div>
-          <div className="flex-1 border-t border-dashed border-gray-300" />
+        <Divider />
+
+        {/* Fila trasera */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'center', gap: '10px' }}>
+          <SeatIcon number={2} state={getSeatState(2)} onClick={() => handleClick(2)} />
+          <SeatIcon number={3} state={getSeatState(3)} onClick={() => handleClick(3)} />
+          <SeatIcon number={4} state={getSeatState(4)} onClick={() => handleClick(4)} />
         </div>
 
-        {/* Fila trasera: asientos 2, 3, 4 */}
-        <div className="flex items-end justify-center gap-3 mb-1">
-          <SeatIcon number={2} state={getSeatState(2)} onClick={() => handleClick(2)}/>
-          <SeatIcon number={3} state={getSeatState(3)} onClick={() => handleClick(3)}/>
-          <SeatIcon number={4} state={getSeatState(4)} onClick={() => handleClick(4)}/>
-        </div>
-
-        {/* Asiento 5 (extra / si aplica) */}
+        {/* Asiento 5 */}
         {MAX_SEATS >= 5 && (
           <>
-            <div className="flex items-center gap-2 my-4">
-              <div className="flex-1 border-t border-dashed border-gray-200" />
-              <div className="flex gap-1">
-                <div className="w-1 h-1 rounded-full bg-gray-200" />
-                <div className="w-1 h-1 rounded-full bg-gray-200" />
-                <div className="w-1 h-1 rounded-full bg-gray-200" />
-              </div>
-              <div className="flex-1 border-t border-dashed border-gray-200" />
-            </div>
-            <div className="flex justify-center">
-              <SeatIcon number={5} state={getSeatState(5)} onClick={() => handleClick(5)}/>
+            <Divider faint />
+            <div style={{ display: 'flex', justifyContent: 'center' }}>
+              <SeatIcon number={5} state={getSeatState(5)} onClick={() => handleClick(5)} />
             </div>
           </>
         )}
 
-        {/* Indicador trasera */}
-        <div className="flex items-center gap-2 mt-5 justify-center">
-          <div className="h-px flex-1 bg-gray-200" />
-          <span className="text-[10px] font-bold text-gray-300 tracking-widest uppercase">Parte trasera</span>
-          <div className="h-px flex-1 bg-gray-200" />
+        {/* Parte trasera */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '18px', justifyContent: 'center' }}>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
+          <span style={{ fontSize: '8px', fontWeight: 700, color: 'rgba(107,114,143,0.45)', letterSpacing: '0.15em', textTransform: 'uppercase', fontFamily: "'DM Sans', sans-serif" }}>Parte trasera</span>
+          <div style={{ flex: 1, height: '1px', background: 'rgba(255,255,255,0.06)' }} />
         </div>
       </div>
 
       {/* Leyenda */}
-      <div className="flex flex-wrap gap-x-4 gap-y-1 justify-center text-xs text-gray-400">
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded border-2 border-gray-300 bg-white inline-block" /> Disponible
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded border-2 border-violet-500 bg-violet-100 inline-block" /> Tus asientos
-        </span>
-        <span className="flex items-center gap-1.5">
-          <span className="w-3 h-3 rounded border-2 border-red-300 bg-red-50 inline-block" /> Ocupado
-        </span>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px 14px', justifyContent: 'center', padding: '2px 0' }}>
+        {[
+          { bg: '#141D30', border: 'rgba(255,255,255,0.1)', label: 'Disponible' },
+          { bg: 'rgba(255,190,0,0.1)', border: '#FFBE00', label: 'Tus asientos' },
+          { bg: 'rgba(239,68,68,0.06)', border: 'rgba(239,68,68,0.35)', label: 'Ocupado' },
+        ].map(({ bg, border, label }) => (
+          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: '5px', fontSize: '0.68rem', color: 'rgba(107,114,143,0.65)', fontFamily: "'DM Sans', sans-serif" }}>
+            <span style={{ width: '10px', height: '10px', borderRadius: '3px', border: `1.5px solid ${border}`, background: bg, display: 'inline-block', flexShrink: 0 }} />
+            {label}
+          </span>
+        ))}
       </div>
 
-      {/* Info asientos seleccionados */}
-      {selectedSeats.length > 0 ? (
-        <div className="bg-violet-50 border border-violet-200 rounded-xl py-2.5 px-4 animate-fade-in">
-          <p className="text-xs text-violet-500 mb-1.5 font-medium text-center">
-            {selectedSeats.length === 1 ? '1 asiento seleccionado' : `${selectedSeats.length} asientos seleccionados`}
-          </p>
-          <div className="flex flex-wrap gap-1.5 justify-center">
-            {[...selectedSeats].sort((a, b) => a - b).map((n) => (
-              <span
-                key={n}
-                className="inline-flex items-center gap-1 bg-violet-500 text-white text-xs font-bold px-2.5 py-1 rounded-full"
-              >
-                Asiento {n}
-                <button
-                  type="button"
-                  onClick={() => onToggle(n)}
-                  className="ml-0.5 hover:bg-violet-600 rounded-full w-3.5 h-3.5 flex items-center justify-center transition-colors"
-                >
-                  <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="3">
-                    <path strokeLinecap="round" d="M6 18L18 6M6 6l12 12"/>
-                  </svg>
-                </button>
-              </span>
-            ))}
-          </div>
-        </div>
-      ) : (
-        <div className="bg-gray-50 border border-gray-200 rounded-xl py-2.5 px-4 text-center">
-          <p className="text-xs text-gray-400">Toca un asiento para seleccionarlo — puedes elegir varios</p>
-        </div>
-      )}
     </div>
   );
 };
 
 // ── Componente principal ─────────────────────────────────────────────────────
-
 const VerDetalles = () => {
-  const [userData,          setUserData]          = useState(null);
-  const [isLoading,         setIsLoading]         = useState(true);
-  const [carDetails,        setCarDetails]        = useState(null);
-  const [selectedSeats,     setSelectedSeats]     = useState([]);
-  const [pickupLocation,    setPickupLocation]    = useState('');
-  const [nombre,            setNombre]            = useState('');
-  const [telefono,          setTelefono]          = useState('');
-  const [asientosOcupados,  setAsientosOcupados]  = useState([]);
-  const [showConfirmation,  setShowConfirmation]  = useState(false);
-  const [isReserving,       setIsReserving]       = useState(false);
-  const [showSuccess,       setShowSuccess]       = useState(false);
-  const [locLoading,        setLocLoading]        = useState(false);
-  const [conductorPerfil,   setConductorPerfil]   = useState(null);
+  const [userData,         setUserData]         = useState(null);
+  const [isLoading,        setIsLoading]        = useState(true);
+  const [carDetails,       setCarDetails]       = useState(null);
+  const [selectedSeats,    setSelectedSeats]    = useState([]);
+  const [pickupLocation,   setPickupLocation]   = useState('');
+  const [nombre,           setNombre]           = useState('');
+  const [telefono,         setTelefono]         = useState('');
+  const [asientosOcupados, setAsientosOcupados] = useState([]);
+  const [showConfirmation, setShowConfirmation] = useState(false);
+  const [isReserving,      setIsReserving]      = useState(false);
+  const [showSuccess,      setShowSuccess]      = useState(false);
+  const [locLoading,       setLocLoading]       = useState(false);
+  const [conductorPerfil,  setConductorPerfil]  = useState(null);
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
   const { carId } = useParams();
@@ -309,33 +437,25 @@ const VerDetalles = () => {
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (!stored) { navigate('/login'); return; }
-
     try {
       const user = JSON.parse(stored);
       if (user.rol === 'conductor') { navigate('/conductor', { replace: true }); return; }
       setUserData(user);
       setNombre(user.Nombre || user.nombre || user.name || '');
       setTelefono(user.Telefono || user.telefono || user.tel || '');
-    } catch {
-      navigate('/login');
-      return;
-    }
+    } catch { navigate('/login'); return; }
 
     const loadAll = async () => {
       try {
-        const [carrosData, reservasData] = await Promise.all([
-          listarCarrosApi(),
-          listarReservasApi(),
-        ]);
-
+        const [carrosData, reservasData] = await Promise.all([listarCarrosApi(), listarReservasApi()]);
         const carrosArray = Array.isArray(carrosData) ? carrosData : (carrosData?.data ?? []);
         const car = carrosArray.find(c => (c.id_carros || c.id || c.ID) == carId);
         if (!car) { setIsLoading(false); return; }
 
         const ra = Array.isArray(reservasData) ? reservasData : (reservasData?.data ?? []);
-        const ESTADOS_ACTIVOS = ['pendiente', 'confirmada'];
+        const ACTIVOS = ['pendiente', 'confirmada'];
         const ocupados = ra
-          .filter(r => r.id_carros == carId && ESTADOS_ACTIVOS.includes((r.estado || '').toLowerCase()))
+          .filter(r => r.id_carros == carId && ACTIVOS.includes((r.estado || '').toLowerCase()))
           .map(r => parseInt(r.Asiento || r.asiento || 0))
           .filter(n => n > 0);
         setAsientosOcupados(ocupados);
@@ -357,7 +477,6 @@ const VerDetalles = () => {
           id_users:    conductorUserId,
         });
 
-        // Cargar perfil del conductor en paralelo (no bloquea la carga principal)
         if (conductorUserId) {
           getConductorPerfilApi(conductorUserId)
             .then(res => { if (res?.data) setConductorPerfil(res.data); })
@@ -369,28 +488,22 @@ const VerDetalles = () => {
         setIsLoading(false);
       }
     };
-
     loadAll();
   }, [carId, navigate]);
 
   const handleGetLocation = () => {
-    if (!navigator.geolocation) {
-      showToast('Tu navegador no soporta geolocalización.', 'error');
-      return;
-    }
+    if (!navigator.geolocation) { showToast('Tu navegador no soporta geolocalización.', 'error'); return; }
     setLocLoading(true);
     navigator.geolocation.getCurrentPosition(
       async ({ coords }) => {
         try {
           const res = await fetch(
-            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}&accept-language=es`,
+            `https://nominatim.openstreetmap.org/reverse?format=json&lat=${coords.latitude}&lon=${coords.longitude}`,
             { headers: { 'Accept-Language': 'es' } }
           );
           const data = await res.json();
-          const addr = data.display_name || `${coords.latitude}, ${coords.longitude}`;
-          setPickupLocation(addr);
+          setPickupLocation(data.display_name || `${coords.latitude}, ${coords.longitude}`);
         } catch {
-          // Si falla la geocodificación inversa, usar coordenadas crudas
           setPickupLocation(`${coords.latitude.toFixed(6)}, ${coords.longitude.toFixed(6)}`);
         } finally {
           setLocLoading(false);
@@ -398,11 +511,7 @@ const VerDetalles = () => {
       },
       (err) => {
         setLocLoading(false);
-        const msgs = {
-          1: 'Permiso de ubicación denegado. Actívalo en la configuración del navegador.',
-          2: 'No se pudo obtener tu ubicación. Verifica tu GPS.',
-          3: 'Tiempo de espera agotado. Inténtalo de nuevo.',
-        };
+        const msgs = { 1: 'Permiso de ubicación denegado.', 2: 'No se pudo obtener tu ubicación.', 3: 'Tiempo de espera agotado.' };
         showToast(msgs[err.code] || 'Error al obtener ubicación.', 'error');
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -410,12 +519,12 @@ const VerDetalles = () => {
   };
 
   const handleConfirm = () => {
-    if (!userData) { navigate('/login'); return; }
-    if (selectedSeats.length === 0)                 { showToast('Selecciona al menos un asiento.', 'error'); return; }
-    if (!pickupLocation.trim())                     { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
-    if (pickupLocation.trim().length < 10)          { showToast('La ubicación debe tener al menos 10 caracteres.', 'error'); return; }
-    if (!nombre.trim())                             { showToast('Ingresa tu nombre.', 'error'); return; }
-    if (!telefono.trim())                           { showToast('Ingresa tu teléfono.', 'error'); return; }
+    if (!userData)                                    { navigate('/login'); return; }
+    if (selectedSeats.length === 0)                   { showToast('Selecciona al menos un asiento.', 'error'); return; }
+    if (!pickupLocation.trim())                       { showToast('Ingresa tu ubicación de recogida.', 'error'); return; }
+    if (pickupLocation.trim().length < 10)            { showToast('La ubicación debe tener al menos 10 caracteres.', 'error'); return; }
+    if (!nombre.trim())                               { showToast('Ingresa tu nombre.', 'error'); return; }
+    if (!telefono.trim())                             { showToast('Ingresa tu teléfono.', 'error'); return; }
     if (carDetails.asientos - asientosOcupados.length <= 0) { showToast('No hay asientos disponibles.', 'error'); return; }
     const userId = userData.id || userData.id_users || userData.ID || userData.user_id || userData.userId;
     if (!userId) { showToast('Error de sesión. Inicia sesión nuevamente.', 'error'); navigate('/login'); return; }
@@ -426,43 +535,39 @@ const VerDetalles = () => {
     setIsReserving(true);
     const carroId = carDetails.id_carros || carId;
     try {
-      // Crear una reserva por cada asiento seleccionado
       await Promise.all(
-        selectedSeats.map((seat) =>
-          crearReservaApi({
-            Nombre:    nombre.trim(),
-            Ubicacion: pickupLocation.trim(),
-            Asiento:   seat,
-            id_carros: carroId,
-            Telefono:  telefono.trim(),
-          })
+        selectedSeats.map(seat =>
+          crearReservaApi({ Nombre: nombre.trim(), Ubicacion: pickupLocation.trim(), Asiento: seat, id_carros: carroId, Telefono: telefono.trim() })
         )
       );
       setShowConfirmation(false);
       setShowSuccess(true);
       setTimeout(() => navigate('/indexLogin'), 3000);
     } catch (err) {
-      const msg = err.response?.data?.message || 'Error al reservar. Inténtalo de nuevo.';
-      showToast(msg, 'error');
+      showToast(err.response?.data?.message || 'Error al reservar. Inténtalo de nuevo.', 'error');
     } finally {
       setIsReserving(false);
     }
   };
 
-  if (isLoading) return <LoadingScreen message="Cargando detalles del viaje..." />;
+  if (isLoading) return <LoadingScreen message="Cargando detalles del viaje…" />;
 
   if (!userData || !carDetails) return (
-    <PageBg centered>
-      <div className="text-center text-white space-y-3">
-        <p className="text-lg font-semibold">{!userData ? 'Error de autenticación' : 'No se encontró el viaje'}</p>
-        <button
-          onClick={() => navigate(-1)}
-          className="px-6 py-2 bg-white/20 rounded-xl hover:bg-white/30 transition-colors text-sm"
-        >
-          Volver
-        </button>
+    <div className="home-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div style={{ textAlign: 'center' }}>
+        <div style={{ width: '56px', height: '56px', borderRadius: '14px', background: 'rgba(255,190,0,0.08)', border: '1px solid rgba(255,190,0,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: '1.5rem', color: '#FFBE00' }}>
+          <FaCar />
+        </div>
+        <p style={{ fontFamily: "'Syne', sans-serif", fontSize: '1rem', fontWeight: 700, color: '#EEF0FA', marginBottom: '12px' }}>
+          {!userData ? 'Error de autenticación' : 'No se encontró el viaje'}
+        </p>
+        <button onClick={() => navigate(-1)} style={{
+          padding: '8px 24px', background: 'rgba(255,190,0,0.08)',
+          border: '1px solid rgba(255,190,0,0.25)', borderRadius: '10px',
+          color: '#FFBE00', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '0.85rem',
+        }}>Volver</button>
       </div>
-    </PageBg>
+    </div>
   );
 
   const totalAsientos  = carDetails.asientos;
@@ -470,344 +575,464 @@ const VerDetalles = () => {
   const estadoInfo     = getEstadoInfo(carDetails.id_estados);
   const enViaje        = parseInt(carDetails.id_estados) === 2;
   const viajeTerminado = parseInt(carDetails.id_estados) === 5;
-  const isFormComplete = !enViaje && !viajeTerminado && selectedSeats.length > 0 && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
+  const estadoBadge    = { 1: 'badge-green', 2: 'badge-amber', 3: 'badge-orange', 4: 'badge-red', 5: 'badge-gray' }[parseInt(carDetails.id_estados)] || 'badge-gray';
+  const isFormComplete = !enViaje && !viajeTerminado && selectedSeats.length > 0
+    && pickupLocation.trim() && nombre.trim() && telefono.trim() && disponibles > 0;
+
+  const confirmRows = [
+    ['Conductor',   carDetails.conductor],
+    ['Destino',     carDetails.destino],
+    ['Fecha',       formatFecha(carDetails.fecha)],
+    ['Hora',        carDetails.horasalida],
+    ['Asiento(s)',  [...selectedSeats].sort((a,b)=>a-b).map(n=>`#${n}`).join(', ')],
+    ['Pasajero',    nombre],
+    ['Teléfono',    telefono],
+    ['Recogida',    pickupLocation],
+    ...(carDetails.precio !== null ? [['Total', `$${Number(carDetails.precio * selectedSeats.length).toLocaleString('es-CO')}`]] : []),
+  ];
 
   return (
-    <PageBg>
+    <div className="home-page" style={{ minHeight: '100vh' }}>
       <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
-      <InnerNavbar userData={userData} title="Detalles del viaje" />
+      <Navbar title="Detalles del viaje" />
 
-      <div className="max-w-5xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6 animate-fade-in-up">
+      <div style={{ maxWidth: '1024px', margin: '0 auto', padding: '24px 16px 60px', width: '100%' }}>
 
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl font-extrabold text-white">{carDetails.destino}</h1>
-            <p className="text-blue-200 text-sm mt-0.5">{carDetails.conductor} · {carDetails.placa}</p>
+        {/* ── Header de la página ── */}
+        <div className="animate-fade-in-up" style={{
+          background: '#0E1422',
+          border: '1px solid rgba(255,255,255,0.07)',
+          borderRadius: '20px',
+          padding: '24px 28px',
+          marginBottom: '20px',
+          display: 'flex',
+          flexWrap: 'wrap',
+          gap: '20px',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          {/* Ruta */}
+          <div style={{ flex: '1 1 260px', minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '6px' }}>
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '1.4rem', fontWeight: 800, color: '#EEF0FA', letterSpacing: '-0.02em' }}>
+                {carDetails.origen || '—'}
+              </span>
+              <FaArrowRight style={{ color: '#FFBE00', fontSize: '0.8rem', flexShrink: 0 }} />
+              <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '1.4rem', fontWeight: 800, color: '#EEF0FA', letterSpacing: '-0.02em' }}>
+                {carDetails.destino}
+              </span>
+            </div>
           </div>
-          <div className="flex items-center gap-2 flex-wrap">
-            <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${estadoInfo.color}`}>
+
+          {/* Badges y stats */}
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px', alignItems: 'center' }}>
+            <span className={estadoBadge} style={{ fontSize: '0.72rem', padding: '5px 12px', borderRadius: '20px', fontFamily: "'DM Sans', sans-serif", fontWeight: 600 }}>
               {estadoInfo.label}
             </span>
-            <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${disponibles > 0 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-              {disponibles > 0 ? `${disponibles} asiento${disponibles !== 1 ? 's' : ''} libre${disponibles !== 1 ? 's' : ''}` : 'Sin asientos'}
+            <span style={{
+              fontSize: '0.72rem', padding: '5px 12px', borderRadius: '20px',
+              fontFamily: "'DM Sans', sans-serif", fontWeight: 600,
+              background: 'rgba(6,9,16,0.82)',
+              color: disponibles > 0 ? '#22c55e' : '#ef4444',
+              border: `1px solid ${disponibles > 0 ? 'rgba(34,197,94,0.5)' : 'rgba(239,68,68,0.5)'}`,
+              backdropFilter: 'blur(6px)',
+            }}>
+              {disponibles > 0 ? `${disponibles} libre${disponibles !== 1 ? 's' : ''}` : 'Sin asientos'}
             </span>
+            {carDetails.precio !== null && (
+              <span style={{
+                fontSize: '0.9rem', padding: '4px 14px', borderRadius: '20px',
+                fontFamily: "'Syne', sans-serif", fontWeight: 800,
+                background: 'rgba(255,190,0,0.1)',
+                color: '#FFBE00',
+                border: '1px solid rgba(255,190,0,0.3)',
+              }}>
+                ${Number(carDetails.precio).toLocaleString('es-CO')}
+              </span>
+            )}
           </div>
         </div>
 
-        {/* Cuerpo en dos columnas */}
-        <div className="grid lg:grid-cols-5 gap-6">
+        {/* ── Cuadrícula principal ── */}
+        <div className="vd-grid">
 
-          {/* ── Columna izquierda: información ── */}
-          <div className="lg:col-span-3 space-y-5">
+          {/* ── Columna izquierda (info) ── */}
+          <div className="vd-col-left" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-            {/* Imagen */}
-            <div className="rounded-2xl overflow-hidden shadow-xl bg-white/5">
+            {/* Imagen del carro */}
+            <div className="animate-fade-in-up" style={{ borderRadius: '16px', overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)', animationDelay: '60ms' }}>
               <CarImage
                 imageUrl={getCarImageUrl(carDetails.imagencarro)}
                 conductorName={carDetails.conductor}
-                className="w-full h-56 object-cover"
-                fallbackClassName="w-full h-56 bg-gradient-to-br from-blue-800/60 to-violet-800/60 flex items-center justify-center"
-                fallbackIconSize="text-7xl"
+                className="vd-car-img"
+                fallbackClassName="vd-car-fallback"
+                fallbackIconSize="text-6xl"
               />
             </div>
 
             {/* Conductor */}
-            <SectionCard title="Conductor" icon={<FaUser className="text-xs" />} accent="blue">
-              <div className="flex items-start gap-4">
-
-                {/* Foto del conductor */}
-                <div className="shrink-0">
-                  <UserAvatar
-                    userData={{
-                      fotoperfil: conductorPerfil?.fotoperfil ?? null,
-                      name: carDetails.conductor,
-                    }}
-                    size="xl"
-                    className="ring-2 ring-blue-200 shadow-md"
-                  />
-                </div>
-
-                {/* Info conductor */}
-                <div className="flex-1 min-w-0 space-y-2">
-                  <div>
-                    <p className="font-bold text-gray-900 text-base leading-tight">{carDetails.conductor}</p>
-                    <p className="text-xs text-gray-400">{carDetails.placa}</p>
+            <div className="animate-fade-in-up" style={{ animationDelay: '120ms' }}>
+              <Panel title="Conductor" icon={<FaUser />}>
+                <div style={{ display: 'flex', gap: '14px', alignItems: 'flex-start' }}>
+                  <div style={{ flexShrink: 0 }}>
+                    <UserAvatar
+                      userData={{ fotoperfil: conductorPerfil?.fotoperfil ?? null, name: carDetails.conductor }}
+                      size="xl"
+                    />
                   </div>
-
-                  {/* Estrellas y viajes */}
-                  {conductorPerfil ? (
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div className="flex items-center gap-1">
-                        <StarRow value={conductorPerfil.promedio_estrellas ?? 0} />
-                        {conductorPerfil.promedio_estrellas != null ? (
-                          <span className="text-xs font-bold text-amber-600 ml-1">
-                            {Number(conductorPerfil.promedio_estrellas).toFixed(1)}
-                          </span>
-                        ) : (
-                          <span className="text-xs text-gray-400 ml-1">Sin calificaciones</span>
-                        )}
-                        {conductorPerfil.total_calificaciones > 0 && (
-                          <span className="text-xs text-gray-400">
-                            ({conductorPerfil.total_calificaciones})
-                          </span>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <FaRoad className="text-blue-400 text-[10px]" />
-                        <span className="font-semibold">{conductorPerfil.total_viajes}</span>
-                        <span>{conductorPerfil.total_viajes === 1 ? 'viaje' : 'viajes'}</span>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="flex items-center gap-1">
-                      {[1,2,3,4,5].map(n => <FaRegStar key={n} className="text-gray-200 text-sm" />)}
-                      <span className="text-xs text-gray-300 ml-1">Cargando...</span>
-                    </div>
-                  )}
-
-                  {/* Teléfono + Ver perfil */}
-                  <div className="flex items-center justify-between gap-2 flex-wrap pt-0.5">
-                    <p className="text-sm text-gray-700 flex items-center gap-1">
-                      <FaPhone className="text-blue-500 text-xs shrink-0" />
-                      {carDetails.telefono}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <p style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.95rem', fontWeight: 700, color: '#EEF0FA', marginBottom: '2px' }}>
+                      {carDetails.conductor}
                     </p>
-                    {carDetails.id_users && (
-                      <button
-                        type="button"
-                        onClick={() => navigate(`/usuario/${carDetails.id_users}`)}
-                        className="text-xs font-semibold text-blue-600 hover:text-blue-800 underline underline-offset-2 transition-colors"
-                      >
-                        Ver perfil completo
-                      </button>
+                    <p style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.95rem', fontWeight: 700, color: '#EEF0FA', marginBottom: '10px' }}>
+                      {carDetails.placa}
+                    </p>
+
+                    {/* Estrellas */}
+                    {conductorPerfil ? (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap', marginBottom: '10px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <StarRow value={conductorPerfil.promedio_estrellas ?? 0} />
+                          {conductorPerfil.promedio_estrellas != null ? (
+                            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', fontWeight: 700, color: '#FFBE00' }}>
+                              {Number(conductorPerfil.promedio_estrellas).toFixed(1)}
+                            </span>
+                          ) : (
+                            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.72rem', color: '#6B728F' }}>Sin calificaciones</span>
+                          )}
+                          {conductorPerfil.total_calificaciones > 0 && (
+                            <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', color: '#6B728F' }}>
+                              ({conductorPerfil.total_calificaciones})
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                          <FaRoad style={{ color: '#FFBE00', fontSize: '0.62rem' }} />
+                          <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', fontWeight: 600, color: 'rgba(238,240,250,0.7)' }}>
+                            {conductorPerfil.total_viajes} {conductorPerfil.total_viajes === 1 ? 'viaje' : 'viajes'}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginBottom: '10px' }}>
+                        {[1,2,3,4,5].map(n => <FaRegStar key={n} style={{ color: 'rgba(107,114,143,0.25)', fontSize: '0.72rem' }} />)}
+                        <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.7rem', color: 'rgba(107,114,143,0.4)', marginLeft: '4px' }}>Cargando…</span>
+                      </div>
                     )}
+
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                      <span style={{ display: 'flex', alignItems: 'center', gap: '6px', fontFamily: "'DM Sans', sans-serif", fontSize: '0.8rem', color: 'rgba(238,240,250,0.7)' }}>
+                        <FaPhone style={{ color: '#FFBE00', fontSize: '0.65rem' }} />
+                        {carDetails.telefono}
+                      </span>
+                      {carDetails.id_users && (
+                        <button
+                          type="button"
+                          onClick={() => navigate(`/usuario/${carDetails.id_users}`)}
+                          style={{
+                            background: 'none', border: 'none', cursor: 'pointer',
+                            fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', fontWeight: 600,
+                            color: '#FFBE00', textDecoration: 'underline', textUnderlineOffset: '3px',
+                            padding: 0,
+                          }}
+                        >
+                          Ver perfil completo
+                        </button>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            </SectionCard>
+              </Panel>
+            </div>
 
             {/* Detalles del viaje */}
-            <SectionCard title="Detalles del viaje" icon={<FaMapMarkerAlt className="text-xs" />} accent="green">
-              <div className="grid sm:grid-cols-2 gap-4 text-sm">
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Origen</p>
-                  <p className="font-semibold text-gray-800 flex items-center gap-1">
-                    <FaMapMarkerAlt className="text-blue-400 text-xs shrink-0" />
-                    {carDetails.origen || 'No especificado'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Destino</p>
-                  <p className="font-semibold text-gray-800 flex items-center gap-1">
-                    <FaMapMarkerAlt className="text-green-500 text-xs shrink-0" /> {carDetails.destino}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Fecha</p>
-                  <p className="font-semibold text-gray-800 flex items-center gap-1">
-                    <FaCalendar className="text-green-500 text-xs shrink-0" /> {formatFecha(carDetails.fecha)}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Hora de salida</p>
-                  <p className="font-semibold text-gray-800 flex items-center gap-1">
-                    <FaClock className="text-green-500 text-xs shrink-0" /> {carDetails.horasalida}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-xs text-gray-400 mb-0.5">Asientos disponibles</p>
-                  <p className="font-semibold text-gray-800">
-                    {disponibles} de {totalAsientos}
-                  </p>
-                </div>
-              </div>
-            </SectionCard>
+            <div className="animate-fade-in-up" style={{ animationDelay: '180ms' }}>
+              <Panel title="Detalles del viaje" icon={<FaMapMarkerAlt />}>
+                <InfoRow icon={<FaMapMarkerAlt />} label="Origen"    value={carDetails.origen || 'No especificado'} highlight />
+                <InfoRow icon={<FaMapMarkerAlt />} label="Destino"   value={carDetails.destino} highlight />
+                <InfoRow icon={<FaCalendar />}     label="Fecha"     value={formatFecha(carDetails.fecha)} highlight />
+                <InfoRow icon={<FaClock />}        label="Hora salida" value={carDetails.horasalida} highlight />
+                <InfoRow
+                  icon={<FaUser />}
+                  label="Asientos"
+                  value={`${disponibles} disponible${disponibles !== 1 ? 's' : ''} de ${totalAsientos}`}
+                  highlight={disponibles > 0}
+                />
+              </Panel>
+            </div>
 
-            {/* Precio del viaje */}
+            {/* Precio */}
             {carDetails.precio !== null && (
-              <SectionCard title="Precio del viaje" accent="orange">
-                <div className="flex items-center justify-between py-1">
-                  <span className="text-sm text-gray-600">
-                    {carDetails.origen} → {carDetails.destino}
-                  </span>
-                  <span className="text-xl font-extrabold text-green-600">
-                    ${Number(carDetails.precio).toLocaleString('es-CO')}
-                  </span>
-                </div>
-                <p className="text-xs text-gray-400 mt-1">Precio por pasajero</p>
-              </SectionCard>
+              <div className="animate-fade-in-up" style={{ animationDelay: '240ms' }}>
+                <Panel title="Precio por pasajero" icon={<FaRoad />} accent="#22c55e">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', color: '#6B728F' }}>
+                      {carDetails.origen} → {carDetails.destino}
+                    </span>
+                    <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '1.6rem', fontWeight: 800, color: '#22c55e', letterSpacing: '-0.03em' }}>
+                      ${Number(carDetails.precio).toLocaleString('es-CO')}
+                    </span>
+                  </div>
+                  {selectedSeats.length > 1 && (
+                    <div style={{ marginTop: '10px', padding: '8px 12px', background: 'rgba(34,197,94,0.06)', border: '1px solid rgba(34,197,94,0.18)', borderRadius: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', color: '#6B728F' }}>
+                        Total ({selectedSeats.length} asientos)
+                      </span>
+                      <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '1rem', fontWeight: 800, color: '#22c55e' }}>
+                        ${Number(carDetails.precio * selectedSeats.length).toLocaleString('es-CO')}
+                      </span>
+                    </div>
+                  )}
+                </Panel>
+              </div>
             )}
           </div>
 
-          {/* ── Columna derecha: reserva ── */}
-          <div className="lg:col-span-2 space-y-5">
+          {/* ── Columna derecha (reserva) ── */}
+          <div className="vd-col-right" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
             {/* Banner viaje en curso */}
             {enViaje && (
-              <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4 flex items-start gap-3">
-                <FaRoad className="text-blue-500 text-lg mt-0.5 shrink-0 animate-pulse" />
+              <div className="animate-fade-in-up" style={{
+                background: 'rgba(59,130,246,0.07)', border: '1px solid rgba(59,130,246,0.25)',
+                borderRadius: '14px', padding: '14px 16px',
+                display: 'flex', gap: '12px', alignItems: 'flex-start',
+              }}>
+                <FaRoad style={{ color: '#60a5fa', fontSize: '1rem', marginTop: '2px', flexShrink: 0 }} />
                 <div>
-                  <p className="font-bold text-blue-800 text-sm">Viaje en curso</p>
-                  <p className="text-blue-600 text-xs mt-0.5">Este vehículo ya inició su recorrido. No es posible hacer nuevas reservas.</p>
+                  <p style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.82rem', fontWeight: 700, color: '#93c5fd', marginBottom: '4px' }}>Viaje en curso</p>
+                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', color: 'rgba(147,197,253,0.7)' }}>
+                    Este vehículo ya inició su recorrido. No es posible hacer nuevas reservas.
+                  </p>
                 </div>
               </div>
             )}
 
             {/* Banner viaje terminado */}
             {viajeTerminado && (
-              <div className="bg-gray-50 border border-gray-200 rounded-2xl p-4 flex items-start gap-3">
-                <FaRoad className="text-gray-400 text-lg mt-0.5 shrink-0" />
+              <div className="animate-fade-in-up" style={{
+                background: 'rgba(107,114,143,0.07)', border: '1px solid rgba(107,114,143,0.2)',
+                borderRadius: '14px', padding: '14px 16px',
+                display: 'flex', gap: '12px', alignItems: 'flex-start',
+              }}>
+                <FaRoad style={{ color: '#6B728F', fontSize: '1rem', marginTop: '2px', flexShrink: 0 }} />
                 <div>
-                  <p className="font-bold text-gray-700 text-sm">Viaje terminado</p>
-                  <p className="text-gray-500 text-xs mt-0.5">Este viaje ya finalizó y no acepta reservas.</p>
+                  <p style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.82rem', fontWeight: 700, color: '#6B728F', marginBottom: '4px' }}>Viaje terminado</p>
+                  <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.75rem', color: 'rgba(107,114,143,0.6)' }}>
+                    Este viaje ya finalizó y no acepta reservas.
+                  </p>
                 </div>
               </div>
             )}
 
-            {/* Selección de asiento */}
-            <SectionCard title="Selecciona tu asiento" accent="violet">
-              <TaxiSeatMap
-                totalAsientos={totalAsientos}
-                asientosOcupados={asientosOcupados}
-                selectedSeats={selectedSeats}
-                onToggle={(seat) =>
-                  setSelectedSeats((prev) =>
-                    prev.includes(seat) ? prev.filter((s) => s !== seat) : [...prev, seat]
-                  )
-                }
-                onSelectAll={(seats) => setSelectedSeats(seats)}
-                onOccupied={(seat) => showToast(`El asiento ${seat} ya está ocupado.`, 'error')}
-              />
-            </SectionCard>
+            {/* Selector de asientos */}
+            <div className="animate-fade-in-up" style={{ animationDelay: '80ms' }}>
+              <Panel title="Selecciona tu asiento" icon={<FaCar />}>
+                <TaxiSeatMap
+                  totalAsientos={totalAsientos}
+                  asientosOcupados={asientosOcupados}
+                  selectedSeats={selectedSeats}
+                  onToggle={seat =>
+                    setSelectedSeats(prev =>
+                      prev.includes(seat) ? prev.filter(s => s !== seat) : [...prev, seat]
+                    )
+                  }
+                  onSelectAll={seats => setSelectedSeats(seats)}
+                  onOccupied={seat => showToast(`El asiento ${seat} ya está ocupado.`, 'error')}
+                />
+              </Panel>
+            </div>
 
-            {/* Datos del pasajero + confirmar */}
-            <SectionCard title="Tus datos" icon={<FaUser className="text-xs" />} accent="blue">
-              <div className="space-y-4">
-                <FormInput
-                  label="Nombre"
-                  icon={<FaUser className="text-xs" />}
-                  type="text"
-                  value={nombre}
-                  onChange={e => setNombre(e.target.value)}
-                  placeholder="Tu nombre completo"
-                  required
-                />
-                <FormInput
-                  label="Teléfono"
-                  icon={<FaPhone className="text-xs" />}
-                  type="tel"
-                  value={telefono}
-                  onChange={e => setTelefono(e.target.value)}
-                  placeholder="+57 300 000 0000"
-                  required
-                />
-                {/* Ubicación de recogida con botón GPS */}
-                <div className="space-y-1.5">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">
-                    Ubicación de recogida
-                  </label>
-                  <div className="relative">
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                      <FaMapMarkerAlt className="text-xs" />
-                    </div>
-                    <input
-                      type="text"
-                      value={pickupLocation}
-                      onChange={e => setPickupLocation(e.target.value)}
-                      placeholder="Ej: Calle 50 #23-45, Barrio El Centro"
-                      minLength={10}
-                      maxLength={500}
-                      className="w-full pl-8 pr-[7.5rem] py-2.5 border border-gray-200 rounded-xl text-sm text-gray-800 placeholder-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:border-blue-400 transition-all"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleGetLocation}
-                      disabled={locLoading}
-                      className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1.5 bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white text-xs font-semibold rounded-lg transition-all active:scale-95 whitespace-nowrap"
-                    >
-                      {locLoading
-                        ? <><FaSpinner className="animate-spin text-[10px]" /> Buscando...</>
-                        : <><FaLocationArrow className="text-[10px]" /> Mi ubicación</>
-                      }
-                    </button>
-                  </div>
-                  {pickupLocation && (
-                    <p className="text-[10px] text-gray-400 pl-1 truncate" title={pickupLocation}>
-                      {pickupLocation}
-                    </p>
-                  )}
+            {/* Datos del pasajero */}
+            <div className="animate-fade-in-up" style={{ animationDelay: '160ms' }}>
+              <Panel title="Tus datos" icon={<FaUser />}>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+                  <DarkInput
+                    label="Nombre completo"
+                    icon={<FaUser />}
+                    value={nombre}
+                    onChange={e => setNombre(e.target.value)}
+                    placeholder="Tu nombre"
+                  />
+                  <DarkInput
+                    label="Teléfono"
+                    icon={<FaPhone />}
+                    type="tel"
+                    value={telefono}
+                    onChange={e => setTelefono(e.target.value)}
+                    placeholder="+57 300 000 0000"
+                  />
+
+                  {/* Ubicación de recogida */}
+                  <DarkInput
+                    label="Ubicación de recogida"
+                    icon={<FaMapMarkerAlt />}
+                    value={pickupLocation}
+                    onChange={e => setPickupLocation(e.target.value)}
+                    placeholder="Ej: Calle 50 #23-45, Barrio Centro"
+                    hint={pickupLocation && pickupLocation.length > 60 ? pickupLocation.slice(0, 60) + '…' : ''}
+                    rightSlot={
+                      <button
+                        type="button"
+                        onClick={handleGetLocation}
+                        disabled={locLoading}
+                        style={{
+                          display: 'flex', alignItems: 'center', gap: '5px',
+                          padding: '6px 10px',
+                          background: locLoading ? 'rgba(255,190,0,0.07)' : 'rgba(255,190,0,0.12)',
+                          border: '1px solid rgba(255,190,0,0.3)',
+                          borderRadius: '7px',
+                          color: '#FFBE00',
+                          fontFamily: "'DM Sans', sans-serif",
+                          fontSize: '0.7rem',
+                          fontWeight: 600,
+                          cursor: locLoading ? 'not-allowed' : 'pointer',
+                          whiteSpace: 'nowrap',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {locLoading
+                          ? <><FaSpinner style={{ fontSize: '0.6rem', animation: 'spin 1s linear infinite' }} /> Buscando…</>
+                          : <><FaLocationArrow style={{ fontSize: '0.6rem' }} /> Mi ubicación</>
+                        }
+                      </button>
+                    }
+                  />
+
+                  {/* Botón confirmar */}
+                  <button
+                    onClick={handleConfirm}
+                    disabled={!isFormComplete}
+                    style={{
+                      width: '100%', padding: '13px',
+                      background: isFormComplete
+                        ? 'linear-gradient(135deg, #FFBE00 0%, #f59e0b 100%)'
+                        : 'rgba(255,255,255,0.04)',
+                      border: isFormComplete
+                        ? '1.5px solid rgba(255,190,0,0.5)'
+                        : '1.5px solid rgba(255,255,255,0.07)',
+                      borderRadius: '12px',
+                      color: isFormComplete ? '#080B12' : 'rgba(107,114,143,0.5)',
+                      fontFamily: "'Syne', sans-serif",
+                      fontSize: '0.88rem',
+                      fontWeight: 800,
+                      cursor: isFormComplete ? 'pointer' : 'not-allowed',
+                      display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px',
+                      transition: 'all 0.2s',
+                      boxShadow: isFormComplete ? '0 4px 20px rgba(255,190,0,0.25)' : 'none',
+                      letterSpacing: '-0.01em',
+                    }}
+                  >
+                    <FaCheck style={{ fontSize: '0.75rem' }} />
+                    {disponibles <= 0
+                      ? 'Sin asientos disponibles'
+                      : selectedSeats.length > 1
+                        ? `Confirmar ${selectedSeats.length} asientos`
+                        : 'Confirmar reserva'}
+                  </button>
                 </div>
-
-                <button
-                  onClick={handleConfirm}
-                  disabled={!isFormComplete}
-                  className="w-full py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl shadow-md hover:shadow-violet-300/50 hover:shadow-lg transition-all hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 flex items-center justify-center gap-2"
-                >
-                  <FaCheck />
-                  {disponibles <= 0
-                    ? 'Sin asientos disponibles'
-                    : selectedSeats.length > 1
-                      ? `Confirmar ${selectedSeats.length} asientos`
-                      : 'Confirmar Reserva'}
-                </button>
-              </div>
-            </SectionCard>
+              </Panel>
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Modal de confirmación */}
+      {/* ── Modal de confirmación ── */}
       {showConfirmation && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
+          style={{
+            position: 'fixed', inset: 0, zIndex: 50,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+            background: 'rgba(8,11,18,0.88)', backdropFilter: 'blur(8px)',
+          }}
           onClick={e => e.target === e.currentTarget && setShowConfirmation(false)}
         >
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
-            <div className="bg-gradient-to-r from-blue-700 to-violet-600 px-6 py-4 flex items-center justify-between">
-              <h2 className="text-base font-bold text-white">Confirmar Reserva</h2>
-              <button onClick={() => setShowConfirmation(false)} className="text-white/60 hover:text-white text-xl leading-none">&times;</button>
+          <div style={{
+            background: '#0E1422',
+            border: '1px solid rgba(255,255,255,0.09)',
+            borderRadius: '20px', width: '100%', maxWidth: '440px',
+            boxShadow: '0 24px 80px rgba(0,0,0,0.6)',
+            overflow: 'hidden',
+          }}>
+            {/* Header modal */}
+            <div style={{
+              background: 'linear-gradient(90deg, rgba(255,190,0,0.1) 0%, rgba(255,190,0,0.04) 100%)',
+              borderBottom: '1px solid rgba(255,255,255,0.07)',
+              padding: '16px 20px',
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <div style={{ width: '32px', height: '32px', borderRadius: '8px', background: 'rgba(255,190,0,0.12)', border: '1px solid rgba(255,190,0,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#FFBE00', fontSize: '0.8rem' }}>
+                  <FaCheck />
+                </div>
+                <span style={{ fontFamily: "'Syne', sans-serif", fontSize: '0.9rem', fontWeight: 700, color: '#EEF0FA' }}>
+                  Confirmar reserva
+                </span>
+              </div>
+              <button
+                onClick={() => setShowConfirmation(false)}
+                style={{ background: 'none', border: 'none', color: '#6B728F', cursor: 'pointer', fontSize: '1.1rem', lineHeight: 1, padding: '4px' }}
+              >
+                <FaTimes />
+              </button>
             </div>
-            <div className="p-6 divide-y divide-gray-50">
-              {[
-                ['Conductor',  carDetails.conductor],
-                ['Destino',    carDetails.destino],
-                ['Fecha',      formatFecha(carDetails.fecha)],
-                ['Hora',       carDetails.horasalida],
-                ['Asiento(s)', [...selectedSeats].sort((a,b)=>a-b).map(n=>`#${n}`).join(', ')],
-                ['Pasajero',   nombre],
-                ['Teléfono',   telefono],
-                ['Recogida',   pickupLocation],
-              ].map(([label, val]) => (
-                <div key={label} className="flex justify-between py-2.5 text-sm">
-                  <span className="text-gray-400">{label}</span>
-                  <span className="font-semibold text-gray-800">{val}</span>
+
+            {/* Filas de detalle */}
+            <div style={{ padding: '8px 20px' }}>
+              {confirmRows.map(([label, val]) => (
+                <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '12px', padding: '9px 0', borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                  <span style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.78rem', color: '#6B728F', flexShrink: 0 }}>{label}</span>
+                  <span style={{
+                    fontFamily: "'DM Sans', sans-serif", fontSize: '0.82rem', fontWeight: 600,
+                    color: label === 'Total' ? '#22c55e' : '#EEF0FA',
+                    textAlign: 'right', maxWidth: '220px', wordBreak: 'break-word',
+                  }}>{val}</span>
                 </div>
               ))}
             </div>
-            <div className="px-6 pb-6 flex gap-3">
+
+            {/* Botones */}
+            <div style={{ padding: '16px 20px', display: 'flex', gap: '10px' }}>
               <button
                 onClick={() => setShowConfirmation(false)}
                 disabled={isReserving}
-                className="flex-1 py-2.5 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-gray-50 transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{
+                  flex: 1, padding: '11px',
+                  background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
+                  borderRadius: '10px', color: '#6B728F',
+                  fontFamily: "'DM Sans', sans-serif", fontSize: '0.83rem', fontWeight: 600,
+                  cursor: isReserving ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'all 0.15s',
+                }}
               >
-                <FaTimes /> Cancelar
+                <FaTimes style={{ fontSize: '0.7rem' }} /> Cancelar
               </button>
               <button
                 onClick={handleReserve}
                 disabled={isReserving}
-                className="flex-1 py-2.5 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl hover:shadow-lg transition-all disabled:opacity-50 flex items-center justify-center gap-2"
+                style={{
+                  flex: 1, padding: '11px',
+                  background: 'linear-gradient(135deg, #FFBE00 0%, #f59e0b 100%)',
+                  border: 'none', borderRadius: '10px',
+                  color: '#080B12',
+                  fontFamily: "'Syne', sans-serif", fontSize: '0.83rem', fontWeight: 800,
+                  cursor: isReserving ? 'not-allowed' : 'pointer',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px',
+                  transition: 'all 0.15s',
+                  opacity: isReserving ? 0.75 : 1,
+                }}
               >
                 {isReserving ? (
                   <>
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
+                    <svg style={{ width: '14px', height: '14px', animation: 'spin 1s linear infinite' }} fill="none" viewBox="0 0 24 24">
+                      <circle style={{ opacity: 0.25 }} cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
+                      <path style={{ opacity: 0.75 }} fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
                     </svg>
-                    Reservando...
+                    Reservando…
                   </>
                 ) : (
-                  <><FaCheck /> Confirmar</>
+                  <><FaCheck style={{ fontSize: '0.7rem' }} /> Confirmar</>
                 )}
               </button>
             </div>
@@ -815,26 +1040,50 @@ const VerDetalles = () => {
         </div>
       )}
 
-      {/* Modal de éxito */}
+      {/* ── Modal de éxito ── */}
       {showSuccess && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(10,5,30,0.80)', backdropFilter: 'blur(6px)' }}
-        >
-          <div className="bg-white rounded-2xl w-full max-w-md shadow-2xl p-8 text-center">
-            <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaCheck className="text-green-600 text-2xl" />
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px',
+          background: 'rgba(8,11,18,0.92)', backdropFilter: 'blur(10px)',
+        }}>
+          <div style={{
+            background: '#0E1422',
+            border: '1px solid rgba(34,197,94,0.2)',
+            borderRadius: '20px', width: '100%', maxWidth: '380px',
+            padding: '36px 28px', textAlign: 'center',
+            boxShadow: '0 0 60px rgba(34,197,94,0.08)',
+          }}>
+            <div style={{
+              width: '64px', height: '64px', borderRadius: '18px',
+              background: 'rgba(34,197,94,0.1)', border: '1px solid rgba(34,197,94,0.3)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 20px',
+              color: '#22c55e', fontSize: '1.6rem',
+            }}>
+              <FaCheck />
             </div>
-            <h3 className="text-xl font-bold text-gray-900 mb-2">¡Reserva creada!</h3>
-            <p className="text-gray-500 text-sm mb-4">
+            <h3 style={{ fontFamily: "'Syne', sans-serif", fontSize: '1.2rem', fontWeight: 800, color: '#EEF0FA', marginBottom: '10px', letterSpacing: '-0.02em' }}>
+              ¡Reserva creada!
+            </h3>
+            <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.85rem', color: '#6B728F', marginBottom: '20px', lineHeight: 1.6 }}>
               Tu reserva está pendiente de confirmación por el conductor. Te notificaremos cuando sea aprobada.
             </p>
-            <p className="text-xs text-gray-400">Redirigiendo en unos segundos...</p>
+            <div style={{
+              padding: '8px 16px', background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)', borderRadius: '8px',
+              display: 'inline-block',
+            }}>
+              <p style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.72rem', color: 'rgba(107,114,143,0.6)' }}>
+                Redirigiendo en unos segundos…
+              </p>
+            </div>
           </div>
         </div>
       )}
 
-    </PageBg>
+      <Footer />
+    </div>
   );
 };
 

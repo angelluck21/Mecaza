@@ -1,10 +1,147 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { FaSignOutAlt, FaCar, FaBell, FaTicketAlt, FaFileInvoice } from 'react-icons/fa';
+import { FaSignOutAlt, FaCar, FaBell, FaTicketAlt, FaFileInvoice, FaChevronDown } from 'react-icons/fa';
 import { UserCircleIcon, Cog6ToothIcon } from '@heroicons/react/24/outline';
 import { useNavigate } from 'react-router-dom';
 import { ROLES } from '../../constants';
 import UserAvatar from './UserAvatar';
 import { logoutApi } from '../../services/api';
+
+/* ── Estilos inline con tokens del sistema ───────────────────── */
+const S = {
+  wrap:      { position: 'relative' },
+  trigger: (open) => ({
+    display:        'flex',
+    alignItems:     'center',
+    gap:            '0.6rem',
+    padding:        '0.4rem 0.75rem 0.4rem 0.45rem',
+    borderRadius:   '10px',
+    border:         `1px solid ${open ? 'rgba(255,190,0,0.4)' : 'rgba(255,255,255,0.07)'}`,
+    background:     open ? 'rgba(255,190,0,0.06)' : '#141D30',
+    cursor:         'pointer',
+    transition:     'all 0.2s',
+    fontFamily:     "'DM Sans', sans-serif",
+  }),
+  triggerName: {
+    fontFamily:   "'Syne', sans-serif",
+    fontSize:     '0.82rem',
+    fontWeight:   700,
+    color:        '#EEF0FA',
+    maxWidth:     '120px',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace:   'nowrap',
+  },
+  chevron: (open) => ({
+    width:      '12px',
+    height:     '12px',
+    color:      '#6B728F',
+    transition: 'transform 0.25s',
+    transform:  open ? 'rotate(180deg)' : 'rotate(0deg)',
+    flexShrink: 0,
+  }),
+  dropdown: {
+    position:     'absolute',
+    right:        0,
+    top:          'calc(100% + 8px)',
+    width:        '220px',
+    background:   '#0E1422',
+    border:       '1px solid rgba(255,255,255,0.07)',
+    borderRadius: '14px',
+    overflow:     'hidden',
+    boxShadow:    '0 16px 48px rgba(0,0,0,0.55), 0 0 0 1px rgba(255,190,0,0.05)',
+    zIndex:       99999,
+    animation:    'scaleIn 0.25s cubic-bezier(.22,1,.36,1) both',
+  },
+  dropHeader: {
+    padding:       '1rem',
+    background:    'linear-gradient(160deg, #0B0F1C 0%, #141D30 100%)',
+    borderBottom:  '1px solid rgba(255,255,255,0.07)',
+    display:       'flex',
+    alignItems:    'center',
+    gap:           '0.7rem',
+  },
+  headerInfo: { minWidth: 0 },
+  headerName: {
+    fontFamily:   "'Syne', sans-serif",
+    fontSize:     '0.85rem',
+    fontWeight:   700,
+    color:        '#EEF0FA',
+    whiteSpace:   'nowrap',
+    overflow:     'hidden',
+    textOverflow: 'ellipsis',
+  },
+  rolBadge: {
+    display:       'inline-block',
+    fontSize:      '0.58rem',
+    fontWeight:    700,
+    letterSpacing: '0.1em',
+    textTransform: 'uppercase',
+    color:         '#FFBE00',
+    background:    'rgba(255,190,0,0.1)',
+    border:        '1px solid rgba(255,190,0,0.2)',
+    padding:       '0.12rem 0.5rem',
+    borderRadius:  '4px',
+    marginTop:     '0.25rem',
+  },
+  menuSection: { padding: '0.4rem 0' },
+  divider: {
+    borderTop: '1px solid rgba(255,255,255,0.07)',
+    padding:   '0.4rem 0',
+  },
+  menuItem: {
+    display:     'flex',
+    alignItems:  'center',
+    gap:         '0.65rem',
+    width:       '100%',
+    padding:     '0.55rem 1rem',
+    background:  'none',
+    border:      'none',
+    cursor:      'pointer',
+    fontSize:    '0.82rem',
+    fontFamily:  "'DM Sans', sans-serif",
+    fontWeight:  500,
+    color:       '#6B728F',
+    transition:  'color 0.15s, background 0.15s',
+    textAlign:   'left',
+  },
+  logoutItem: {
+    display:     'flex',
+    alignItems:  'center',
+    gap:         '0.65rem',
+    width:       '100%',
+    padding:     '0.55rem 1rem',
+    background:  'none',
+    border:      'none',
+    cursor:      'pointer',
+    fontSize:    '0.82rem',
+    fontFamily:  "'DM Sans', sans-serif",
+    fontWeight:  500,
+    color:       '#ef4444',
+    transition:  'color 0.15s, background 0.15s',
+    textAlign:   'left',
+  },
+};
+
+/* Hover state vía onMouse handlers */
+const MenuItem = ({ icon, children, onClick, danger = false }) => {
+  const [hovered, setHovered] = useState(false);
+  const base = danger ? S.logoutItem : S.menuItem;
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        ...base,
+        background: hovered ? (danger ? 'rgba(239,68,68,0.06)' : 'rgba(255,190,0,0.04)') : 'none',
+        color:      hovered ? (danger ? '#ef4444' : '#FFBE00') : base.color,
+      }}
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <span style={{ fontSize: '0.85rem', flexShrink: 0, opacity: hovered ? 1 : 0.5 }}>{icon}</span>
+      {children}
+    </button>
+  );
+};
 
 const UserMenu = ({ userData }) => {
   const [open, setOpen] = useState(false);
@@ -30,114 +167,74 @@ const UserMenu = ({ userData }) => {
     go('/login');
   };
 
-  const rol        = userData?.rol;
+  const rol         = userData?.rol;
   const isConductor = rol === ROLES.CONDUCTOR;
   const isAdmin     = rol === ROLES.ADMIN || rol === 'administrador';
   const isUsuario   = !isConductor && !isAdmin;
-
-  const nombre = userData?.Nombre || userData?.nombre || userData?.name || 'Usuario';
+  const nombre      = userData?.Nombre || userData?.nombre || userData?.name || 'Usuario';
 
   return (
-    <div className="relative" ref={menuRef}>
+    <div style={S.wrap} ref={menuRef}>
       {/* Trigger */}
-      <button
-        onClick={() => setOpen((p) => !p)}
-        className={`flex items-center gap-2 px-2.5 py-1.5 rounded-full border-2 transition-all duration-200 ${
-          open
-            ? 'border-violet-400 bg-violet-50 text-violet-800'
-            : 'border-gray-200 bg-gray-50 text-blue-900 hover:border-violet-300 hover:bg-violet-50'
-        }`}
-      >
+      <button style={S.trigger(open)} onClick={() => setOpen(p => !p)}>
         <UserAvatar userData={userData} size="sm" />
-        <span className="font-semibold text-sm max-w-[120px] truncate">{nombre}</span>
-        <svg
-          className={`w-3.5 h-3.5 text-gray-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
-          fill="none" viewBox="0 0 24 24" stroke="currentColor"
-        >
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-        </svg>
+        <span style={S.triggerName}>{nombre}</span>
+        <FaChevronDown style={S.chevron(open)} />
       </button>
 
       {/* Dropdown */}
       {open && (
-        <div className="absolute right-0 top-full mt-2 w-52 bg-white rounded-2xl shadow-xl shadow-violet-100/60 border border-gray-100 overflow-hidden animate-scale-in z-[99999]">
+        <div style={S.dropdown}>
 
-          {/* Info usuario */}
-          <div className="px-4 py-3 bg-gradient-to-r from-blue-50 to-violet-50 border-b border-gray-100">
-            <div className="flex items-center gap-3 mb-1">
-              <UserAvatar userData={userData} size="md" />
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-blue-900 truncate">{nombre}</p>
-                <span className="inline-block text-xs bg-violet-100 text-violet-700 font-semibold px-2 py-0.5 rounded-full capitalize">
-                  {userData?.rol || 'usuario'}
-                </span>
-              </div>
+          {/* Header */}
+          <div style={S.dropHeader}>
+            <UserAvatar userData={userData} size="md" />
+            <div style={S.headerInfo}>
+              <p style={S.headerName}>{nombre}</p>
+              <span style={S.rolBadge}>{userData?.rol || 'usuario'}</span>
             </div>
           </div>
 
-          {/* Opciones */}
-          <div className="py-1">
-            <MenuItem icon={<UserCircleIcon className="w-4 h-4" />} onClick={() => go('/ver-perfil')}>
+          {/* Links */}
+          <div style={S.menuSection}>
+            <MenuItem icon={<UserCircleIcon style={{ width: 15, height: 15 }} />} onClick={() => go('/ver-perfil')}>
               Ver perfil
             </MenuItem>
 
             {isUsuario && (
               <>
-                <MenuItem icon={<FaTicketAlt className="w-4 h-4" />} onClick={() => go('/mis-reservas')}>
-                  Mis Reservas
-                </MenuItem>
-                <MenuItem icon={<FaFileInvoice className="w-4 h-4" />} onClick={() => go('/mis-facturas')}>
-                  Mis Facturas
-                </MenuItem>
+                <MenuItem icon={<FaTicketAlt />}   onClick={() => go('/mis-reservas')}>Mis Reservas</MenuItem>
+                <MenuItem icon={<FaFileInvoice />}  onClick={() => go('/mis-facturas')}>Mis Facturas</MenuItem>
               </>
             )}
 
             {isConductor && (
-              <>
-                <MenuItem icon={<FaCar className="w-4 h-4" />} onClick={() => go('/conductor')}>
-                  Mi Panel
-                </MenuItem>
-                <MenuItem icon={<FaBell className="w-4 h-4" />} onClick={() => go('/conductor-notificaciones')}>
-                  Notificaciones
-                </MenuItem>
-              </>
+              <MenuItem icon={<FaCar />} onClick={() => go('/conductor')}>Mi Panel</MenuItem>
             )}
 
             {isAdmin && (
-              <MenuItem icon={<FaCar className="w-4 h-4" />} onClick={() => go('/indexAdmin')}>
-                Mi Panel
-              </MenuItem>
+              <MenuItem icon={<FaCar />} onClick={() => go('/indexAdmin')}>Mi Panel</MenuItem>
             )}
 
-            <MenuItem icon={<Cog6ToothIcon className="w-4 h-4" />} onClick={() => go('/ajustes-perfil')}>
+            {!isAdmin && (
+              <MenuItem icon={<FaBell />} onClick={() => go('/notificaciones')}>Notificaciones</MenuItem>
+            )}
+
+            <MenuItem icon={<Cog6ToothIcon style={{ width: 15, height: 15 }} />} onClick={() => go('/ajustes-perfil')}>
               Ajustes
             </MenuItem>
           </div>
 
-          {/* Cerrar sesión */}
-          <div className="border-t border-gray-100 py-1">
-            <button
-              onClick={handleLogout}
-              className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-red-500 hover:text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <FaSignOutAlt className="w-4 h-4" />
-              <span className="font-medium">Cerrar sesión</span>
-            </button>
+          {/* Logout */}
+          <div style={S.divider}>
+            <MenuItem icon={<FaSignOutAlt />} onClick={handleLogout} danger>
+              Cerrar sesión
+            </MenuItem>
           </div>
         </div>
       )}
     </div>
   );
 };
-
-const MenuItem = ({ icon, children, onClick }) => (
-  <button
-    onClick={onClick}
-    className="flex items-center gap-2.5 w-full px-4 py-2 text-sm text-gray-700 hover:text-violet-700 hover:bg-violet-50 transition-colors"
-  >
-    <span className="text-gray-400 group-hover:text-violet-500">{icon}</span>
-    <span className="font-medium">{children}</span>
-  </button>
-);
 
 export default UserMenu;

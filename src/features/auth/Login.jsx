@@ -9,6 +9,8 @@ import { useToast }        from '../../hooks/useToast';
 import ToastNotification   from '../../components/ui/ToastNotification';
 import GoogleAuthButton, { REDIRECT_BY_ROLE as GOOGLE_REDIRECT } from '../../components/ui/GoogleAuthButton';
 
+import './Login.css';
+
 const REDIRECT_BY_ROLE = {
   usuario:       '/indexLogin',
   conductor:     '/conductor',
@@ -16,9 +18,61 @@ const REDIRECT_BY_ROLE = {
   admin:         '/indexAdmin',
 };
 
+/* ── Animated SVG route A→B ───────────────────────────── */
+const RouteVisualization = () => (
+  <div className="mcz-route">
+    <svg className="mcz-route-svg" viewBox="0 0 320 180" fill="none" xmlns="http://www.w3.org/2000/svg">
+
+      {/* Background dashed ghost path */}
+      <path
+        className="route-path-bg"
+        d="M 60 30 L 60 70 Q 60 95 85 95 L 195 95 Q 220 95 220 118 L 220 155 Q 220 170 205 170 L 145 170"
+      />
+
+      {/* Animated amber route */}
+      <path
+        className="route-path"
+        d="M 60 30 L 60 70 Q 60 95 85 95 L 195 95 Q 220 95 220 118 L 220 155 Q 220 170 205 170 L 145 170"
+      />
+
+      {/* ── Pin A — Origin ── */}
+      <g className="pin-a">
+        <circle className="pin-pulse"   cx="60" cy="30" r="10" fill="none" stroke="#FFBE00" strokeWidth="1.5"/>
+        <circle className="pin-pulse-2" cx="60" cy="30" r="14" fill="none" stroke="#FFBE00" strokeWidth="0.8"/>
+        <circle cx="60" cy="30" r="7" fill="#0E1422" stroke="#FFBE00" strokeWidth="2"/>
+        <circle cx="60" cy="30" r="3" fill="#FFBE00"/>
+        <rect x="70" y="22" width="54" height="16" rx="4" fill="#141D30"/>
+        <text x="97" y="34" textAnchor="middle" className="route-label route-label-highlight">ORIGEN</text>
+      </g>
+
+      {/* ── Pin B — Destination ── */}
+      <g className="pin-b">
+        <circle className="pin-pulse"   cx="145" cy="170" r="10" fill="none" stroke="#FFBE00" strokeWidth="1.5"/>
+        <circle className="pin-pulse-2" cx="145" cy="170" r="14" fill="none" stroke="#FFBE00" strokeWidth="0.8"/>
+        <circle cx="145" cy="170" r="7" fill="#0E1422" stroke="#FFBE00" strokeWidth="2"/>
+        <circle cx="145" cy="170" r="3" fill="#FFBE00"/>
+        <rect x="155" y="162" width="60" height="16" rx="4" fill="#141D30"/>
+        <text x="185" y="174" textAnchor="middle" className="route-label route-label-highlight">DESTINO</text>
+      </g>
+
+      {/* Waypoint nodes */}
+      <circle cx="85"  cy="95"  r="3" fill="#FFBE00" opacity="0" style={{animation:'pinAppear 0.3s ease 1.2s forwards'}}/>
+      <circle cx="220" cy="118" r="3" fill="#FFBE00" opacity="0" style={{animation:'pinAppear 0.3s ease 1.8s forwards'}}/>
+
+      {/* Distance badge */}
+      <g className="route-car">
+        <rect x="220" y="26" width="80" height="28" rx="6" fill="#141D30" stroke="rgba(255,190,0,0.18)" strokeWidth="1"/>
+        <text x="260" y="37" textAnchor="middle" className="route-label" style={{fontSize:'7.5px'}}>DISTANCIA EST.</text>
+        <text x="260" y="49" textAnchor="middle" style={{fontFamily:'Syne,sans-serif', fontSize:'11px', fontWeight:'700', fill:'#FFBE00'}}>~4.2 km</text>
+      </g>
+    </svg>
+  </div>
+);
+
+/* ── Main component ───────────────────────────────────── */
 const Login = () => {
-  const [isLoading,   setIsLoading]   = useState(false);
-  const [showPass,    setShowPass]    = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPass,  setShowPass]  = useState(false);
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
@@ -26,7 +80,7 @@ const Login = () => {
     e.preventDefault();
     setIsLoading(true);
 
-    const correo    = e.target.correo.value;
+    const correo     = e.target.correo.value;
     const contrasena = e.target.contrasenaS.value;
 
     try {
@@ -43,154 +97,159 @@ const Login = () => {
 
     } catch (error) {
       const errData = error.response?.data;
-      if (errData?.errors)        showToast(Object.values(errData.errors).flat().join(', '), 'error');
-      else if (errData?.message)  showToast(errData.message, 'error');
-      else if (error.request)     showToast('Error de conexión con el servidor.', 'error');
-      else                        showToast('Error inesperado al iniciar sesión.', 'error');
+      if (errData?.errors)       showToast(Object.values(errData.errors).flat().join(', '), 'error');
+      else if (errData?.message) showToast(errData.message, 'error');
+      else if (error.request)    showToast('Error de conexión con el servidor.', 'error');
+      else                       showToast('Error inesperado al iniciar sesión.', 'error');
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900 px-4 relative overflow-hidden">
+    <div className="mcz-login">
+      <ToastNotification
+        isVisible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={hideToast}
+      />
 
-      {/* Decoración de fondo */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-violet-700/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+      {/* ── Left brand panel ── */}
+      <div className="mcz-left">
 
-      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
-
-      <div className="w-full max-w-md animate-scale-in">
-        {/* Card */}
-        <div className="bg-white rounded-2xl shadow-2xl shadow-violet-900/40 overflow-hidden">
-
-          {/* Header de color */}
-          <div className="bg-gradient-to-r from-blue-800 to-violet-700 px-8 py-8 text-center relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/5 rounded-full" />
-            <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-white/5 rounded-full" />
-            <div className="relative">
-              <div className="w-16 h-16 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <FaCar className="text-white text-3xl" />
-              </div>
-              <h1 className="text-2xl font-extrabold text-white">Iniciar Sesión</h1>
-              <p className="text-blue-200 text-sm mt-1">
-                Bienvenido de vuelta a <span className="font-bold text-white">Mecaza</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Formulario */}
-          <div className="px-8 py-8">
-            <form onSubmit={handleLogin} className="space-y-5">
-
-              {/* Correo */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Correo electrónico
-                </label>
-                <div className="relative">
-                  <EnvelopeIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input
-                    name="correo"
-                    type="email"
-                    placeholder="tu@correo.com"
-                    required
-                    className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
-
-              {/* Contraseña */}
-              <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5">
-                  Contraseña
-                </label>
-                <div className="relative">
-                  <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input
-                    name="contrasenaS"
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    required
-                    className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass((p) => !p)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors"
-                  >
-                    {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Botón login */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl shadow-md hover:shadow-violet-300/50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mt-2"
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                    </svg>
-                    Iniciando sesión...
-                  </span>
-                ) : 'Iniciar sesión'}
-              </button>
-
-              {/* Separador Google */}
-              <div className="relative my-1">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-xs text-gray-400">o continúa con</span>
-                </div>
-              </div>
-
-              {/* Botón Google */}
-              <GoogleAuthButton
-                label="Iniciar sesión con Google"
-                onSuccess={(userData) => {
-                  showToast('¡Bienvenido!', 'success');
-                  const rol = userData?.rol || 'usuario';
-                  setTimeout(() => navigate(GOOGLE_REDIRECT[rol] ?? '/indexLogin', { replace: true }), 1200);
-                }}
-                onError={(msg) => showToast(msg, 'error')}
-              />
-
-              {/* Separador registro */}
-              <div className="relative my-1">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-xs text-gray-400">¿No tienes cuenta?</span>
-                </div>
-              </div>
-
-              {/* Botón registro */}
-              <button
-                type="button"
-                onClick={() => navigate('/registrar')}
-                className="w-full py-2.5 bg-gray-50 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-all duration-200 text-sm active:scale-95"
-              >
-                Crear cuenta gratis
-              </button>
-            </form>
-          </div>
+        <div className="mcz-logo">
+          <div className="mcz-logo-icon"><FaCar /></div>
+          <span className="mcz-logo-name">Mecaza</span>
         </div>
 
-        {/* Link volver */}
-        <p className="text-center text-blue-300 text-sm mt-4">
-          <button onClick={() => navigate('/')} className="hover:text-white transition-colors underline underline-offset-2">
-            ← Volver al inicio
+        <div className="mcz-brand">
+          <span className="mcz-eyebrow">Movilidad compartida</span>
+          <h1 className="mcz-tagline">
+            Tu viaje,<br />
+            <em>tu ritmo.</em>
+          </h1>
+          <p className="mcz-desc">
+            Conectamos pasajeros y conductores para viajes compartidos más humanos, seguros y accesibles.
+          </p>
+        </div>
+
+        <RouteVisualization />
+
+        <div className="mcz-stats">
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">10K+</span>
+            <span className="mcz-stat-lbl">Viajes</span>
+          </div>
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">500+</span>
+            <span className="mcz-stat-lbl">Conductores</span>
+          </div>
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">4.9★</span>
+            <span className="mcz-stat-lbl">Puntuación</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="mcz-right">
+        <div className="mcz-card">
+
+          <div className="mcz-card-header">
+            <h2 className="mcz-card-title">Bienvenido de vuelta</h2>
+            <p className="mcz-card-sub">Inicia sesión para continuar tu viaje</p>
+          </div>
+
+          <form onSubmit={handleLogin} noValidate>
+
+            {/* Email */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="mcz-email">Correo electrónico</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="mcz-email"
+                  name="correo"
+                  type="email"
+                  placeholder="tu@correo.com"
+                  autoComplete="email"
+                  required
+                  className="mcz-input"
+                />
+                <EnvelopeIcon className="mcz-input-icon" />
+              </div>
+            </div>
+
+            {/* Password */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="mcz-pass">Contraseña</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="mcz-pass"
+                  name="contrasenaS"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="••••••••••"
+                  autoComplete="current-password"
+                  required
+                  className="mcz-input has-toggle"
+                />
+                <LockClosedIcon className="mcz-input-icon" />
+                <button
+                  type="button"
+                  className="mcz-toggle"
+                  onClick={() => setShowPass(p => !p)}
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPass ? <EyeSlashIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" className="mcz-btn-primary" disabled={isLoading}>
+              {isLoading ? (
+                <span className="mcz-btn-spinner">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    style={{animation:'spin 0.8s linear infinite'}}>
+                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                  Iniciando sesión…
+                </span>
+              ) : 'Iniciar sesión →'}
+            </button>
+          </form>
+
+          <div className="mcz-divider"><span>o continúa con</span></div>
+
+          <GoogleAuthButton
+            label="Continuar con Google"
+            onSuccess={(userData) => {
+              showToast('¡Bienvenido!', 'success');
+              const rol = userData?.rol || 'usuario';
+              setTimeout(() => navigate(GOOGLE_REDIRECT[rol] ?? '/indexLogin', { replace: true }), 1200);
+            }}
+            onError={(msg) => showToast(msg, 'error')}
+          />
+
+          <div className="mcz-divider"><span>¿No tienes cuenta?</span></div>
+
+          <button
+            type="button"
+            className="mcz-btn-secondary"
+            onClick={() => navigate('/registrar')}
+          >
+            Crear cuenta gratis
           </button>
-        </p>
+
+          <div className="mcz-back-strip">
+            <button className="mcz-back" onClick={() => navigate('/')}>
+              <span className="mcz-back-arrow">←</span>
+              Volver al inicio
+            </button>
+            <span className="mcz-back-brand">Mecaza</span>
+          </div>
+        </div>
       </div>
     </div>
   );

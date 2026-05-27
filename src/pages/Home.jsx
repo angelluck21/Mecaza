@@ -1,309 +1,329 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FaCar, FaFilter, FaChevronDown, FaTimes, FaMapMarkerAlt, FaCalendarAlt } from 'react-icons/fa';
+import { FaCar, FaTimes, FaMapMarkerAlt, FaCalendarAlt } from 'react-icons/fa';
 
 import Navbar              from '../components/layout/Navbar';
 import Footer              from '../components/layout/Footer';
 import Carousel            from '../components/ui/Carousel';
 import CarCard             from '../components/ui/CarCard';
+import LoadingScreen       from '../components/ui/LoadingScreen';
+import Pagination          from '../components/ui/Pagination';
 import RegisterPromptModal from '../components/ui/RegisterPromptModal';
 
-import { listarCarrosApi, listarReservasApi } from '../services/api';
-import { calcularAsientosDisponibles } from '../utils';
+import { listarCarrosApi, listarPreciosApi } from '../services/api';
+import './Home.css';
 
-// ── Helpers ──────────────────────────────────────────────────────────────────
+// Calcula asientos desde reservas embebidas en cada carro
+const withSeats = (cars) => cars.map(c => {
+  const occupied = (c.reservas || []).filter(r => {
+    const est = (r.estado || '').toLowerCase();
+    return est === 'pendiente' || est === 'confirmada';
+  }).length;
+  return { ...c, asientos_disponibles: Math.max(0, (c.asientos || 0) - occupied) };
+});
 
-const filtrarCarros = (cars, term, ruta, fecha) => {
-  let result = cars;
-  if (ruta)  result = result.filter((c) => c.destino && c.destino.toLowerCase() === ruta.toLowerCase());
-  if (fecha) result = result.filter((c) => c.fecha && c.fecha.startsWith(fecha));
-  if (term.trim()) {
-    const lower = term.toLowerCase();
-    result = result.filter((c) =>
-      (c.conductor  && c.conductor.toLowerCase().includes(lower))  ||
-      (c.destino    && c.destino.toLowerCase().includes(lower))    ||
-      (c.placa      && c.placa.toLowerCase().includes(lower))      ||
-      (c.horasalida && c.horasalida.toLowerCase().includes(lower)) ||
-      (c.fecha      && c.fecha.toLowerCase().includes(lower))
-    );
-  }
-  return result;
-};
-
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Componente ─────────────────────────────────────────────────────────────────
 
 const Home = () => {
   const [userData,          setUserData]          = useState(null);
+  const [initialLoading,    setInitialLoading]    = useState(true);
+  const [loading,           setLoading]           = useState(false);
   const [cars,              setCars]              = useState([]);
-  const [filteredCars,      setFilteredCars]      = useState([]);
-  const [isLoading,         setIsLoading]         = useState(true);
-  const [searchTerm,        setSearchTerm]        = useState('');
-  const [selectedRuta,      setSelectedRuta]      = useState('');
-  const [selectedFecha,     setSelectedFecha]     = useState('');
+  const [currentPage,       setCurrentPage]       = useState(1);
+  const [lastPage,          setLastPage]          = useState(1);
+  const [total,             setTotal]             = useState(0);
+  const [precios,           setPrecios]           = useState([]);
   const [filterOpen,        setFilterOpen]        = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
 
-  const navigate = useNavigate();
+  // Filtros
+  const [searchTerm,      setSearchTerm]      = useState('');
+  const [selectedOrigen,  setSelectedOrigen]  = useState('');
+  const [selectedDestino, setSelectedDestino] = useState('');
+  const [selectedFecha,   setSelectedFecha]   = useState('');
 
-  const rutasDisponibles = useMemo(() =>
-    [...new Set(cars.map((c) => c.destino).filter(Boolean))].sort(),
-    [cars]
+  const debounceRef = useRef(null);
+  const navigate    = useNavigate();
+
+  // ── Opciones de filtros ───────────────────────────────────────────────────────
+  const origenesDisponibles = useMemo(() =>
+    [...new Set(precios.map(p => p.origen).filter(Boolean))].sort(),
+    [precios]
   );
 
+  const destinosDisponibles = useMemo(() => {
+    const base = selectedOrigen
+      ? precios.filter(p => p.origen === selectedOrigen)
+      : precios;
+    return [...new Set(base.map(p => p.destino).filter(Boolean))].sort();
+  }, [precios, selectedOrigen]);
+
+  // ── Fetch ─────────────────────────────────────────────────────────────────────
+  const fetchCars = async (params = {}) => {
+    setLoading(true);
+    try {
+      const data = await listarCarrosApi(params);
+      const raw  = Array.isArray(data.data) ? data.data : [];
+      setCars(withSeats(raw));
+      setCurrentPage(data.current_page ?? 1);
+      setLastPage(data.last_page ?? 1);
+      setTotal(data.total ?? 0);
+    } catch {
+      setCars([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // ── Auth check + carga inicial ────────────────────────────────────────────────
   useEffect(() => {
     const stored = localStorage.getItem('userData');
     if (stored) {
-      try { setUserData(JSON.parse(stored)); } catch { /* sin usuario */ }
-    }
-  }, []);
-
-  useEffect(() => {
-    const fetchData = async () => {
       try {
-        const data   = await listarCarrosApi();
-        let carsData = Array.isArray(data.data) ? data.data : [];
+        const user = JSON.parse(stored);
+        // Redirigir roles que no deben ver esta vista
+        if (user.rol === 'conductor') { navigate('/conductor', { replace: true }); return; }
+        if (user.rol === 'admin' || user.rol === 'administrador') { navigate('/indexAdmin', { replace: true }); return; }
+        setUserData(user);
+      } catch { /* sesión inválida, continuar como invitado */ }
+    }
 
-        try {
-          const reservasData  = await listarReservasApi();
-          const reservasArray = Array.isArray(reservasData) ? reservasData : (reservasData.data ?? []);
-          carsData = calcularAsientosDisponibles(carsData, reservasArray);
-        } catch {
-          carsData = carsData.map((c) => ({ ...c, asientos_disponibles: c.asientos || 4 }));
-        }
+    Promise.all([
+      fetchCars({ page: 1 }),
+      listarPreciosApi()
+        .then(r => setPrecios(Array.isArray(r.data?.data) ? r.data.data : []))
+        .catch(() => {}),
+    ]).finally(() => setInitialLoading(false));
+  }, [navigate]);
 
-        setCars(carsData);
-        setFilteredCars(carsData);
-      } catch {
-        setCars([]);
-        setFilteredCars([]);
-      } finally {
-        setIsLoading(false);
-      }
+  // ── Handlers ──────────────────────────────────────────────────────────────────
+  const buildParams = (overrides = {}) => {
+    const base = {
+      page:    1,
+      origen:  selectedOrigen,
+      destino: selectedDestino,
+      fecha:   selectedFecha,
+      search:  searchTerm,
     };
-    fetchData();
-  }, []);
+    return Object.fromEntries(
+      Object.entries({ ...base, ...overrides }).filter(([, v]) => v != null && v !== '')
+    );
+  };
 
   const handleSearch = (value) => {
     setSearchTerm(value);
-    setFilteredCars(filtrarCarros(cars, value, selectedRuta, selectedFecha));
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() =>
+      fetchCars(buildParams({ search: value, page: 1 }))
+    , 400);
   };
 
-  const handleRuta = (ruta) => {
-    const next = ruta === selectedRuta ? '' : ruta;
-    setSelectedRuta(next);
-    setFilteredCars(filtrarCarros(cars, searchTerm, next, selectedFecha));
+  const handleOrigen = (origen) => {
+    const next = origen === selectedOrigen ? '' : origen;
+    const validDestinos = new Set(
+      precios.filter(p => !next || p.origen === next).map(p => p.destino)
+    );
+    const newDestino = validDestinos.has(selectedDestino) ? selectedDestino : '';
+    setSelectedOrigen(next);
+    setSelectedDestino(newDestino);
+    fetchCars(buildParams({ origen: next, destino: newDestino, page: 1 }));
+  };
+
+  const handleDestino = (destino) => {
+    const next = destino === selectedDestino ? '' : destino;
+    setSelectedDestino(next);
+    fetchCars(buildParams({ destino: next, page: 1 }));
   };
 
   const handleFecha = (fecha) => {
     setSelectedFecha(fecha);
-    setFilteredCars(filtrarCarros(cars, searchTerm, selectedRuta, fecha));
+    fetchCars(buildParams({ fecha, page: 1 }));
   };
 
   const handleClearFilters = () => {
-    setSelectedRuta('');
-    setSearchTerm('');
+    setSelectedOrigen('');
+    setSelectedDestino('');
     setSelectedFecha('');
-    setFilteredCars(cars);
+    setSearchTerm('');
+    fetchCars({ page: 1 });
+    setFilterOpen(false);
   };
 
-  const handleVerDetalles = (carId) => {
-    if (userData) navigate(`/ver-detalles/${carId}`);
-    else setShowRegisterModal(true);
+  const handlePageChange = (p) => {
+    fetchCars(buildParams({ page: p }));
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Invitados → modal de registro; usuarios → navegar a detalle
+  const handleVerDetalles = (id) => {
+    if (userData) navigate(`/ver-detalles/${id}`);
+    else          setShowRegisterModal(true);
+  };
+
+  if (initialLoading) return <LoadingScreen message="Cargando viajes…" />;
+
+  const hasFilters  = !!(selectedOrigen || selectedDestino || selectedFecha || searchTerm.trim());
+  const activeCount = [selectedOrigen, selectedDestino, selectedFecha].filter(Boolean).length;
+  const firstName   = userData
+    ? (userData.Nombre || userData.nombre || 'viajero').split(' ')[0]
+    : null;
+
+  // ── Contenido del dropdown de filtros ────────────────────────────────────────
+  const filterContent = (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+      {origenesDisponibles.length > 0 && (
+        <div>
+          <p className="filter-section-label">
+            <FaMapMarkerAlt className="f-icon" /> Origen
+          </p>
+          <div className="filter-tags">
+            {origenesDisponibles.map(o => (
+              <button
+                key={o} type="button"
+                className={`filter-tag ${selectedOrigen === o ? 'active' : ''}`}
+                onClick={() => handleOrigen(o)}
+              >
+                <FaMapMarkerAlt style={{ fontSize: '0.6rem', flexShrink: 0 }} /> {o}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {destinosDisponibles.length > 0 && (
+        <div>
+          <p className="filter-section-label">
+            <FaMapMarkerAlt className="f-icon" /> Destino
+          </p>
+          <div className="filter-tags">
+            {destinosDisponibles.map(d => (
+              <button
+                key={d} type="button"
+                className={`filter-tag ${selectedDestino === d ? 'active' : ''}`}
+                onClick={() => handleDestino(d)}
+              >
+                <FaMapMarkerAlt style={{ fontSize: '0.6rem', flexShrink: 0 }} /> {d}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div>
+        <p className="filter-section-label">
+          <FaCalendarAlt className="f-icon" /> Fecha del viaje
+        </p>
+        <div className="filter-date-wrap">
+          <input
+            type="date"
+            value={selectedFecha}
+            onChange={e => handleFecha(e.target.value)}
+            className="filter-date-input"
+          />
+          {selectedFecha && (
+            <button type="button" className="filter-date-clear" onClick={() => handleFecha('')}>
+              <FaTimes />
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  );
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900 relative">
-
-      {/* Decoración de fondo */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 -left-32 w-96 h-96 bg-violet-700/10 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 -right-32 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl" />
-      </div>
-
-      <Navbar userData={userData} searchTerm={searchTerm} onSearch={handleSearch} />
+    <div className="home-page">
+      <Navbar
+        searchTerm={searchTerm}
+        onSearch={handleSearch}
+        filterConfig={{
+          open:        filterOpen,
+          onToggle:    () => setFilterOpen(o => !o),
+          activeCount,
+          hasActive:   hasFilters,
+          onClear:     handleClearFilters,
+          content:     filterContent,
+        }}
+      />
       <Carousel />
 
-      {/* Contenido principal */}
-      <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 py-10 relative z-10">
+      <main className="home-main">
 
-        {/* Encabezado de sección */}
-        <div className="text-center mb-10 animate-fade-in-up">
-          <h2 className="text-3xl md:text-4xl font-extrabold text-white mb-2">
-            {userData ? 'Viajes disponibles' : 'Encuentra tu próximo viaje'}
-          </h2>
-          <p className="text-blue-200 text-base">
+        {/* ── Encabezado ── */}
+        <div className="home-section-header animate-fade-in-up">
+          <div className="home-eyebrow">
+            {userData ? 'Viajes disponibles' : 'Movilidad compartida'}
+          </div>
+          <h2 className="home-title">
             {userData
-              ? `Bienvenido de vuelta, ${userData?.Nombre || userData?.nombre || 'viajero'}`
-              : 'Regístrate para reservar tu asiento y viajar seguro'}
+              ? <>Hola de nuevo, <em>{firstName}</em></>
+              : <>Encuentra tu <em>próximo viaje</em></>}
+          </h2>
+          <p className="home-subtitle">
+            {userData
+              ? total > 0
+                ? `${total} viaje${total !== 1 ? 's' : ''} disponible${total !== 1 ? 's' : ''} para ti hoy`
+                : 'Explora los viajes disponibles y elige el tuyo'
+              : 'Regístrate para reservar tu asiento y viajar seguro.'}
           </p>
-          <div className="mx-auto mt-4 w-16 h-1 rounded-full bg-gradient-to-r from-blue-400 to-violet-400" />
         </div>
 
-        {/* ── Filtro por ruta ── */}
-        {!isLoading && rutasDisponibles.length > 0 && (
-          <div className="mb-8 animate-fade-in-up">
-            <div className="bg-white/10 backdrop-blur-sm border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <button
-                type="button"
-                onClick={() => setFilterOpen((o) => !o)}
-                className="w-full flex items-center justify-between px-5 py-4 text-white hover:bg-white/5 transition-colors"
-              >
-                <div className="flex items-center gap-2.5 flex-wrap">
-                  <div className="w-7 h-7 rounded-lg bg-violet-500/30 flex items-center justify-center shrink-0">
-                    <FaFilter className="text-violet-300 text-xs" />
-                  </div>
-                  <span className="font-semibold text-sm">Filtros</span>
-                  {selectedRuta && (
-                    <span className="bg-violet-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                      {selectedRuta}
-                    </span>
-                  )}
-                  {selectedFecha && (
-                    <span className="bg-blue-500 text-white text-[10px] font-bold px-2.5 py-0.5 rounded-full">
-                      {new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES', { day: '2-digit', month: 'short' })}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-3">
-                  {(selectedRuta || searchTerm || selectedFecha) && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); handleClearFilters(); }}
-                      className="flex items-center gap-1 text-xs text-red-300 hover:text-red-200 transition-colors"
-                    >
-                      <FaTimes className="text-[10px]" /> Limpiar
-                    </button>
-                  )}
-                  <FaChevronDown className={`text-white/50 text-xs transition-transform duration-300 ${filterOpen ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-              <div className={`transition-all duration-300 ease-in-out overflow-hidden ${filterOpen ? 'max-h-[28rem] opacity-100' : 'max-h-0 opacity-0'}`}>
-                <div className="px-5 pb-5 pt-1 border-t border-white/10 space-y-4">
-
-                  {/* Filtro por fecha */}
-                  <div>
-                    <p className="text-blue-200 text-xs mb-2 flex items-center gap-1.5">
-                      <FaCalendarAlt className="text-blue-300" /> Filtrar por fecha:
-                    </p>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="date"
-                        value={selectedFecha}
-                        onChange={(e) => handleFecha(e.target.value)}
-                        className="bg-white/10 border border-white/20 text-white text-sm rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 [color-scheme:dark]"
-                      />
-                      {selectedFecha && (
-                        <button
-                          type="button"
-                          onClick={() => handleFecha('')}
-                          className="text-xs text-white/50 hover:text-white transition-colors"
-                        >
-                          <FaTimes />
-                        </button>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Filtro por ruta */}
-                  <div>
-                    <p className="text-blue-200 text-xs mb-2 flex items-center gap-1.5">
-                      <FaMapMarkerAlt className="text-blue-300" /> Filtrar por destino:
-                    </p>
-                    <div className="flex flex-wrap gap-2">
-                      {rutasDisponibles.map((ruta) => {
-                        const isActive = selectedRuta === ruta;
-                        const count    = cars.filter((c) => c.destino === ruta).length;
-                        return (
-                          <button
-                            key={ruta}
-                            type="button"
-                            onClick={() => handleRuta(ruta)}
-                            className={[
-                              'flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-150 active:scale-95',
-                              isActive
-                                ? 'bg-violet-500 text-white shadow-lg shadow-violet-500/30 scale-105'
-                                : 'bg-white/10 text-white/80 hover:bg-white/20 hover:text-white border border-white/10',
-                            ].join(' ')}
-                          >
-                            <FaMapMarkerAlt className={`text-xs shrink-0 ${isActive ? 'text-violet-200' : 'text-blue-300'}`} />
-                            {ruta}
-                            <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-white/10 text-white/60'}`}>
-                              {count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Estados de carga / vacío / grid */}
-        {isLoading ? (
-          <div className="flex flex-col items-center justify-center py-24 animate-fade-in">
-            <div className="w-14 h-14 rounded-full border-4 border-violet-400 border-t-transparent animate-spin mb-4" />
-            <p className="text-blue-200 text-lg">Cargando viajes disponibles...</p>
+        {/* ── Estado de carga / resultados ── */}
+        {loading ? (
+          <div className="home-loading">
+            <div className="home-spinner" />
+            <p className="home-loading-text">Buscando viajes…</p>
           </div>
 
-        ) : !filteredCars.length ? (
-          <div className="text-center py-24 animate-fade-in">
-            <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 rounded-2xl bg-white/10 flex items-center justify-center">
-                <FaCar className="text-white/60 text-3xl" />
-              </div>
-            </div>
-            <p className="text-white text-xl font-semibold mb-2">
-              {searchTerm || selectedRuta ? 'Sin resultados' : 'No hay viajes disponibles'}
+        ) : cars.length === 0 ? (
+          <div className="home-empty">
+            <div className="home-empty-icon"><FaCar /></div>
+            <p className="home-empty-title">
+              {hasFilters ? 'Sin resultados' : 'No hay viajes disponibles'}
             </p>
-            <p className="text-blue-200">
-              {selectedRuta
-                ? `No hay viajes hacia "${selectedRuta}"${selectedFecha ? ` el ${new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES')}` : ''}${searchTerm ? ` que coincidan con "${searchTerm}"` : ''}.`
-                : selectedFecha
-                  ? `No encontramos viajes para el ${new Date(selectedFecha + 'T12:00:00').toLocaleDateString('es-ES')}.`
-                  : searchTerm
-                    ? `No encontramos viajes para "${searchTerm}".`
-                    : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
+            <p className="home-empty-desc">
+              {selectedOrigen && selectedDestino
+                ? `No hay viajes de ${selectedOrigen} a ${selectedDestino}.`
+                : selectedOrigen  ? `No hay viajes desde ${selectedOrigen}.`
+                : selectedDestino ? `No hay viajes hacia ${selectedDestino}.`
+                : selectedFecha   ? 'No hay viajes para esta fecha.'
+                : searchTerm      ? `Sin coincidencias para "${searchTerm}".`
+                : 'Vuelve más tarde, pronto habrá nuevos viajes.'}
             </p>
-            {(searchTerm || selectedRuta || selectedFecha) && (
-              <button
-                onClick={handleClearFilters}
-                className="mt-4 px-5 py-2 bg-white/10 hover:bg-white/20 text-white text-sm rounded-xl transition-colors"
-              >
+            {hasFilters && (
+              <button className="home-empty-btn" onClick={handleClearFilters}>
                 Limpiar filtros
               </button>
             )}
           </div>
 
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-            {filteredCars.map((car, idx) =>
-              car ? (
-                <div
-                  key={car.id_carros || idx}
-                  className="animate-fade-in-up"
-                  style={{ animationDelay: `${Math.min(idx * 60, 400)}ms` }}
-                >
-                  <CarCard
-                    car={car}
-                    userData={userData}
-                    onVerDetalles={handleVerDetalles}
-                  />
-                </div>
-              ) : null
-            )}
-          </div>
-        )}
+          <>
+            <div className="cars-grid">
+              {cars.map((car, idx) =>
+                car ? (
+                  <div
+                    key={car.id_carros || idx}
+                    className="animate-fade-in-up"
+                    style={{ animationDelay: `${Math.min(idx * 55, 380)}ms` }}
+                  >
+                    <CarCard
+                      car={car}
+                      userData={userData}
+                      onVerDetalles={handleVerDetalles}
+                    />
+                  </div>
+                ) : null
+              )}
+            </div>
 
-        {/* Pie de sección */}
-        {!isLoading && filteredCars.length > 0 && (
-          <p className="text-center text-blue-300 text-sm mt-10 animate-fade-in">
-            {userData
-              ? '¿Necesitas ayuda? Contacta directamente con tu conductor.'
-              : 'Regístrate gratis para ver precios, detalles del conductor y reservar tu asiento.'}
-          </p>
+            <Pagination
+              currentPage={currentPage}
+              lastPage={lastPage}
+              total={total}
+              onPageChange={handlePageChange}
+              loading={loading}
+            />
+          </>
         )}
       </main>
 

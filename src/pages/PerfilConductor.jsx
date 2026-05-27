@@ -6,6 +6,7 @@ import {
 
 import PageBg        from '../components/ui/PageBg';
 import InnerNavbar   from '../components/layout/InnerNavbar';
+import Footer        from '../components/layout/Footer';
 import LoadingScreen from '../components/ui/LoadingScreen';
 import SectionCard   from '../components/ui/SectionCard';
 import UserAvatar    from '../components/ui/UserAvatar';
@@ -94,7 +95,7 @@ const PerfilConductor = () => {
 
   return (
     <PageBg>
-      <InnerNavbar userData={userData} title="Perfil del conductor" />
+      <InnerNavbar title="Perfil del conductor" />
 
       <div className="max-w-2xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6 animate-fade-in-up">
 
@@ -210,6 +211,7 @@ const PerfilConductor = () => {
         </div>
 
       </div>
+      <Footer />
     </PageBg>
   );
 };

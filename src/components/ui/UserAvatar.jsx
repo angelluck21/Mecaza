@@ -1,7 +1,7 @@
 import React from 'react';
 import { getUserPhotoUrl } from '../../utils';
 
-const GRADIENT = 'bg-gradient-to-br from-blue-600 to-violet-600';
+const GRADIENT = 'bg-gradient-to-br from-amber-500 to-yellow-400';
 
 const SIZE = {
   xs:  'w-6 h-6 text-[10px]',
@@ -31,7 +31,8 @@ const UserAvatar = ({ userData, size = 'md', className = '' }) => {
 
   return (
     <div
-      className={`${sizeClass} ${GRADIENT} rounded-full flex items-center justify-center text-white font-bold shrink-0 select-none ${className}`}
+      className={`${sizeClass} ${GRADIENT} rounded-full flex items-center justify-center font-bold shrink-0 select-none ${className}`}
+      style={{ color: '#080B12' }}
     >
       {inicial}
     </div>

@@ -2,74 +2,123 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   FaUser, FaEnvelope, FaPhone, FaShieldAlt,
-  FaEdit, FaTrash, FaIdCard, FaArrowLeft,
+  FaEdit, FaTrash, FaIdCard,
   FaStar, FaRegStar, FaRoad, FaCommentAlt,
 } from 'react-icons/fa';
 
-import PageBg        from '../../components/ui/PageBg';
-import InnerNavbar   from '../../components/layout/InnerNavbar';
-import LoadingScreen from '../../components/ui/LoadingScreen';
-import SectionCard   from '../../components/ui/SectionCard';
-import InfoRow       from '../../components/ui/InfoRow';
+import Navbar             from '../../components/layout/Navbar';
+import LoadingScreen     from '../../components/ui/LoadingScreen';
 import ToastNotification from '../../components/ui/ToastNotification';
+import Footer            from '../../components/layout/Footer';
 import { useToast }      from '../../hooks/useToast';
-import { verUsuarioApi, eliminarUsuarioApi, getConductorPerfilApi, getUsuarioPerfilApi } from '../../services/api';
+import {
+  verUsuarioApi, eliminarUsuarioApi,
+  getConductorPerfilApi, getUsuarioPerfilApi,
+} from '../../services/api';
 import { getUserPhotoUrl } from '../../utils';
-import UserAvatar from '../../components/ui/UserAvatar';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// ── Design tokens ──────────────────────────────────────────────────────────────
+const T = {
+  void:      '#080B12',
+  surface:   '#0E1422',
+  surface2:  '#141D30',
+  border:    'rgba(255,255,255,0.07)',
+  amber:     '#FFBE00',
+  amberGlow: 'rgba(255,190,0,0.12)',
+  white:     '#EEF0FA',
+  fog:       '#6B728F',
+  muted:     '#3A4060',
+};
 
-const ROL_LABEL = { admin: 'Administrador', administrador: 'Administrador', conductor: 'Conductor', usuario: 'Usuario' };
-const ROL_COLOR = { admin: 'violet', administrador: 'violet', conductor: 'blue', usuario: 'green' };
+const ROL_LABEL = {
+  admin: 'Administrador', administrador: 'Administrador',
+  conductor: 'Conductor', usuario: 'Usuario',
+};
 
 const resolveField = (obj, keys) => {
   for (const k of keys) if (obj?.[k]) return obj[k];
   return null;
 };
 
-// ── Fila de estrellas ─────────────────────────────────────────────────────────
-const StarRow = ({ value, size = 'text-sm' }) => (
-  <span className="inline-flex items-center gap-0.5">
-    {[1, 2, 3, 4, 5].map((n) =>
+// ── Sub-components ─────────────────────────────────────────────────────────────
+
+const StarRow = ({ value, size = 13 }) => (
+  <span style={{ display: 'inline-flex', alignItems: 'center', gap: 2 }}>
+    {[1,2,3,4,5].map(n =>
       n <= Math.round(value ?? 0)
-        ? <FaStar    key={n} className={`${size} text-amber-400`} />
-        : <FaRegStar key={n} className={`${size} text-gray-300`}  />
+        ? <FaStar    key={n} style={{ fontSize: size, color: T.amber }} />
+        : <FaRegStar key={n} style={{ fontSize: size, color: T.muted  }} />
     )}
   </span>
 );
 
-// ── Barra distribución ────────────────────────────────────────────────────────
 const StarBar = ({ label, count, total }) => {
   const pct = total > 0 ? Math.round((count / total) * 100) : 0;
   return (
-    <div className="flex items-center gap-2 text-xs">
-      <span className="w-14 text-gray-500 text-right shrink-0">{label} ★</span>
-      <div className="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
-        <div className="h-full bg-amber-400 rounded-full transition-all duration-500" style={{ width: `${pct}%` }} />
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '0.72rem' }}>
+      <span style={{ width: 40, textAlign: 'right', color: T.fog, flexShrink: 0 }}>{label} ★</span>
+      <div style={{ flex: 1, background: T.surface2, borderRadius: 99, height: 6, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: T.amber, borderRadius: 99, transition: 'width 0.5s ease' }} />
       </div>
-      <span className="w-6 text-gray-400 shrink-0">{count}</span>
+      <span style={{ width: 18, color: T.fog, flexShrink: 0, fontSize: '0.68rem' }}>{count}</span>
     </div>
   );
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+const InfoRow = ({ icon, label, value }) => {
+  if (!value) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 0', borderBottom: `1px solid ${T.border}` }}>
+      <span style={{ color: T.amber, fontSize: '0.85rem', flexShrink: 0, opacity: 0.9 }}>{icon}</span>
+      <div style={{ flex: 1, minWidth: 0 }}>
+        <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.62rem', fontWeight: 700, color: T.fog, textTransform: 'uppercase', letterSpacing: '0.07em', margin: 0 }}>{label}</p>
+        <p style={{ fontFamily: 'DM Sans, sans-serif', fontSize: '0.875rem', color: T.white, margin: 0, marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{value}</p>
+      </div>
+    </div>
+  );
+};
+
+const Panel = ({ title, icon, children }) => (
+  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, overflow: 'hidden' }}>
+    <div style={{
+      padding: '12px 16px',
+      background: 'linear-gradient(135deg, rgba(255,190,0,0.08) 0%, transparent 100%)',
+      borderBottom: `1px solid ${T.border}`,
+      display: 'flex', alignItems: 'center', gap: 8,
+    }}>
+      <span style={{ color: T.amber, fontSize: '0.75rem' }}>{icon}</span>
+      <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.72rem', fontWeight: 700, color: T.white, textTransform: 'uppercase', letterSpacing: '0.07em' }}>{title}</span>
+    </div>
+    <div style={{ padding: '14px 16px' }}>{children}</div>
+  </div>
+);
+
+const StatTile = ({ value, label, accentColor }) => (
+  <div style={{ background: T.surface, border: `1px solid ${T.border}`, borderRadius: 16, padding: '1.2rem 1rem', textAlign: 'center', borderTop: `3px solid ${accentColor}` }}>
+    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '2.4rem', fontWeight: 800, color: accentColor, margin: 0, lineHeight: 1 }}>{value ?? '—'}</p>
+    <p style={{ fontSize: '0.7rem', color: T.fog, margin: '6px 0 0', fontWeight: 600, letterSpacing: '0.03em' }}>{label}</p>
+  </div>
+);
+
+// ── Main component ─────────────────────────────────────────────────────────────
 
 const VerPerfil = () => {
   const { userId: paramUserId } = useParams();
 
-  const [loggedInUser,    setLoggedInUser]    = useState(null);
-  const [userData,        setUserData]        = useState(null);
-  const [isViewingOther,  setIsViewingOther]  = useState(false);
-  const [isLoading,       setIsLoading]       = useState(true);
-  const [showDelete,      setShowDelete]      = useState(false);
-  const [isDeleting,      setIsDeleting]      = useState(false);
-  const [conductorStats,  setConductorStats]  = useState(null);
-  const [usuarioStats,    setUsuarioStats]    = useState(null);
+  const [loggedInUser,   setLoggedInUser]   = useState(null);
+  const [userData,       setUserData]       = useState(null);
+  const [isViewingOther, setIsViewingOther] = useState(false);
+  const [isLoading,      setIsLoading]      = useState(true);
+  const [showDelete,     setShowDelete]     = useState(false);
+  const [isDeleting,     setIsDeleting]     = useState(false);
+  const [conductorStats,    setConductorStats]    = useState(null);
+  const [usuarioStats,      setUsuarioStats]      = useState(null);
+  const [resenasConductorN, setResenasConductorN] = useState(5);
+  const [resenasUsuarioN,   setResenasUsuarioN]   = useState(5);
 
   const { toast, showToast, hideToast } = useToast();
   const navigate = useNavigate();
 
-  // ── Carga de datos ────────────────────────────────────────────────────────
   useEffect(() => {
     const load = async () => {
       const stored = localStorage.getItem('userData');
@@ -78,17 +127,12 @@ const VerPerfil = () => {
       let loggedIn;
       try { loggedIn = JSON.parse(stored); } catch { navigate('/login'); return; }
 
-      const loggedInRol = loggedIn.rol;
-      const isAdmin     = loggedInRol === 'admin' || loggedInRol === 'administrador';
-
-      // Cualquier usuario autenticado puede ver el perfil de otro cuando hay paramUserId
       const viewingOther = !!paramUserId;
       setLoggedInUser(loggedIn);
       setIsViewingOther(viewingOther);
 
       const loggedInId = resolveField(loggedIn, ['id_users', 'id', 'ID', 'id_user', 'user_id', 'userId']);
       const targetId   = viewingOther ? paramUserId : loggedInId;
-
       if (!targetId) { navigate('/login'); return; }
 
       try {
@@ -105,7 +149,6 @@ const VerPerfil = () => {
           setUserData(finalData);
         }
 
-        // Cargar estadísticas según rol
         const perfilRol = finalData.rol ?? perfil.rol;
         if (perfilRol === 'conductor') {
           getConductorPerfilApi(targetId)
@@ -117,12 +160,8 @@ const VerPerfil = () => {
             .catch(() => {});
         }
       } catch {
-        if (viewingOther) {
-          showToast('No se pudo cargar el perfil.', 'error');
-          navigate(-1);
-        } else {
-          setUserData(loggedIn);
-        }
+        if (viewingOther) { showToast('No se pudo cargar el perfil.', 'error'); navigate(-1); }
+        else setUserData(loggedIn);
       } finally {
         setIsLoading(false);
       }
@@ -130,7 +169,6 @@ const VerPerfil = () => {
     load();
   }, [navigate, paramUserId]);
 
-  // ── Eliminar ──────────────────────────────────────────────────────────────
   const confirmDelete = async () => {
     setIsDeleting(true);
     try {
@@ -138,7 +176,7 @@ const VerPerfil = () => {
       await eliminarUsuarioApi(targetId);
       showToast(isViewingOther ? 'Usuario eliminado correctamente.' : 'Cuenta eliminada exitosamente.', 'success');
       setTimeout(() => {
-        if (isViewingOther) navigate('/lista-usuarios');
+        if (isViewingOther) navigate('/indexAdmin');
         else {
           localStorage.removeItem('userData');
           localStorage.removeItem('authToken');
@@ -171,355 +209,421 @@ const VerPerfil = () => {
   const isOwnProfile    = !isViewingOther || String(loggedInId) === String(userId);
   const esConductor     = rol === 'conductor';
 
-  // Estadísticas del conductor
+  // Conductor stats
   const resenas  = conductorStats?.resenas ?? [];
   const totalCal = conductorStats?.total_calificaciones ?? 0;
   const promedio = conductorStats?.promedio_estrellas    ?? null;
-  const distrib  = [5, 4, 3, 2, 1].map(star => ({
-    star,
-    count: resenas.filter(r => Math.round(r.calificacion) === star).length,
+  const distrib  = [5,4,3,2,1].map(star => ({
+    star, count: resenas.filter(r => Math.round(r.calificacion) === star).length,
   }));
 
-  // Estadísticas del usuario (calificaciones como pasajero)
+  // Usuario stats
   const uResenas  = usuarioStats?.resenas ?? [];
   const uTotalCal = usuarioStats?.total_calificaciones ?? 0;
   const uPromedio = usuarioStats?.promedio_estrellas    ?? null;
-  const uDistrib  = [5, 4, 3, 2, 1].map(star => ({
-    star,
-    count: uResenas.filter(r => Math.round(r.calificacion) === star).length,
+  const uDistrib  = [5,4,3,2,1].map(star => ({
+    star, count: uResenas.filter(r => Math.round(r.calificacion) === star).length,
   }));
 
-  // Foto de perfil procesada
   const fotoRaw = userData.fotoperfil || userData.fotoPerfil || null;
   const fotoUrl = fotoRaw ? (getUserPhotoUrl(fotoRaw) || fotoRaw) : null;
 
+  const roleBadge =
+    esConductor
+      ? { bg: 'rgba(59,130,246,0.14)', color: '#A0A8C0', border: 'rgba(59,130,246,0.3)' }
+      : rol === 'admin' || rol === 'administrador'
+        ? { bg: 'rgba(139,92,246,0.14)', color: '#A78BFA', border: 'rgba(139,92,246,0.3)' }
+        : { bg: T.amberGlow, color: T.amber, border: 'rgba(255,190,0,0.3)' };
+
+  // ── JSX ──────────────────────────────────────────────────────────────────────
   return (
-    <PageBg>
+    <div style={{ minHeight: '100vh', background: T.void, display: 'flex', flexDirection: 'column', fontFamily: 'DM Sans, sans-serif' }}>
       <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
 
-      <InnerNavbar
-        userData={loggedInUser}
-        title={isViewingOther ? `Perfil de ${nombre || 'conductor'}` : 'Mi Perfil'}
-        backTo={isViewingOther ? undefined : undefined}
-      />
+      <Navbar />
 
-      <div className="max-w-3xl mx-auto w-full px-4 sm:px-6 py-8 space-y-6">
+      {/* ── Main content ──────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, maxWidth: 680, width: '100%', margin: '0 auto', padding: '2rem 1rem 3rem', display: 'flex', flexDirection: 'column', gap: 18 }}>
 
-        {/* ── Hero card ─────────────────────────────────────────────────────── */}
-        <div className="bg-white rounded-2xl shadow-xl shadow-violet-900/20 overflow-hidden animate-fade-in-up">
-          <div className="h-24 bg-gradient-to-r from-blue-800 to-violet-700 relative">
-            <div className="absolute -bottom-10 left-8">
-              <div className="w-20 h-20 rounded-2xl bg-white shadow-lg overflow-hidden border-4 border-white">
-                {fotoUrl
-                  ? <img
-                      src={fotoUrl}
-                      alt={nombre}
-                      className="w-full h-full object-cover"
-                      onError={e => { e.currentTarget.style.display='none'; }}
-                    />
-                  : <UserAvatar userData={userData} size="xl" className="rounded-none w-full h-full" />
-                }
-              </div>
+        {/* ── Hero card ── */}
+        <div style={{ background: T.surface, borderRadius: 20, overflow: 'hidden', border: `1px solid ${T.border}` }} className="animate-fade-in-up">
+
+          {/* Banner amber */}
+          <div style={{ height: 100, background: 'linear-gradient(135deg, #92600A 0%, #C8960C 35%, #FFBE00 65%, #FFD84D 100%)', position: 'relative', overflow: 'hidden' }}>
+            <div style={{ position: 'absolute', inset: 0, backgroundImage: 'radial-gradient(ellipse at 70% 50%, rgba(255,255,255,0.2) 0%, transparent 60%)' }} />
+          </div>
+
+          {/* Avatar centrado, overlapping */}
+          <div style={{ display: 'flex', justifyContent: 'center', marginTop: -44, position: 'relative', zIndex: 2 }}>
+            <div style={{
+              width: 88, height: 88, borderRadius: 20,
+              overflow: 'hidden',
+              border: `3px solid ${T.amber}`,
+              boxShadow: `0 0 0 5px ${T.surface}, 0 8px 28px rgba(255,190,0,0.3)`,
+              background: T.surface2,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              {fotoUrl
+                ? <img src={fotoUrl} alt={nombre} style={{ width: '100%', height: '100%', objectFit: 'cover' }} onError={e => { e.currentTarget.style.display = 'none'; }} />
+                : <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '2rem', fontWeight: 800, color: T.amber }}>
+                    {(nombre || '?').charAt(0).toUpperCase()}
+                  </span>
+              }
             </div>
           </div>
 
-          <div className="pt-14 pb-6 px-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
-            <div>
-              <h1 className="text-2xl font-extrabold text-gray-900">{nombre || 'Sin nombre'}</h1>
-              <span className={`inline-block mt-1 text-xs font-bold px-3 py-1 rounded-full ${
-                esConductor                                        ? 'bg-blue-100 text-blue-700'
-                : rol === 'admin' || rol === 'administrador'       ? 'bg-violet-100 text-violet-700'
-                : 'bg-green-100 text-green-700'
-              }`}>
+          {/* Nombre, badge y stats — todo centrado */}
+          <div style={{ textAlign: 'center', padding: '14px 1.5rem 1.5rem' }}>
+            <h1 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.55rem', fontWeight: 800, color: T.white, margin: '0 0 10px', lineHeight: 1.15 }}>
+              {nombre || 'Sin nombre'}
+            </h1>
+
+            {/* Badges row */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+              <span style={{
+                fontFamily: 'Syne, sans-serif', fontSize: '0.68rem', fontWeight: 700,
+                padding: '4px 12px', borderRadius: 99, letterSpacing: '0.05em',
+                background: roleBadge.bg, color: roleBadge.color,
+                border: `1px solid ${roleBadge.border}`,
+              }}>
                 {ROL_LABEL[rol] ?? 'Usuario'}
               </span>
 
-              {/* Estrellas rápidas en el hero (solo conductor con stats) */}
-              {esConductor && conductorStats && (
-                <div className="flex items-center gap-2 mt-2">
-                  <StarRow value={promedio ?? 0} size="text-sm" />
-                  {promedio != null
-                    ? <span className="text-sm font-bold text-amber-600">{Number(promedio).toFixed(1)}</span>
-                    : <span className="text-xs text-gray-400">Sin calificaciones</span>
-                  }
-                  {totalCal > 0 && (
-                    <span className="text-xs text-gray-400">· {totalCal} {totalCal === 1 ? 'reseña' : 'reseñas'}</span>
-                  )}
-                  <span className="text-xs text-gray-400 flex items-center gap-1">
-                    · <FaRoad className="text-blue-400" /> {conductorStats.total_viajes} {conductorStats.total_viajes === 1 ? 'viaje' : 'viajes'}
-                  </span>
-                </div>
-              )}
-            </div>
-
-            <div className="flex gap-2 shrink-0">
-              {isViewingOther ? (
-                isOwnProfile ? null : (
-                  loggedInIsAdmin ? (
-                    /* Admin viendo otro usuario */
-                    <>
-                      <button
-                        onClick={() => navigate('/lista-usuarios')}
-                        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
-                      >
-                        <FaArrowLeft /> Lista
-                      </button>
-                      <button
-                        onClick={() => setShowDelete(true)}
-                        className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
-                      >
-                        <FaTrash /> Eliminar
-                      </button>
-                    </>
-                  ) : (
-                    /* Usuario regular viendo perfil de conductor */
-                    <button
-                      onClick={() => navigate(-1)}
-                      className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-200 transition-all active:scale-95"
-                    >
-                      <FaArrowLeft /> Volver
-                    </button>
-                  )
-                )
-              ) : (
-                /* Perfil propio */
+              {esConductor && conductorStats && promedio != null && (
                 <>
-                  <button
-                    onClick={() => navigate('/ajustes-perfil')}
-                    className="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-blue-700 to-violet-600 text-white text-sm font-semibold rounded-xl hover:shadow-lg hover:shadow-violet-300/40 transition-all hover:scale-105 active:scale-95"
-                  >
-                    <FaEdit /> Editar perfil
-                  </button>
-                  <button
-                    onClick={() => setShowDelete(true)}
-                    className="flex items-center gap-2 px-4 py-2 bg-red-50 text-red-600 text-sm font-semibold rounded-xl border border-red-200 hover:bg-red-100 transition-all active:scale-95"
-                  >
-                    <FaTrash />
-                  </button>
+                  <span style={{ color: T.muted, fontSize: '0.7rem' }}>·</span>
+                  <StarRow value={promedio} size={12} />
+                  <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.8rem', fontWeight: 700, color: T.amber }}>
+                    {Number(promedio).toFixed(1)}
+                  </span>
+                  <span style={{ color: T.muted, fontSize: '0.7rem' }}>·</span>
+                  <span style={{ fontSize: '0.72rem', color: T.fog, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <FaRoad style={{ color: '#A0A8C0', fontSize: '0.65rem' }} /> {conductorStats.total_viajes} viajes
+                  </span>
+                </>
+              )}
+
+              {!esConductor && rol === 'usuario' && usuarioStats && (
+                <>
+                  <span style={{ color: T.muted, fontSize: '0.7rem' }}>·</span>
+                  <span style={{ fontSize: '0.72rem', color: T.fog, display: 'flex', alignItems: 'center', gap: 4 }}>
+                    <FaRoad style={{ color: '#A0A8C0', fontSize: '0.65rem' }} />
+                    {usuarioStats.total_viajes ?? 0} {(usuarioStats.total_viajes ?? 0) === 1 ? 'viaje realizado' : 'viajes realizados'}
+                  </span>
                 </>
               )}
             </div>
+
+            {/* Separador */}
+            <div style={{ height: 1, background: T.border, margin: '0 0 16px' }} />
+
+            {/* CTA de edición — solo perfil propio */}
+            {!isViewingOther && (
+              <button
+                onClick={() => navigate('/ajustes-perfil')}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '9px 24px',
+                  background: `linear-gradient(135deg, #C8960C, ${T.amber})`,
+                  border: 'none', borderRadius: 12,
+                  color: '#080B12', fontSize: '0.82rem', fontWeight: 800,
+                  cursor: 'pointer', fontFamily: 'Syne, sans-serif',
+                  boxShadow: '0 4px 18px rgba(255,190,0,0.3)',
+                  letterSpacing: '0.02em',
+                }}
+              >
+                <FaEdit style={{ fontSize: '0.7rem' }} />
+                Editar perfil
+              </button>
+            )}
+
+            {/* Admin viendo otro usuario */}
+            {isViewingOther && loggedInIsAdmin && (
+              <button
+                onClick={() => setShowDelete(true)}
+                style={{
+                  display: 'inline-flex', alignItems: 'center', gap: 8,
+                  padding: '9px 24px',
+                  background: 'rgba(239,68,68,0.1)',
+                  border: '1px solid rgba(239,68,68,0.25)',
+                  borderRadius: 12, color: '#F87171',
+                  fontSize: '0.82rem', fontWeight: 700,
+                  cursor: 'pointer', fontFamily: 'Syne, sans-serif',
+                }}
+              >
+                <FaTrash style={{ fontSize: '0.7rem' }} />
+                Eliminar usuario
+              </button>
+            )}
           </div>
         </div>
 
-        {/* ── Info cards ────────────────────────────────────────────────────── */}
-        <div className="grid md:grid-cols-2 gap-4 animate-fade-in-up">
-          <SectionCard title="Información personal" icon={<FaUser className="text-sm" />} accent="violet">
-            {loggedInIsAdmin && (
-              <InfoRow label="ID de usuario" value={`#${userId}`} icon={<FaIdCard className="text-xs" />} />
-            )}
-            <InfoRow label="Nombre" value={nombre}         icon={<FaUser      className="text-xs" />} />
-            <InfoRow label="Rol"    value={ROL_LABEL[rol]} icon={<FaShieldAlt className="text-xs" />} badge color={ROL_COLOR[rol]} />
-          </SectionCard>
+        {/* ── Info panels ────────────────────────────────────────────────────── */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 14 }} className="animate-fade-in-up">
+          <Panel title="Información personal" icon={<FaUser />}>
+            {loggedInIsAdmin && <InfoRow icon={<FaIdCard />} label="ID de usuario" value={`#${userId}`} />}
+            <InfoRow icon={<FaUser />}      label="Nombre completo"   value={nombre} />
+            <InfoRow icon={<FaShieldAlt />} label="Rol en el sistema" value={ROL_LABEL[rol] ?? 'Usuario'} />
+          </Panel>
 
-          <SectionCard title="Información de contacto" icon={<FaEnvelope className="text-sm" />} accent="blue">
-            {/* Mostrar email: propio, admin, o perfil de conductor */}
+          <Panel title="Información de contacto" icon={<FaEnvelope />}>
             {(isOwnProfile || loggedInIsAdmin || esConductor) && (
-              <InfoRow label="Correo" value={correo} icon={<FaEnvelope className="text-xs" />} />
+              <InfoRow icon={<FaEnvelope />} label="Correo electrónico" value={correo} />
             )}
-            <InfoRow label="Teléfono" value={telefono} icon={<FaPhone className="text-xs" />} />
-          </SectionCard>
+            <InfoRow icon={<FaPhone />} label="Teléfono" value={telefono} />
+            {!(isOwnProfile || loggedInIsAdmin || esConductor) && !telefono && (
+              <p style={{ fontSize: '0.8rem', color: T.fog, margin: 0, padding: '8px 0' }}>
+                Sin datos de contacto disponibles.
+              </p>
+            )}
+          </Panel>
         </div>
 
-        {/* ── Sección conductor: estadísticas ───────────────────────────────── */}
+        {/* ── Conductor: stats + ratings + reviews ────────────────────────────── */}
         {esConductor && (
-          <div className="space-y-4 animate-fade-in-up">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }} className="animate-fade-in-up">
 
-            {/* Stats tiles */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
-                <p className="text-3xl font-extrabold text-blue-700">
-                  {conductorStats ? conductorStats.total_viajes : '—'}
-                </p>
-                <p className="text-xs text-blue-500 font-medium mt-1">
-                  {conductorStats?.total_viajes === 1 ? 'Viaje completado' : 'Viajes completados'}
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
-                <p className="text-3xl font-extrabold text-amber-600">
-                  {conductorStats && promedio != null ? Number(promedio).toFixed(1) : '—'}
-                </p>
-                <p className="text-xs text-amber-500 font-medium mt-1">Promedio de estrellas</p>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <StatTile
+                value={conductorStats ? conductorStats.total_viajes : '—'}
+                label={conductorStats?.total_viajes === 1 ? 'Viaje completado' : 'Viajes completados'}
+                accentColor={T.amber}
+              />
+              <StatTile
+                value={conductorStats && promedio != null ? Number(promedio).toFixed(1) : '—'}
+                label="Promedio de estrellas"
+                accentColor={T.amber}
+              />
             </div>
 
-            {/* Distribución de calificaciones */}
-            <SectionCard title="Calificaciones" icon={<FaStar className="text-xs text-amber-400" />} accent="orange">
+            <Panel title="Calificaciones" icon={<FaStar />}>
               {!conductorStats ? (
-                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0, padding: '8px 0' }}>Cargando…</p>
               ) : totalCal === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0, padding: '8px 0' }}>
                   {isOwnProfile
                     ? 'Aún no tienes calificaciones. ¡Completa viajes para recibirlas!'
                     : 'Este conductor aún no tiene calificaciones.'}
                 </p>
               ) : (
-                <div className="flex gap-6 items-start">
-                  {/* Número grande */}
-                  <div className="flex flex-col items-center shrink-0">
-                    <p className="text-5xl font-extrabold text-gray-900 leading-none">
+                <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '3.2rem', fontWeight: 800, color: T.amber, margin: 0, lineHeight: 1 }}>
                       {Number(promedio).toFixed(1)}
                     </p>
-                    <StarRow value={promedio} size="text-base" />
-                    <p className="text-xs text-gray-400 mt-1">
+                    <StarRow value={promedio} size={15} />
+                    <p style={{ fontSize: '0.68rem', color: T.fog, margin: '5px 0 0' }}>
                       {totalCal} {totalCal === 1 ? 'reseña' : 'reseñas'}
                     </p>
                   </div>
-
-                  {/* Barras por estrella */}
-                  <div className="flex-1 space-y-2 pt-1">
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 6 }}>
                     {distrib.map(({ star, count }) => (
                       <StarBar key={star} label={star} count={count} total={totalCal} />
                     ))}
                   </div>
                 </div>
               )}
-            </SectionCard>
+            </Panel>
 
-            {/* Reseñas recientes */}
-            <SectionCard title="Reseñas recientes" icon={<FaCommentAlt className="text-xs" />} accent="violet">
+            <Panel title="Reseñas recientes" icon={<FaCommentAlt />}>
               {!conductorStats ? (
-                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0 }}>Cargando…</p>
               ) : resenas.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0 }}>
                   {isOwnProfile ? 'Aún no tienes comentarios escritos.' : 'Sin comentarios por el momento.'}
                 </p>
               ) : (
-                <div className="space-y-4">
-                  {resenas.map((r, i) => (
-                    <div key={i} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <StarRow value={r.calificacion} size="text-sm" />
-                        <span className="text-[11px] text-gray-400">{r.fecha}</span>
+                <div>
+                  {resenas.slice(0, resenasConductorN).map((r, i) => (
+                    <div key={i} style={{ padding: '12px 0', borderBottom: i < Math.min(resenasConductorN, resenas.length) - 1 ? `1px solid ${T.border}` : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <StarRow value={r.calificacion} size={12} />
+                        <span style={{ fontSize: '0.68rem', color: T.fog }}>{r.fecha}</span>
                       </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{r.comentario}</p>
+                      <p style={{ fontSize: '0.84rem', color: T.white, margin: 0, lineHeight: 1.55, opacity: 0.85 }}>{r.comentario}</p>
                     </div>
                   ))}
+                  {resenas.length > resenasConductorN ? (
+                    <button
+                      onClick={() => setResenasConductorN(n => n + 10)}
+                      style={{ marginTop: 12, width: '100%', padding: '8px', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 10, color: T.amber, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne, sans-serif', letterSpacing: '0.02em' }}
+                    >
+                      Ver más reseñas ({resenas.length - resenasConductorN} restantes)
+                    </button>
+                  ) : resenas.length > 5 && (
+                    <button
+                      onClick={() => setResenasConductorN(5)}
+                      style={{ marginTop: 12, width: '100%', padding: '8px', background: 'transparent', border: `1px solid ${T.border}`, borderRadius: 10, color: T.fog, fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}
+                    >
+                      Mostrar menos
+                    </button>
+                  )}
                 </div>
               )}
-            </SectionCard>
-
+            </Panel>
           </div>
         )}
 
-        {/* ── Sección usuario: calificaciones como pasajero ─────────────────── */}
+        {/* ── Usuario: calificaciones como pasajero ────────────────────────────── */}
         {!esConductor && rol === 'usuario' && (
-          <div className="space-y-4 animate-fade-in-up">
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }} className="animate-fade-in-up">
 
-            {/* Stats tiles */}
-            <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
-                <p className="text-3xl font-extrabold text-blue-700">
-                  {usuarioStats ? usuarioStats.total_viajes : '—'}
-                </p>
-                <p className="text-xs text-blue-500 font-medium mt-1">
-                  {usuarioStats?.total_viajes === 1 ? 'Viaje realizado' : 'Viajes realizados'}
-                </p>
-              </div>
-              <div className="bg-white rounded-2xl shadow-md p-5 text-center">
-                <p className="text-3xl font-extrabold text-amber-600">
-                  {usuarioStats && uPromedio != null ? Number(uPromedio).toFixed(1) : '—'}
-                </p>
-                <p className="text-xs text-amber-500 font-medium mt-1">Calificación como pasajero</p>
-              </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+              <StatTile
+                value={usuarioStats ? (usuarioStats.total_viajes ?? 0) : '—'}
+                label={usuarioStats?.total_viajes === 1 ? 'Viaje realizado' : 'Viajes realizados'}
+                accentColor={T.amber}
+              />
+              <StatTile
+                value={usuarioStats && uPromedio != null ? Number(uPromedio).toFixed(1) : '—'}
+                label="Calificación como pasajero"
+                accentColor={T.amber}
+              />
             </div>
 
-            {/* Distribución */}
-            <SectionCard title="Calificaciones recibidas" icon={<FaStar className="text-xs text-amber-400" />} accent="orange">
+            <Panel title="Calificaciones recibidas" icon={<FaStar />}>
               {!usuarioStats ? (
-                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0, padding: '8px 0' }}>Cargando…</p>
               ) : uTotalCal === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">
-                  {isOwnProfile
-                    ? 'Aún no tienes calificaciones como pasajero.'
-                    : 'Este usuario aún no tiene calificaciones.'}
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0, padding: '8px 0' }}>
+                  {isOwnProfile ? 'Aún no tienes calificaciones como pasajero.' : 'Este usuario aún no tiene calificaciones.'}
                 </p>
               ) : (
-                <div className="flex gap-6 items-start">
-                  <div className="flex flex-col items-center shrink-0">
-                    <p className="text-5xl font-extrabold text-gray-900 leading-none">
+                <div style={{ display: 'flex', gap: 28, alignItems: 'flex-start' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+                    <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '3.2rem', fontWeight: 800, color: T.amber, margin: 0, lineHeight: 1 }}>
                       {Number(uPromedio).toFixed(1)}
                     </p>
-                    <StarRow value={uPromedio} size="text-base" />
-                    <p className="text-xs text-gray-400 mt-1">
+                    <StarRow value={uPromedio} size={15} />
+                    <p style={{ fontSize: '0.68rem', color: T.fog, margin: '5px 0 0' }}>
                       {uTotalCal} {uTotalCal === 1 ? 'reseña' : 'reseñas'}
                     </p>
                   </div>
-                  <div className="flex-1 space-y-2 pt-1">
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: 9, paddingTop: 6 }}>
                     {uDistrib.map(({ star, count }) => (
                       <StarBar key={star} label={star} count={count} total={uTotalCal} />
                     ))}
                   </div>
                 </div>
               )}
-            </SectionCard>
+            </Panel>
 
-            {/* Reseñas recientes */}
-            <SectionCard title="Comentarios de conductores" icon={<FaCommentAlt className="text-xs" />} accent="violet">
+            <Panel title="Comentarios de conductores" icon={<FaCommentAlt />}>
               {!usuarioStats ? (
-                <p className="text-sm text-gray-400 text-center py-2">Cargando...</p>
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0 }}>Cargando…</p>
               ) : uResenas.length === 0 ? (
-                <p className="text-sm text-gray-400 text-center py-2">
+                <p style={{ fontSize: '0.8rem', color: T.fog, textAlign: 'center', margin: 0 }}>
                   {isOwnProfile ? 'Aún no tienes comentarios escritos sobre ti.' : 'Sin comentarios por el momento.'}
                 </p>
               ) : (
-                <div className="space-y-4">
-                  {uResenas.map((r, i) => (
-                    <div key={i} className="border-b border-gray-50 last:border-0 pb-4 last:pb-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <StarRow value={r.calificacion} size="text-sm" />
-                        <span className="text-[11px] text-gray-400">{r.fecha}</span>
+                <div>
+                  {uResenas.slice(0, resenasUsuarioN).map((r, i) => (
+                    <div key={i} style={{ padding: '12px 0', borderBottom: i < Math.min(resenasUsuarioN, uResenas.length) - 1 ? `1px solid ${T.border}` : 'none' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 5 }}>
+                        <StarRow value={r.calificacion} size={12} />
+                        <span style={{ fontSize: '0.68rem', color: T.fog }}>{r.fecha}</span>
                       </div>
-                      <p className="text-sm text-gray-700 leading-relaxed">{r.comentario}</p>
+                      <p style={{ fontSize: '0.84rem', color: T.white, margin: 0, lineHeight: 1.55, opacity: 0.85 }}>{r.comentario}</p>
                     </div>
                   ))}
+                  {uResenas.length > resenasUsuarioN ? (
+                    <button
+                      onClick={() => setResenasUsuarioN(n => n + 10)}
+                      style={{ marginTop: 12, width: '100%', padding: '8px', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 10, color: T.amber, fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne, sans-serif', letterSpacing: '0.02em' }}
+                    >
+                      Ver más comentarios ({uResenas.length - resenasUsuarioN} restantes)
+                    </button>
+                  ) : uResenas.length > 5 && (
+                    <button
+                      onClick={() => setResenasUsuarioN(5)}
+                      style={{ marginTop: 12, width: '100%', padding: '8px', background: 'transparent', border: `1px solid ${T.border}`, borderRadius: 10, color: T.fog, fontSize: '0.78rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'Syne, sans-serif' }}
+                    >
+                      Mostrar menos
+                    </button>
+                  )}
                 </div>
               )}
-            </SectionCard>
-
+            </Panel>
           </div>
         )}
+
+        {/* ── Zona de peligro (solo perfil propio) ─────────────────────────────── */}
+        {!isViewingOther && (
+          <div style={{ background: T.surface, border: '1px solid rgba(239,68,68,0.18)', borderRadius: 16, overflow: 'hidden' }} className="animate-fade-in-up">
+            <div style={{ padding: '12px 16px', background: 'rgba(239,68,68,0.06)', borderBottom: '1px solid rgba(239,68,68,0.12)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <FaTrash style={{ color: '#F87171', fontSize: '0.72rem' }} />
+              <span style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.72rem', fontWeight: 700, color: '#F87171', textTransform: 'uppercase', letterSpacing: '0.07em' }}>Zona de peligro</span>
+            </div>
+            <div style={{ padding: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap' }}>
+              <div>
+                <p style={{ fontFamily: 'Syne, sans-serif', fontSize: '0.82rem', fontWeight: 700, color: T.white, margin: 0 }}>Eliminar cuenta</p>
+                <p style={{ fontSize: '0.75rem', color: T.fog, margin: '3px 0 0' }}>Esta acción es permanente e irreversible.</p>
+              </div>
+              <button
+                onClick={() => setShowDelete(true)}
+                style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.28)', borderRadius: 10, color: '#F87171', fontSize: '0.78rem', fontWeight: 700, cursor: 'pointer', fontFamily: 'Syne, sans-serif', flexShrink: 0 }}
+              >
+                <FaTrash style={{ fontSize: '0.65rem' }} /> Eliminar mi cuenta
+              </button>
+            </div>
+          </div>
+        )}
+
       </div>
 
-      {/* ── Modal confirmación eliminar ───────────────────────────────────────── */}
+      {/* ── Modal: confirmar eliminación ──────────────────────────────────────── */}
       {showDelete && (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: 'rgba(15,10,40,0.75)', backdropFilter: 'blur(6px)' }}
-        >
-          <div className="bg-white rounded-2xl w-full max-w-sm p-6 shadow-2xl text-center">
-            <div className="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <FaTrash className="text-red-500 text-xl" />
+        <div style={{
+          position: 'fixed', inset: 0, zIndex: 50,
+          display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '1rem',
+          background: 'rgba(8,11,18,0.88)', backdropFilter: 'blur(10px)',
+        }}>
+          <div style={{
+            background: T.surface, border: `1px solid ${T.border}`,
+            borderRadius: 20, width: '100%', maxWidth: 380,
+            padding: '2rem 1.75rem', boxShadow: '0 30px 70px rgba(0,0,0,0.5)',
+            textAlign: 'center',
+          }} className="animate-scale-in">
+            <div style={{
+              width: 58, height: 58, borderRadius: '50%',
+              background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.22)',
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              margin: '0 auto 1.25rem',
+            }}>
+              <FaTrash style={{ color: '#F87171', fontSize: '1.2rem' }} />
             </div>
-            <h3 className="text-lg font-bold text-gray-900 mb-2">
+            <h3 style={{ fontFamily: 'Syne, sans-serif', fontSize: '1.1rem', fontWeight: 800, color: T.white, margin: '0 0 0.5rem' }}>
               {isViewingOther ? '¿Eliminar este usuario?' : '¿Eliminar tu cuenta?'}
             </h3>
-            <p className="text-sm text-gray-500 mb-6">
-              Esta acción es <span className="font-semibold text-red-600">irreversible</span>.
+            <p style={{ fontSize: '0.82rem', color: T.fog, margin: '0 0 1.5rem', lineHeight: 1.65 }}>
+              Esta acción es{' '}
+              <span style={{ color: '#F87171', fontWeight: 700 }}>irreversible</span>.{' '}
               {isViewingOther
-                ? ` Se eliminará toda la información de ${nombre || 'este usuario'}.`
-                : ' Se eliminará toda tu información, reservas y datos del sistema.'}
+                ? `Se eliminará toda la información de ${nombre || 'este usuario'}.`
+                : 'Se eliminará toda tu información, reservas y datos del sistema.'}
             </p>
-            <div className="flex gap-3">
+            <div style={{ display: 'flex', gap: 10 }}>
               <button
                 onClick={() => setShowDelete(false)}
                 disabled={isDeleting}
-                className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl font-semibold hover:bg-gray-200 transition-all disabled:opacity-50"
+                style={{ flex: 1, padding: '0.75rem', background: T.surface2, border: `1px solid ${T.border}`, borderRadius: 12, color: T.fog, fontSize: '0.84rem', fontWeight: 600, cursor: 'pointer', fontFamily: 'Syne, sans-serif', opacity: isDeleting ? 0.5 : 1 }}
               >
                 Cancelar
               </button>
               <button
                 onClick={confirmDelete}
                 disabled={isDeleting}
-                className="flex-1 py-2.5 bg-red-500 text-white rounded-xl font-semibold hover:bg-red-600 transition-all disabled:opacity-60"
+                style={{ flex: 1, padding: '0.75rem', background: 'linear-gradient(135deg, #b91c1c, #ef4444)', border: 'none', borderRadius: 12, color: '#fff', fontSize: '0.84rem', fontWeight: 700, cursor: isDeleting ? 'not-allowed' : 'pointer', opacity: isDeleting ? 0.6 : 1, fontFamily: 'Syne, sans-serif' }}
               >
-                {isDeleting ? 'Eliminando...' : 'Sí, eliminar'}
+                {isDeleting ? 'Eliminando…' : 'Sí, eliminar'}
               </button>
             </div>
           </div>
         </div>
       )}
-    </PageBg>
+
+      <Footer />
+    </div>
   );
 };
 

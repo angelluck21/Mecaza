@@ -1,7 +1,7 @@
 import React from 'react';
 import { FaChevronLeft, FaChevronRight } from 'react-icons/fa';
 
-const Pagination = ({ currentPage, lastPage, total, onPageChange, loading = false, className = '' }) => {
+const Pagination = ({ currentPage, lastPage, total, onPageChange, loading = false }) => {
   if (!lastPage || lastPage <= 1) return null;
 
   const getPages = () => {
@@ -21,46 +21,47 @@ const Pagination = ({ currentPage, lastPage, total, onPageChange, loading = fals
   };
 
   return (
-    <div className={`flex flex-col items-center gap-2 ${className}`}>
+    <div className="mcz-pagination">
       {total != null && (
-        <p className="text-xs text-gray-400">
-          Página {currentPage} de {lastPage} · {total} registros
+        <p className="mcz-pagination-info">
+          Página <strong>{currentPage}</strong> de <strong>{lastPage}</strong>
+          {' · '}{total} viaje{total !== 1 ? 's' : ''}
         </p>
       )}
-      <div className="flex items-center gap-1">
+
+      <div className="mcz-pagination-row">
+        {/* Anterior */}
         <button
+          className="mcz-page-btn"
           onClick={() => go(currentPage - 1)}
           disabled={currentPage === 1 || loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
-          <FaChevronLeft className="text-[10px]" /> Anterior
+          <FaChevronLeft style={{ fontSize: '0.6rem' }} /> Ant.
         </button>
 
+        {/* Páginas */}
         {getPages().map((p, i) =>
           p === '…' ? (
-            <span key={`el-${i}`} className="px-1.5 text-gray-400 text-sm select-none">…</span>
+            <span key={`el-${i}`} className="mcz-page-ellipsis">…</span>
           ) : (
             <button
               key={p}
+              className={`mcz-page-btn ${p === currentPage ? 'active' : ''}`}
               onClick={() => go(p)}
               disabled={loading}
-              className={`w-8 h-8 rounded-lg text-xs font-bold transition-all disabled:opacity-50 ${
-                p === currentPage
-                  ? 'bg-violet-600 text-white shadow-sm'
-                  : 'text-gray-600 hover:bg-violet-50 hover:text-violet-700'
-              }`}
             >
               {p}
             </button>
           )
         )}
 
+        {/* Siguiente */}
         <button
+          className="mcz-page-btn"
           onClick={() => go(currentPage + 1)}
           disabled={currentPage === lastPage || loading}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold text-gray-500 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-30 disabled:cursor-not-allowed transition-all"
         >
-          Siguiente <FaChevronRight className="text-[10px]" />
+          Sig. <FaChevronRight style={{ fontSize: '0.6rem' }} />
         </button>
       </div>
     </div>

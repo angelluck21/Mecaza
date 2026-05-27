@@ -1,0 +1,672 @@
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300;1,9..144,700&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap');
+
+/* ─── Design tokens ─────────────────────────────── */
+.mcz-login {
+  --void:       #080B12;
+  --surface:    #0E1422;
+  --surface-2:  #141D30;
+  --border:     rgba(255,255,255,0.07);
+  --amber:      #FFBE00;
+  --amber-dim:  #CC9800;
+  --amber-glow: rgba(255,190,0,0.12);
+  --amber-soft: rgba(255,190,0,0.06);
+  --white:      #EEF0FA;
+  --fog:        #6B728F;
+  --muted:      #3A4060;
+
+  font-family: 'DM Sans', system-ui, sans-serif;
+  min-height: 100svh;
+  display: flex;
+  background: var(--void);
+  overflow: hidden;
+  position: relative;
+}
+
+/* Background dot grid */
+.mcz-login::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: radial-gradient(circle, rgba(255,255,255,0.055) 1px, transparent 1px);
+  background-size: 32px 32px;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ─── Left panel ────────────────────────────────── */
+.mcz-left {
+  position: relative;
+  z-index: 1;
+  width: 44%;
+  min-width: 360px;
+  display: flex;
+  flex-direction: column;
+  padding: 3rem 3rem 2.5rem;
+  border-right: 1px solid var(--border);
+  background: linear-gradient(160deg, #0C101C 0%, var(--void) 60%);
+}
+
+/* Subtle amber ambient on left panel */
+.mcz-left::after {
+  content: '';
+  position: absolute;
+  bottom: -80px;
+  left: -80px;
+  width: 400px;
+  height: 400px;
+  background: radial-gradient(circle, rgba(255,190,0,0.06) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* Logo */
+.mcz-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: auto;
+}
+
+.mcz-logo-icon {
+  width: 44px;
+  height: 44px;
+  background: var(--amber);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--void);
+  font-size: 1.25rem;
+  flex-shrink: 0;
+  box-shadow: 0 0 20px rgba(255,190,0,0.3);
+}
+
+.mcz-logo-name {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 800;
+  color: var(--white);
+  letter-spacing: -0.02em;
+}
+
+/* Brand content */
+.mcz-brand {
+  margin-top: 3.5rem;
+  flex: 1;
+}
+
+.mcz-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 500;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--amber);
+  margin-bottom: 1.25rem;
+}
+
+.mcz-eyebrow::before {
+  content: '';
+  display: block;
+  width: 20px;
+  height: 1px;
+  background: var(--amber);
+}
+
+.mcz-tagline {
+  font-family: 'Fraunces', Georgia, serif;
+  font-size: clamp(2.4rem, 4vw, 3.2rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+  color: var(--white);
+  margin-bottom: 1.25rem;
+}
+
+.mcz-tagline em {
+  font-style: italic;
+  font-weight: 300;
+  color: var(--amber);
+}
+
+.mcz-desc {
+  font-size: 0.9rem;
+  font-weight: 300;
+  line-height: 1.75;
+  color: var(--fog);
+  max-width: 34ch;
+}
+
+/* ─── Route visualization ────────────────────────── */
+.mcz-route {
+  margin: 2.5rem 0;
+  position: relative;
+}
+
+.mcz-route-svg {
+  width: 100%;
+  height: 180px;
+  overflow: visible;
+}
+
+/* Animated route path */
+.route-path {
+  fill: none;
+  stroke: var(--amber);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 600;
+  stroke-dashoffset: 600;
+  animation: drawRoute 2s cubic-bezier(0.4,0,0.2,1) 0.4s forwards;
+}
+
+.route-path-bg {
+  fill: none;
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-dasharray: 6 8;
+  opacity: 0.4;
+}
+
+@keyframes drawRoute {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Pin A (origin) */
+.pin-a, .pin-b {
+  animation: pinAppear 0.4s ease forwards;
+  opacity: 0;
+}
+.pin-a { animation-delay: 0.3s; }
+.pin-b { animation-delay: 2.2s; }
+
+@keyframes pinAppear {
+  from { opacity: 0; transform: scale(0.5); transform-box: fill-box; transform-origin: center; }
+  to   { opacity: 1; transform: scale(1); transform-box: fill-box; transform-origin: center; }
+}
+
+.pin-pulse {
+  animation: pinPulse 2s ease-in-out infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.pin-pulse-2 {
+  animation: pinPulse 2s ease-in-out 0.5s infinite;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+@keyframes pinPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50%       { opacity: 0; transform: scale(2.2); }
+}
+
+/* Car dot traveling the route */
+.route-car {
+  opacity: 0;
+  animation: carAppear 0.3s ease 2.4s forwards;
+}
+@keyframes carAppear {
+  to { opacity: 1; }
+}
+
+/* Route labels */
+.route-label {
+  font-family: 'DM Sans', sans-serif;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  fill: var(--fog);
+}
+.route-label-highlight { fill: var(--amber); }
+
+/* ─── Stats ──────────────────────────────────────── */
+.mcz-stats {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  border-top: 1px solid var(--border);
+  padding-top: 1.5rem;
+  margin-top: auto;
+}
+
+.mcz-stat {
+  flex: 1;
+  text-align: center;
+}
+
+.mcz-stat:not(:last-child) {
+  border-right: 1px solid var(--border);
+}
+
+.mcz-stat-num {
+  display: block;
+  font-family: 'Syne', sans-serif;
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--amber);
+  letter-spacing: -0.03em;
+  line-height: 1;
+  margin-bottom: 0.25rem;
+}
+
+.mcz-stat-lbl {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 500;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fog);
+}
+
+/* ─── Right panel ────────────────────────────────── */
+.mcz-right {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+/* Ambient glow top-right */
+.mcz-right::before {
+  content: '';
+  position: absolute;
+  top: -100px;
+  right: -100px;
+  width: 500px;
+  height: 500px;
+  background: radial-gradient(circle, rgba(255,190,0,0.04) 0%, transparent 65%);
+  pointer-events: none;
+}
+
+/* ─── Form card ──────────────────────────────────── */
+.mcz-card {
+  width: 100%;
+  max-width: 420px;
+  animation: cardFadeIn 0.6s ease 0.1s both;
+}
+
+@keyframes cardFadeIn {
+  from { opacity: 0; transform: translateY(16px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.mcz-card-header {
+  margin-bottom: 2rem;
+}
+
+.mcz-card-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 1.9rem;
+  font-weight: 700;
+  color: var(--white);
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 0.5rem;
+}
+
+.mcz-card-sub {
+  font-size: 0.875rem;
+  color: var(--fog);
+  font-weight: 300;
+}
+
+/* ─── Form fields ────────────────────────────────── */
+.mcz-field {
+  margin-bottom: 1.1rem;
+  animation: fieldSlide 0.5s ease both;
+}
+
+.mcz-field:nth-child(1) { animation-delay: 0.2s; }
+.mcz-field:nth-child(2) { animation-delay: 0.3s; }
+
+@keyframes fieldSlide {
+  from { opacity: 0; transform: translateX(-8px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.mcz-label {
+  display: block;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--fog);
+  margin-bottom: 0.6rem;
+  font-family: 'DM Sans', sans-serif;
+}
+
+.mcz-input-wrap {
+  position: relative;
+}
+
+.mcz-input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  color: var(--muted);
+  pointer-events: none;
+  transition: color 0.2s;
+  flex-shrink: 0;
+}
+
+.mcz-input {
+  width: 100%;
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem 0.85rem 2.75rem;
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.9rem;
+  color: var(--white);
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s, background 0.2s;
+  -webkit-appearance: none;
+}
+
+.mcz-input::placeholder {
+  color: var(--muted);
+  font-weight: 300;
+}
+
+.mcz-input:focus {
+  border-color: var(--amber);
+  box-shadow: 0 0 0 3px var(--amber-glow), inset 0 0 0 1px var(--amber);
+  background: var(--surface);
+}
+
+.mcz-input:focus + .mcz-input-icon,
+.mcz-input-wrap:focus-within .mcz-input-icon {
+  color: var(--amber);
+}
+
+/* Password input has padding on right for toggle */
+.mcz-input.has-toggle {
+  padding-right: 3rem;
+}
+
+.mcz-toggle {
+  position: absolute;
+  right: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  transition: color 0.2s;
+}
+.mcz-toggle:hover { color: var(--amber); }
+.mcz-toggle svg { width: 1rem; height: 1rem; }
+
+/* ─── Login button ───────────────────────────────── */
+.mcz-btn-primary {
+  width: 100%;
+  margin-top: 0.5rem;
+  padding: 0.95rem;
+  background: var(--amber);
+  color: var(--void);
+  font-family: 'Syne', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  position: relative;
+  overflow: hidden;
+  transition: background 0.2s, transform 0.15s, box-shadow 0.2s;
+  animation: fieldSlide 0.5s ease 0.4s both;
+}
+
+.mcz-btn-primary::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 60%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+  transition: left 0.4s ease;
+}
+
+.mcz-btn-primary:not(:disabled):hover {
+  background: #FFc820;
+  box-shadow: 0 0 24px rgba(255,190,0,0.35);
+  transform: translateY(-1px);
+}
+.mcz-btn-primary:not(:disabled):hover::after { left: 140%; }
+.mcz-btn-primary:not(:disabled):active { transform: translateY(0) scale(0.99); }
+.mcz-btn-primary:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.mcz-btn-spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+/* ─── Divider ────────────────────────────────────── */
+.mcz-divider {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 1.1rem 0;
+}
+
+.mcz-divider::before,
+.mcz-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+.mcz-divider span {
+  font-size: 0.7rem;
+  color: var(--fog);
+  white-space: nowrap;
+  font-weight: 300;
+}
+
+/* ─── Register button ────────────────────────────── */
+.mcz-btn-secondary {
+  width: 100%;
+  padding: 0.85rem;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: var(--fog);
+  font-family: 'DM Sans', sans-serif;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s, background 0.2s;
+}
+
+.mcz-btn-secondary:hover {
+  border-color: rgba(255,190,0,0.3);
+  color: var(--amber);
+  background: var(--amber-soft);
+}
+
+/* ─── Back navigation strip ──────────────────────── */
+.mcz-back-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 1.5rem;
+  padding-top: 1.25rem;
+  border-top: 1px solid var(--border);
+}
+
+.mcz-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.35rem 0.65rem 0.35rem 0.5rem;
+  border-radius: 6px;
+  font-family: 'DM Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 400;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--fog);
+  transition: color 0.22s, background 0.22s, gap 0.22s;
+  margin: 0;
+}
+
+.mcz-back-arrow {
+  display: inline-block;
+  transition: transform 0.22s ease;
+  line-height: 1;
+}
+
+.mcz-back:hover {
+  color: var(--amber);
+  background: var(--amber-soft);
+  gap: 0.75rem;
+}
+
+.mcz-back:hover .mcz-back-arrow {
+  transform: translateX(-3px);
+}
+
+.mcz-back-brand {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* ─── Registration: onboarding steps ────────────── */
+.mcz-steps {
+  margin: 2rem 0 2.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  flex: 1;
+}
+
+.mcz-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 1.1rem;
+  opacity: 0;
+  animation: stepReveal 0.5s ease both;
+}
+.mcz-step:nth-child(1) { animation-delay: 0.5s; }
+.mcz-step:nth-child(3) { animation-delay: 0.75s; }
+.mcz-step:nth-child(5) { animation-delay: 1.0s; }
+
+@keyframes stepReveal {
+  from { opacity: 0; transform: translateX(-12px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+.mcz-step-left {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.mcz-step-num {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: 1.5px solid var(--amber);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: 'Syne', sans-serif;
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: var(--amber);
+  flex-shrink: 0;
+  background: var(--amber-soft);
+}
+
+.mcz-step-connector {
+  width: 1.5px;
+  height: 32px;
+  background: linear-gradient(to bottom, var(--amber), transparent);
+  margin: 4px auto;
+  opacity: 0.3;
+}
+
+.mcz-step-body {
+  padding-top: 6px;
+  padding-bottom: 1.5rem;
+}
+
+.mcz-step-title {
+  font-family: 'Syne', sans-serif;
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--white);
+  margin-bottom: 0.2rem;
+  letter-spacing: -0.01em;
+}
+
+.mcz-step-desc {
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: var(--fog);
+  line-height: 1.5;
+}
+
+/* Step divider (the connector line between steps) */
+.mcz-step-sep {
+  display: flex;
+  padding-left: calc(36px / 2 - 0.75px);
+  margin-bottom: 0;
+}
+
+/* Registration form has more fields — allow scroll on small screens */
+.mcz-login.mcz-register .mcz-right {
+  align-items: flex-start;
+  padding-top: 3rem;
+  padding-bottom: 3rem;
+}
+
+@media (max-height: 720px) {
+  .mcz-login.mcz-register .mcz-right {
+    align-items: flex-start;
+  }
+}
+
+/* ─── Responsive ─────────────────────────────────── */
+@media (max-width: 860px) {
+  .mcz-login { flex-direction: column; }
+  .mcz-left {
+    width: 100%;
+    min-width: unset;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    padding: 2rem;
+  }
+  .mcz-route { display: none; }
+  .mcz-brand { margin-top: 1.5rem; }
+  .mcz-tagline { font-size: 2rem; }
+}

@@ -67,6 +67,7 @@ export const ENDPOINTS = {
   CONTADOR_NOTIFICACIONES:     `${API_BASE_URL}/notificaciones/contador`,
   MARCAR_TODAS_LEIDAS:         `${API_BASE_URL}/notificaciones/leer-todas`,
   MARCAR_NOTIFICACION_LEIDA:   (id) => `${API_BASE_URL}/notificaciones/${id}/leida`,
+  ELIMINAR_TODAS_NOTIFICACIONES: `${API_BASE_URL}/notificaciones`,
 
   // Facturas
   GENERAR_FACTURA:  (id) => `${API_BASE_URL}/generarFactura/${id}`,

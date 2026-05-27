@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LockClosedIcon, EnvelopeIcon, PhoneIcon, UserIcon, EyeIcon, EyeSlashIcon } from '@heroicons/react/24/solid';
-import { FaCar, FaUser } from 'react-icons/fa';
+import {
+  LockClosedIcon, EnvelopeIcon, PhoneIcon,
+  UserIcon, EyeIcon, EyeSlashIcon,
+} from '@heroicons/react/24/solid';
+import { FaCar } from 'react-icons/fa';
 
 import { registrarApi }  from '../../services/api';
 import { extractUserId } from '../../utils';
 import { useToast }      from '../../hooks/useToast';
 import ToastNotification from '../../components/ui/ToastNotification';
 import GoogleAuthButton  from '../../components/ui/GoogleAuthButton';
+
+import './Login.css';   // shared design-system
 
 const ROL = 'usuario';
 
@@ -33,8 +38,44 @@ const parseRegisterError = (error) => {
   return errData?.message || 'Error al registrar usuario.';
 };
 
-// ── Component ─────────────────────────────────────────────────────────────────
+/* ── Steps visual for left panel ─────────────────────── */
+const OnboardingSteps = () => (
+  <div className="mcz-steps">
+    <div className="mcz-step">
+      <div className="mcz-step-left">
+        <div className="mcz-step-num">01</div>
+        <div className="mcz-step-connector" />
+      </div>
+      <div className="mcz-step-body">
+        <p className="mcz-step-title">Crea tu cuenta</p>
+        <p className="mcz-step-desc">Llena tus datos básicos en menos de 2 minutos, sin complicaciones.</p>
+      </div>
+    </div>
 
+    <div className="mcz-step">
+      <div className="mcz-step-left">
+        <div className="mcz-step-num">02</div>
+        <div className="mcz-step-connector" />
+      </div>
+      <div className="mcz-step-body">
+        <p className="mcz-step-title">Elige tu destino</p>
+        <p className="mcz-step-desc">Busca viajes disponibles cerca de ti en tiempo real.</p>
+      </div>
+    </div>
+
+    <div className="mcz-step">
+      <div className="mcz-step-left">
+        <div className="mcz-step-num">03</div>
+      </div>
+      <div className="mcz-step-body">
+        <p className="mcz-step-title">Viaja seguro</p>
+        <p className="mcz-step-desc">Conéctate con conductores verificados y llega a tu destino.</p>
+      </div>
+    </div>
+  </div>
+);
+
+/* ── Main component ───────────────────────────────────── */
 const Registrar = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPass,  setShowPass]  = useState(false);
@@ -73,143 +114,193 @@ const Registrar = () => {
     }
   };
 
-  const inputClass = "w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all";
-  const labelClass = "block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1.5";
-
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-950 via-blue-900 to-violet-900 px-4 py-8 relative overflow-hidden">
+    <div className="mcz-login mcz-register">
+      <ToastNotification
+        isVisible={toast.visible}
+        message={toast.message}
+        type={toast.type}
+        onClose={hideToast}
+      />
 
-      {/* Decoración */}
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-violet-700/20 rounded-full blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-32 w-96 h-96 bg-blue-500/15 rounded-full blur-3xl pointer-events-none" />
+      {/* ── Left brand panel ── */}
+      <div className="mcz-left">
 
-      <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
-
-      <div className="w-full max-w-md animate-scale-in">
-        <div className="bg-white rounded-2xl shadow-2xl shadow-violet-900/40 overflow-hidden">
-
-          {/* Header */}
-          <div className="bg-gradient-to-r from-blue-800 to-violet-700 px-8 py-7 text-center relative overflow-hidden">
-            <div className="absolute -top-10 -right-10 w-36 h-36 bg-white/5 rounded-full" />
-            <div className="absolute -bottom-8 -left-8 w-28 h-28 bg-white/5 rounded-full" />
-            <div className="relative">
-              <div className="w-14 h-14 bg-white/15 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                <FaCar className="text-white text-2xl" />
-              </div>
-              <h1 className="text-2xl font-extrabold text-white">Crear cuenta</h1>
-              <p className="text-blue-200 text-sm mt-1">
-                Empieza a viajar con <span className="font-bold text-white">Mecaza</span>
-              </p>
-            </div>
-          </div>
-
-          {/* Formulario */}
-          <div className="px-8 py-7">
-            <form onSubmit={handleRegister} className="space-y-4">
-
-              {/* Nombre */}
-              <div>
-                <label className={labelClass}>Nombre completo</label>
-                <div className="relative">
-                  <UserIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input name="Nombre" type="text" placeholder="Tu nombre completo" required className={inputClass} />
-                </div>
-              </div>
-
-              {/* Correo */}
-              <div>
-                <label className={labelClass}>Correo electrónico</label>
-                <div className="relative">
-                  <EnvelopeIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input name="Correo" type="email" placeholder="tu@correo.com" required className={inputClass} />
-                </div>
-              </div>
-
-              {/* Teléfono */}
-              <div>
-                <label className={labelClass}>Número de teléfono</label>
-                <div className="relative">
-                  <PhoneIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input name="Telefono" type="text" placeholder="+57 300 000 0000" required className={inputClass} />
-                </div>
-              </div>
-
-              {/* Contraseña */}
-              <div>
-                <label className={labelClass}>Contraseña</label>
-                <div className="relative">
-                  <LockClosedIcon className="absolute left-3 top-2.5 h-5 w-5 text-violet-400" />
-                  <input
-                    name="Contrasena"
-                    type={showPass ? 'text' : 'password'}
-                    placeholder="••••••••"
-                    required
-                    minLength={3}
-                    className="w-full pl-10 pr-10 py-2.5 border border-gray-200 rounded-xl text-gray-800 text-sm placeholder:text-gray-300 focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent transition-all"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPass((p) => !p)}
-                    className="absolute right-3 top-2.5 text-gray-400 hover:text-violet-500 transition-colors"
-                  >
-                    {showPass ? <EyeSlashIcon className="w-4 h-4" /> : <EyeIcon className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Botón registrar */}
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-3 bg-gradient-to-r from-blue-700 to-violet-600 text-white font-bold rounded-xl shadow-md hover:shadow-violet-300/50 hover:shadow-lg transition-all duration-200 hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 mt-1"
-              >
-                {isLoading ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/>
-                    </svg>
-                    Registrando...
-                  </span>
-                ) : 'Crear cuenta'}
-              </button>
-
-              {/* Separador Google */}
-              <div className="relative">
-                <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-gray-100" />
-                </div>
-                <div className="relative flex justify-center">
-                  <span className="bg-white px-3 text-xs text-gray-400">o regístrate con</span>
-                </div>
-              </div>
-
-              {/* Botón Google */}
-              <GoogleAuthButton
-                label="Registrarse con Google"
-                onSuccess={(userData) => {
-                  showToast('¡Cuenta creada con Google!', 'success');
-                  setTimeout(() => navigate('/indexLogin', { replace: true }), 1200);
-                }}
-                onError={(msg) => showToast(msg, 'error')}
-              />
-
-              <button
-                type="button"
-                onClick={() => navigate('/login')}
-                className="w-full py-2.5 bg-gray-50 border border-gray-200 text-gray-600 font-semibold rounded-xl hover:bg-violet-50 hover:border-violet-200 hover:text-violet-700 transition-all duration-200 text-sm active:scale-95"
-              >
-                Ya tengo cuenta
-              </button>
-            </form>
-          </div>
+        <div className="mcz-logo">
+          <div className="mcz-logo-icon"><FaCar /></div>
+          <span className="mcz-logo-name">Mecaza</span>
         </div>
 
-        <p className="text-center text-blue-300 text-sm mt-4">
-          <button onClick={() => navigate('/')} className="hover:text-white transition-colors underline underline-offset-2">
-            ← Volver al inicio
+        <div className="mcz-brand">
+          <span className="mcz-eyebrow">Tu primer viaje</span>
+          <h1 className="mcz-tagline">
+            Únete y<br />
+            <em>muévete.</em>
+          </h1>
+          <p className="mcz-desc">
+            Crea tu cuenta en segundos y empieza a compartir viajes seguros, económicos y accesibles.
+          </p>
+        </div>
+
+        {/* Onboarding steps instead of route */}
+        <OnboardingSteps />
+
+        {/* Stats */}
+        <div className="mcz-stats">
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">10K+</span>
+            <span className="mcz-stat-lbl">Viajes</span>
+          </div>
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">500+</span>
+            <span className="mcz-stat-lbl">Conductores</span>
+          </div>
+          <div className="mcz-stat">
+            <span className="mcz-stat-num">4.9★</span>
+            <span className="mcz-stat-lbl">Puntuación</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Right form panel ── */}
+      <div className="mcz-right">
+        <div className="mcz-card">
+
+          <div className="mcz-card-header">
+            <h2 className="mcz-card-title">Crear cuenta</h2>
+            <p className="mcz-card-sub">Tu primer viaje empieza aquí</p>
+          </div>
+
+          <form onSubmit={handleRegister} noValidate>
+
+            {/* Nombre */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="reg-nombre">Nombre completo</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="reg-nombre"
+                  name="Nombre"
+                  type="text"
+                  placeholder="Tu nombre completo"
+                  autoComplete="name"
+                  required
+                  className="mcz-input"
+                />
+                <UserIcon className="mcz-input-icon" />
+              </div>
+            </div>
+
+            {/* Correo */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="reg-correo">Correo electrónico</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="reg-correo"
+                  name="Correo"
+                  type="email"
+                  placeholder="tu@correo.com"
+                  autoComplete="email"
+                  required
+                  className="mcz-input"
+                />
+                <EnvelopeIcon className="mcz-input-icon" />
+              </div>
+            </div>
+
+            {/* Teléfono */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="reg-tel">Número de teléfono</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="reg-tel"
+                  name="Telefono"
+                  type="tel"
+                  placeholder="+57 300 000 0000"
+                  autoComplete="tel"
+                  required
+                  className="mcz-input"
+                />
+                <PhoneIcon className="mcz-input-icon" />
+              </div>
+            </div>
+
+            {/* Contraseña */}
+            <div className="mcz-field">
+              <label className="mcz-label" htmlFor="reg-pass">Contraseña</label>
+              <div className="mcz-input-wrap">
+                <input
+                  id="reg-pass"
+                  name="Contrasena"
+                  type={showPass ? 'text' : 'password'}
+                  placeholder="••••••••••"
+                  autoComplete="new-password"
+                  required
+                  minLength={3}
+                  className="mcz-input has-toggle"
+                />
+                <LockClosedIcon className="mcz-input-icon" />
+                <button
+                  type="button"
+                  className="mcz-toggle"
+                  onClick={() => setShowPass(p => !p)}
+                  aria-label={showPass ? 'Ocultar contraseña' : 'Mostrar contraseña'}
+                >
+                  {showPass ? <EyeSlashIcon /> : <EyeIcon />}
+                </button>
+              </div>
+            </div>
+
+            {/* Submit */}
+            <button
+              type="submit"
+              className="mcz-btn-primary"
+              disabled={isLoading}
+            >
+              {isLoading ? (
+                <span className="mcz-btn-spinner">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none"
+                    style={{animation:'spin 0.8s linear infinite'}}>
+                    <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="3" strokeOpacity="0.25"/>
+                    <path d="M12 2a10 10 0 0 1 10 10" stroke="currentColor" strokeWidth="3" strokeLinecap="round"/>
+                  </svg>
+                  Creando cuenta…
+                </span>
+              ) : 'Crear cuenta →'}
+            </button>
+          </form>
+
+          {/* Google */}
+          <div className="mcz-divider"><span>o regístrate con</span></div>
+
+          <GoogleAuthButton
+            label="Registrarse con Google"
+            onSuccess={() => {
+              showToast('¡Cuenta creada con Google!', 'success');
+              setTimeout(() => navigate('/indexLogin', { replace: true }), 1200);
+            }}
+            onError={(msg) => showToast(msg, 'error')}
+          />
+
+          {/* Login link */}
+          <div className="mcz-divider"><span>¿Ya tienes cuenta?</span></div>
+
+          <button
+            type="button"
+            className="mcz-btn-secondary"
+            onClick={() => navigate('/login')}
+          >
+            Iniciar sesión
           </button>
-        </p>
+
+          <div className="mcz-back-strip">
+            <button className="mcz-back" onClick={() => navigate('/')}>
+              <span className="mcz-back-arrow">←</span>
+              Volver al inicio
+            </button>
+            <span className="mcz-back-brand">Mecaza</span>
+          </div>
+        </div>
       </div>
     </div>
   );

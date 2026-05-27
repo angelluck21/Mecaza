@@ -1,5 +1,5 @@
 import React from 'react';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import GlobalRatingCheck from './components/GlobalRatingCheck';
 
 // Auth
@@ -7,19 +7,17 @@ import Login    from './features/auth/Login';
 import Registrar from './features/auth/Registrar';
 
 // Usuario
-import IndexLogin   from './features/usuario/IndexLogin';
-import MisReservas  from './features/usuario/MisReservas';
-import MisFacturas  from './features/usuario/MisFacturas';
-import VerPerfil    from './features/usuario/VerPerfil';
-import AjustesPerfil from './features/usuario/AjustesPerfil';
+import MisReservas       from './features/usuario/MisReservas';
+import MisFacturas       from './features/usuario/MisFacturas';
+import MisNotificaciones from './features/usuario/MisNotificaciones';
+import VerPerfil         from './features/usuario/VerPerfil';
+import AjustesPerfil     from './features/usuario/AjustesPerfil';
 
 // Conductor
-import Conductor              from './features/conductor/Conductor';
-import ConductorNotificaciones from './features/conductor/ConductorNotificaciones';
+import Conductor from './features/conductor/Conductor';
 
 // Admin
-import IndexAdmin    from './features/admin/indexAdmin';
-import ListaUsuarios from './features/admin/ListaUsuarios';
+import IndexAdmin from './features/admin/indexAdmin';
 
 // Pages
 import Home             from './pages/Home';
@@ -40,9 +38,10 @@ function App() {
         <Route path="/registrar-conductor" element={<RegConductor />} />
 
         {/* Usuario autenticado */}
-        <Route path="/indexLogin"  element={<IndexLogin />} />
-        <Route path="/mis-reservas" element={<MisReservas />} />
-        <Route path="/mis-facturas" element={<MisFacturas />} />
+        <Route path="/indexLogin"       element={<Navigate to="/" replace />} />
+        <Route path="/mis-reservas"     element={<MisReservas />} />
+        <Route path="/mis-facturas"     element={<MisFacturas />} />
+        <Route path="/notificaciones"   element={<MisNotificaciones />} />
         <Route path="/ver-perfil"           element={<VerPerfil />} />
         <Route path="/ver-perfil/:userId"   element={<VerPerfil />} />
         <Route path="/ajustes-perfil" element={<AjustesPerfil />} />
@@ -54,12 +53,10 @@ function App() {
         <Route path="/conductor-perfil/:conductorId"   element={<PerfilConductor />} />
 
         {/* Conductor */}
-        <Route path="/conductor"               element={<Conductor />} />
-        <Route path="/conductor-notificaciones" element={<ConductorNotificaciones />} />
+        <Route path="/conductor" element={<Conductor />} />
 
         {/* Admin */}
-        <Route path="/indexAdmin"     element={<IndexAdmin />} />
-        <Route path="/lista-usuarios" element={<ListaUsuarios />} />
+        <Route path="/indexAdmin" element={<IndexAdmin />} />
       </Routes>
     </BrowserRouter>
   );

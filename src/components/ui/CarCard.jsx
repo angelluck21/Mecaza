@@ -1,129 +1,126 @@
 import React from 'react';
 import { FaMapMarkerAlt, FaClock, FaCalendarAlt, FaChair } from 'react-icons/fa';
 import CarImage from './CarImage';
-import { getCarImageUrl, getEstadoInfo, formatFecha } from '../../utils';
+import { getCarImageUrl, formatFecha } from '../../utils';
+
+/* Estado → badge class */
+const BADGE_CLASS = {
+  1: 'badge-green',
+  2: 'badge-amber',
+  3: 'badge-orange',
+  4: 'badge-red',
+  5: 'badge-gray',
+};
+
+const BADGE_LABEL = {
+  1: 'Disponible',
+  2: 'En viaje',
+  3: 'Mantenimiento',
+  4: 'Fuera de servicio',
+  5: 'Terminado',
+};
 
 const CarCard = ({ car, onVerDetalles, userData }) => {
-  const estadoInfo       = getEstadoInfo(car.estado || car.Estado || car.id_estados || car.id_estado);
+  const estadoId     = parseInt(car.id_estados ?? car.estado ?? car.Estado ?? 0);
+  const badgeClass   = BADGE_CLASS[estadoId]  || 'badge-gray';
+  const badgeLabel   = BADGE_LABEL[estadoId]  || 'Desconocido';
+  const enViaje      = estadoId === 2;
+
   const asientosDisp     = car.asientos_disponibles ?? car.asientos;
   const asientosOcupados = (car.asientos || 0) - asientosDisp;
   const hayOcupados      = car.asientos_disponibles !== undefined && asientosOcupados > 0;
   const sinAsientos      = asientosDisp === 0;
-  const enViaje          = parseInt(car.id_estados ?? car.estado ?? car.Estado ?? 0) === 2;
+
+  /* Seats color class */
+  const seatsClass    = sinAsientos ? 'none' : hayOcupados ? 'mid' : 'ok';
+  const pct           = car.asientos ? ((asientosOcupados / car.asientos) * 100) : 0;
+
+  /* Ruta text */
+  const rutaText = car.precioviaje
+    ? `${car.precioviaje.origen} → ${car.precioviaje.destino}`
+    : 'Ruta no especificada';
 
   return (
-    <div className="group relative bg-white rounded-2xl shadow-md hover:shadow-xl hover:shadow-violet-200/50 overflow-hidden flex flex-col transition-all duration-300 hover:-translate-y-1">
+    <div className="car-card">
+      {/* Amber top line */}
+      <div className="car-card-topline" />
 
-      {/* Borde gradiente superior */}
-      <div className="h-1 w-full bg-gradient-to-r from-blue-600 via-violet-500 to-purple-600 transition-all duration-300 group-hover:h-1.5" />
-
-      {/* Imagen */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-blue-50 to-violet-50 h-44">
+      {/* Image */}
+      <div className="car-card-img">
         <CarImage
           imageUrl={getCarImageUrl(car.imagencarro)}
           conductorName={car.conductor}
           className="w-full h-full object-cover"
           fallbackClassName="w-full h-full flex items-center justify-center"
         />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+        <div className="car-card-img-overlay" />
 
-        {/* Badge estado */}
-        <div className="absolute top-3 right-3">
-          <span className={`px-2.5 py-1 rounded-full text-xs font-semibold shadow-sm ${estadoInfo.color}`}>
-            {estadoInfo.label}
-          </span>
-        </div>
+        {/* Estado badge */}
+        <span className={`car-card-badge ${badgeClass}`}>{badgeLabel}</span>
 
-        {/* Badge sin asientos */}
-        {sinAsientos && (
-          <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-            <span className="text-white font-bold text-lg tracking-wide">COMPLETO</span>
-          </div>
-        )}
+        {/* Sin asientos */}
+        {sinAsientos && <div className="car-card-full">COMPLETO</div>}
       </div>
 
-      {/* Contenido */}
-      <div className="p-4 flex flex-col flex-1">
+      {/* Body */}
+      <div className="car-card-body">
+        <h3 className="car-card-driver">{car.conductor || 'Conductor'}</h3>
+        <span className="car-card-plate">{car.placa || '—'}</span>
 
-        {/* Conductor */}
-        <h3 className="text-blue-900 font-bold text-base mb-3 group-hover:text-violet-800 transition-colors duration-200 truncate">
-          {car.conductor || 'Conductor'}
-        </h3>
-
-        {/* Info */}
-        <div className="space-y-1.5 text-sm text-gray-600 flex-1">
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono bg-gray-100 text-gray-700 px-2 py-0.5 rounded font-semibold tracking-wider">
-              {car.placa || '—'}
+        <div className="car-card-info">
+          <div className="car-card-row">
+            <FaMapMarkerAlt className="car-icon" />
+            <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {rutaText}
             </span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <FaMapMarkerAlt className="text-violet-500 shrink-0 text-xs" />
-            <span className="truncate">
-              {car.precioviaje
-                ? `${car.precioviaje.origen} → ${car.precioviaje.destino}`
-                : 'Ruta no especificada'}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <FaClock className="text-violet-500 shrink-0 text-xs" />
+          <div className="car-card-row">
+            <FaClock className="car-icon" />
             <span>{car.horasalida || 'Hora no especificada'}</span>
           </div>
-
-          <div className="flex items-center gap-2">
-            <FaCalendarAlt className="text-violet-500 shrink-0 text-xs" />
+          <div className="car-card-row">
+            <FaCalendarAlt className="car-icon" />
             <span>{formatFecha(car.fecha)}</span>
           </div>
 
           {/* Asientos */}
-          <div className="flex items-center gap-2 pt-1">
-            <FaChair className="text-violet-500 shrink-0 text-xs" />
-            <div className="flex items-center gap-1.5 flex-wrap">
-              <span className={`font-semibold ${sinAsientos ? 'text-red-600' : hayOcupados ? 'text-orange-600' : 'text-green-700'}`}>
-                {asientosDisp}
-              </span>
-              <span className="text-gray-400 text-xs">de {car.asientos || '—'} asientos</span>
+          <div className="car-card-seats">
+            <div className="car-card-seats-row">
+              <FaChair className="car-icon" style={{ color: 'var(--amber)', fontSize: '0.7rem' }} />
+              <span className={`car-seats-num ${seatsClass}`}>{asientosDisp}</span>
+              <span className="car-card-seats-label">de {car.asientos || '—'} asientos</span>
               {hayOcupados && !sinAsientos && (
-                <span className="text-xs bg-orange-100 text-orange-700 px-2 py-0.5 rounded-full font-medium">
+                <span className="car-seats-tag">
                   {asientosOcupados} ocupado{asientosOcupados !== 1 ? 's' : ''}
                 </span>
               )}
             </div>
-          </div>
-
-          {/* Barra de ocupación */}
-          <div className="w-full bg-gray-100 rounded-full h-1.5 overflow-hidden mt-1">
-            <div
-              className={`h-full rounded-full transition-all duration-500 ${
-                sinAsientos ? 'bg-red-500' : hayOcupados ? 'bg-orange-400' : 'bg-green-500'
-              }`}
-              style={{ width: `${car.asientos ? ((asientosOcupados / car.asientos) * 100) : 0}%` }}
-            />
+            <div className="car-card-progress">
+              <div
+                className={`car-card-progress-fill ${seatsClass}`}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
           </div>
         </div>
 
-        {/* Botón */}
-        {enViaje ? (
-          <div className="mt-4 w-full py-2.5 px-4 rounded-xl font-semibold text-sm text-center bg-yellow-50 text-yellow-600 border border-yellow-200 flex items-center justify-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-yellow-400 animate-pulse" />
-            En viaje
-          </div>
-        ) : (
-          <button
-            onClick={() => onVerDetalles(car.id_carros)}
-            disabled={sinAsientos}
-            className={`mt-4 w-full py-2.5 px-4 rounded-xl font-semibold text-sm transition-all duration-200 active:scale-95 ${
-              sinAsientos
-                ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                : 'bg-gradient-to-r from-blue-700 to-violet-600 text-white hover:from-blue-800 hover:to-violet-700 shadow-md hover:shadow-violet-300/50 hover:shadow-lg hover:scale-[1.02]'
-            }`}
-          >
-            {sinAsientos ? 'Sin lugares disponibles' : userData ? 'Reservar Viaje' : 'Ver Detalles'}
-          </button>
-        )}
+        {/* Action */}
+        <div className="car-card-action">
+          {enViaje ? (
+            <div className="car-card-btn in-trip">
+              <span className="trip-dot" />
+              En viaje
+            </div>
+          ) : (
+            <button
+              className={`car-card-btn ${sinAsientos ? 'disabled' : 'primary'}`}
+              disabled={sinAsientos}
+              onClick={() => !sinAsientos && onVerDetalles(car.id_carros)}
+            >
+              {sinAsientos ? 'Sin lugares disponibles' : userData ? 'Reservar viaje →' : 'Ver detalles →'}
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

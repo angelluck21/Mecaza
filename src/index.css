@@ -87,6 +87,6 @@
 /* ── Scrollbar personalizada ──────────────────────────────────────────────── */
 
 ::-webkit-scrollbar       { width: 6px; }
-::-webkit-scrollbar-track { background: #1e1b4b; }
-::-webkit-scrollbar-thumb { background: #7c3aed; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #6d28d9; }
+::-webkit-scrollbar-track { background: #0E1422; }
+::-webkit-scrollbar-thumb { background: #FFBE00; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ffc820; }

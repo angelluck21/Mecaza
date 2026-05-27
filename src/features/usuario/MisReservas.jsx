@@ -8,10 +8,11 @@ import {
 
 import PageBg            from '../../components/ui/PageBg';
 import InnerNavbar       from '../../components/layout/InnerNavbar';
+import Footer            from '../../components/layout/Footer';
 import LoadingScreen     from '../../components/ui/LoadingScreen';
 import CarImage          from '../../components/ui/CarImage';
 import ToastNotification from '../../components/ui/ToastNotification';
-import Pagination        from '../../components/ui/Pagination';
+import DarkPagination   from '../../components/ui/DarkPagination';
 import { useToast }      from '../../hooks/useToast';
 import {
   misReservasUsuarioApi, historialUsuarioApi,
@@ -185,7 +186,7 @@ const MisReservas = () => {
   return (
     <PageBg>
       <ToastNotification isVisible={toast.visible} message={toast.message} type={toast.type} onClose={hideToast} />
-      <InnerNavbar userData={userData} title="Mis Reservas" />
+      <InnerNavbar title="Mis Reservas" />
 
       <div className="max-w-4xl mx-auto w-full px-4 sm:px-6 py-8">
 
@@ -480,13 +481,13 @@ const MisReservas = () => {
               })}
             </div>
             )}
-            <Pagination
+            <DarkPagination
               currentPage={pageHistorial}
               lastPage={lastPageHistorial}
               total={totalHistorial}
+              label="viajes"
               onPageChange={fetchHistorial}
               loading={loadingHistorial}
-              className="mt-4"
             />
           </div>
         )}
@@ -600,6 +601,7 @@ const MisReservas = () => {
           </div>
         </div>
       )}
+      <Footer />
     </PageBg>
   );
 };
